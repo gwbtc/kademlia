@@ -8,8 +8,8 @@ overlay for Urbit:
 - `sur/kademlia.hoon`: stable identity, routing, and lookup-state types.
 - `lib/kademlia.hoon`: identity conversion, XOR distance, bucket selection,
   bounded routing-table updates, and a pure iterative node-lookup state
-  machine. Buckets use most-recent-first lists with stored live and
-  replacement counts.
+  machine. Its routing table is an adaptive 128-bit prefix tree whose leaves
+  use most-recent-first lists with stored live and replacement counts.
 - `tests/lib/kademlia.hoon`: unit coverage for the core invariants.
 
 ## Discovery and data transport
@@ -46,6 +46,20 @@ IDs. Indirectly mentioned candidates remain local to the lookup and do not enter
 the routing table until they answer successfully. The lookup retains all valid
 discovered candidates so failed close peers can be replaced by farther ones,
 while its active frontier is always the closest `k` nonfailed candidates.
+
+## Routing buckets
+
+A routing table starts as one empty leaf created by `+empty-table`. Leaves
+partition the 128-bit node-ID space by most-significant-bit prefixes. When a
+newly verified contact reaches a full leaf whose range contains the local node,
+that leaf splits and its contacts are redistributed by the next prefix bit.
+Splitting repeats down the local node's branch when necessary.
+
+A full leaf outside the local node's range does not split. New verified contacts
+enter its bounded replacement roster and may be promoted after live contacts
+fail. Splits are permanent: underfull siblings are not merged. XOR distance is
+still used to order lookup candidates; the prefix tree only controls routing
+table capacity and coverage.
 
 ## Remote-scry constraint
 

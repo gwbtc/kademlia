@@ -23,7 +23,12 @@
   $:  live=roster                   ::  most-recently seen first
       replacements=roster           ::  most-recent candidate first
   ==
-+$  table  (map @ud bucket)        ::  XOR bit index -> bucket
++$  table
+  $+  table
+  $~  [%leaf [[0 ~] [0 ~]]]
+  $%  [%leaf buc=bucket]
+      [%fork zero=table one=table]
+  ==
 +$  config
   $:  k=@ud                        ::  live entries per bucket
       replacement-k=@ud            ::  backup entries per bucket

@@ -64,12 +64,49 @@
   ^-  (list contact)
   (scag n (sort contacts |=([a=contact b=contact] (nearer target a b))))
 ::
-::  get-bucket: retrieve a distance bucket, defaulting to two empty rosters.
+::  empty-table: construct the initial bucket covering the whole ID space.
+::
+++  empty-table
+  ^-  table
+  [%leaf [[0 ~] [0 ~]]]
+::
+::  node-bit: read one node-ID bit, most-significant bit first.
+::
+++  node-bit
+  |=  [depth=@ud id=node-id]
+  ^-  @ub
+  ?>  (lth depth 128)
+  (cut 0 [(sub 127 depth) 1] id)
+::
+::  get-bucket: retrieve the leaf bucket containing an ID.
 ::
 ++  get-bucket
-  |=  [idx=@ud tab=table]
+  |=  [id=node-id tab=table]
   ^-  bucket
-  (fall (~(get by tab) idx) [[0 ~] [0 ~]])
+  ?>  (valid-node id)
+  =/  depth=@ud  0
+  |-
+  ?-  -.tab
+    %leaf  buc.tab
+    %fork  ?:  =(0b0 (node-bit depth id))
+              $(tab zero.tab, depth +(depth))
+            $(tab one.tab, depth +(depth))
+  ==
+::
+::  bucket-depth: return the prefix length of the leaf containing an ID.
+::
+++  bucket-depth
+  |=  [id=node-id tab=table]
+  ^-  @ud
+  ?>  (valid-node id)
+  =/  depth=@ud  0
+  |-
+  ?-  -.tab
+    %leaf  depth
+    %fork  ?:  =(0b0 (node-bit depth id))
+              $(tab zero.tab, depth +(depth))
+            $(tab one.tab, depth +(depth))
+  ==
 ::
 ::  take: remove one contact by ID while preserving order and count.
 ::
@@ -188,106 +225,190 @@
       (rosters-disjoint live.buc replacements.buc)
   ==
 ::
-::  roster-in-bucket: verify every roster ID belongs at one distance index.
+::  roster-side: retain contacts matching one bit of an ID prefix.
 ::
-++  roster-in-bucket
-  |=  [self=node-id idx=@ud ros=roster]
+++  roster-side
+  |=  [depth=@ud side=@ub ros=roster]
+  ^-  roster
+  =/  selected=contacts
+    %+  skim  items.ros
+    |=  con=contact
+    =(side (node-bit depth id.con))
+  [(lent selected) selected]
+::
+::  fill-bucket: promote replacements into unused live capacity.
+::
+++  fill-bucket
+  |=  buc=bucket
+  ^-  bucket
+  =/  room=@ud
+    ?:  (gte count.live.buc k.cfg)  0
+    (sub k.cfg count.live.buc)
+  =/  promoted=contacts  (scag room items.replacements.buc)
+  =/  live=roster
+    %+  roll  promoted
+    |=  [con=contact out=_live.buc]
+    (push k.cfg con out)
+  =/  replacements=roster
+    :-  (sub count.replacements.buc (lent promoted))
+    (slag room items.replacements.buc)
+  [live replacements]
+::
+::  split-bucket: partition a bucket at one prefix bit and fill both children.
+::
+++  split-bucket
+  |=  [depth=@ud buc=bucket]
+  ^-  [zero=bucket one=bucket]
+  =/  zero=bucket
+    [(roster-side depth 0b0 live.buc) (roster-side depth 0b0 replacements.buc)]
+  =/  one=bucket
+    [(roster-side depth 0b1 live.buc) (roster-side depth 0b1 replacements.buc)]
+  [(fill-bucket zero) (fill-bucket one)]
+::
+::  prefix-match: test whether an ID begins with one compact prefix.
+::
+++  prefix-match
+  |=  [depth=@ud prefix=@ux id=node-id]
+  ^-  ?
+  ?:  =(0 depth)  &
+  =(prefix (rsh [0 (sub 128 depth)] id))
+::
+::  roster-in-range: verify that every roster contact belongs to one leaf.
+::
+++  roster-in-range
+  |=  [self=node-id depth=@ud prefix=@ux ros=roster]
   ^-  ?
   =/  remaining=contacts  items.ros
   |-
   ?~  remaining  &
-  =/  got=(unit @ud)  (bucket-index self id.i.remaining)
-  ?~  got  |
-  ?.  =(idx u.got)  |
+  =/  con=contact  i.remaining
+  ?:  =(self id.con)  |
+  ?.  (prefix-match depth prefix id.con)  |
   $(remaining t.remaining)
 ::
-::  table-valid: verify all routing-table and bucket invariants.
+::  table-valid: verify prefix topology and all bucket invariants.
 ::
-::    The local ID must be valid; map keys must be 128-bit distance indexes;
-::    every bucket must be valid; and every contact must occur in the bucket
-::    selected by its XOR distance from .self.  This also excludes .self.
+::    Forks may occur only down the range containing .self.  Leaves may be at
+::    most 128 bits deep, and every contact must match its leaf prefix.
 ::
 ++  table-valid
   |=  [self=node-id tab=table]
   ^-  ?
   ?.  (valid-node self)  |
-  =/  entries=(list [@ud bucket])  ~(tap by tab)
+  =/  depth=@ud  0
+  =/  prefix=@ux  0x0
+  =/  owns-self=?  &
   |-
-  ?~  entries  &
-  =/  [idx=@ud buc=bucket]  i.entries
-  ?.  (lte idx 127)  |
-  ?.  (bucket-valid buc)  |
-  ?.  (roster-in-bucket self idx live.buc)  |
-  ?.  (roster-in-bucket self idx replacements.buc)  |
-  $(entries t.entries)
+  ?-  -.tab
+    %leaf
+      ?&  (bucket-valid buc.tab)
+          (roster-in-range self depth prefix live.buc.tab)
+          (roster-in-range self depth prefix replacements.buc.tab)
+      ==
+    %fork
+      ?.  ?&(owns-self (lth depth 128))  |
+      =/  self-side=@ub  (node-bit depth self)
+      ?:  =(0b0 self-side)
+        ?.  ?=([%leaf *] one.tab)  |
+        ?&  $(tab zero.tab, depth +(depth), prefix (mul 2 prefix), owns-self &)
+            $(tab one.tab, depth +(depth), prefix (add 1 (mul 2 prefix)), owns-self |)
+        ==
+      ?.  ?=([%leaf *] zero.tab)  |
+      ?&  $(tab zero.tab, depth +(depth), prefix (mul 2 prefix), owns-self |)
+          $(tab one.tab, depth +(depth), prefix (add 1 (mul 2 prefix)), owns-self &)
+      ==
+  ==
 ::
 ::  record-success: record a successful direct interaction with a node.
 ::
-::    Resets failures, sets the observation time, and moves an existing live
-::    contact to the front.  A new or replacement contact enters the live
-::    roster when room exists; otherwise it enters the bounded replacement
-::    roster.  The local node itself is ignored because it has no bucket.
+::    A full leaf on the local node's prefix path is split and retried.  Full
+::    leaves outside that path retain new contacts in their replacement cache.
 ::
 ++  record-success
   |=  [self=node-id id=node-id now=@da tab=table]
   ^-  table
+  ?>  (valid-node self)
   ?>  (valid-node id)
+  ?:  =(self id)  tab
   =/  con=contact  [id now 0]
-  =/  idx=(unit @ud)  (bucket-index self id)
-  ?~  idx  tab
-  =/  buc=bucket  (get-bucket u.idx tab)
-  =/  live=roster  live.buc
-  =/  replacements=roster  replacements.buc
-  =^  old-live  live  (take id live)
-  =^  old-replacement  replacements  (take id replacements)
-  ?:  |(?=(^ old-live) (lth count.live k.cfg))
-    =.  live  (push k.cfg con live)
-    (~(put by tab) u.idx [live replacements])
-  =.  replacements  (push replacement-k.cfg con replacements)
-  (~(put by tab) u.idx [live replacements])
+  =/  depth=@ud  0
+  =/  owns-self=?  &
+  |-
+  ?-  -.tab
+    %fork
+      =/  side=@ub  (node-bit depth id)
+      =/  self-side=@ub  (node-bit depth self)
+      =/  child-owns=?  &(owns-self =(side self-side))
+      ?:  =(0b0 side)
+        =/  child=table
+          $(tab zero.tab, depth +(depth), owns-self child-owns)
+        tab(zero child)
+      =/  child=table
+        $(tab one.tab, depth +(depth), owns-self child-owns)
+      tab(one child)
+    %leaf
+      =/  live=roster  live.buc.tab
+      =/  replacements=roster  replacements.buc.tab
+      =^  old-live  live  (take id live)
+      =^  old-replacement  replacements  (take id replacements)
+      ?:  ?=(^ old-live)
+        [%leaf [(push k.cfg con live) replacements]]
+      ?:  (lth count.live k.cfg)
+        [%leaf [(push k.cfg con live) replacements]]
+      ?:  ?&(owns-self !=(0 k.cfg) (lth depth 128))
+        =/  children=[zero=bucket one=bucket]
+          (split-bucket depth [live replacements])
+        $(tab [%fork [%leaf zero.children] [%leaf one.children]])
+      [%leaf [live (push replacement-k.cfg con replacements)]]
+  ==
 ::
 ::  record-failure: count a failed request to a live routing contact.
 ::
-::    Contacts below .max-fails remain live with an incremented counter.  A
-::    contact reaching the threshold is evicted, and the highest-priority
-::    replacement is promoted when available.  Unknown and local IDs leave
-::    the table unchanged.
+::    Eviction and replacement promotion affect only the contact's leaf.  The
+::    prefix tree is never merged after removals.
 ::
 ++  record-failure
   |=  [self=node-id id=node-id max-fails=@ud tab=table]
   ^-  table
+  ?>  (valid-node self)
   ?>  (valid-node id)
-  =/  idx=(unit @ud)  (bucket-index self id)
-  ?~  idx  tab
-  =/  buc=bucket  (get-bucket u.idx tab)
-  =/  live=roster  live.buc
-  =/  replacements=roster  replacements.buc
-  =^  old-live  live  (take id live)
-  ?~  old-live  tab
-  =/  failed=contact  u.old-live(fails +(fails.u.old-live))
-  ?:  (lth fails.failed max-fails)
-    =.  live  (push k.cfg failed live)
-    (~(put by tab) u.idx [live replacements])
-  =/  repl-items=contacts  items.replacements
-  ?~  repl-items
-    (~(put by tab) u.idx [live replacements])
-  =/  promoted=contact  i.repl-items
-  =.  replacements
-    [(dec count.replacements) t.repl-items]
-  =.  live  (push k.cfg promoted live)
-  (~(put by tab) u.idx [live replacements])
+  ?:  =(self id)  tab
+  =/  depth=@ud  0
+  |-
+  ?-  -.tab
+    %fork
+      ?:  =(0b0 (node-bit depth id))
+        =/  child=table  $(tab zero.tab, depth +(depth))
+        tab(zero child)
+      =/  child=table  $(tab one.tab, depth +(depth))
+      tab(one child)
+    %leaf
+      =/  live=roster  live.buc.tab
+      =/  replacements=roster  replacements.buc.tab
+      =^  old-live  live  (take id live)
+      ?~  old-live  tab
+      =/  failed=contact  u.old-live(fails +(fails.u.old-live))
+      ?:  (lth fails.failed max-fails)
+        [%leaf [(push k.cfg failed live) replacements]]
+      =/  repl-items=contacts  items.replacements
+      ?~  repl-items  [%leaf [live replacements]]
+      =/  promoted=contact  i.repl-items
+      =.  replacements  [(dec count.replacements) t.repl-items]
+      [%leaf [(push k.cfg promoted live) replacements]]
+  ==
 ::
 ::  contacts: collect every live contact in the routing table.
 ::
 ::    Replacement contacts are intentionally excluded.  Ordering is only
-::    meaningful within each individual bucket.
+::    meaningful within each individual leaf bucket.
 ::
 ++  contacts
   |=  tab=table
   ^-  (list contact)
-  %+  roll  ~(tap by tab)
-  |=  [[idx=@ud buc=bucket] out=(list contact)]
-  (weld items.live.buc out)
+  ?-  -.tab
+    %leaf  items.live.buc.tab
+    %fork  (weld (contacts zero.tab) (contacts one.tab))
+  ==
 ::
 ::  candidate-nearer: compare lookup candidate IDs by XOR distance.
 ::

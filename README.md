@@ -10,22 +10,53 @@ overlay for Urbit:
   bounded routing-table updates, and a pure iterative node-lookup state
   machine. Its routing table is an adaptive 128-bit prefix tree whose leaves
   use most-recent-first lists with stored live and replacement counts.
+- `sur/content-routing.hoon` and `lib/content-routing.hoon`: a separate pure
+  layer for signed mutable pointers, content-provider announcements, and
+  content verification without coupling Kademlia to an application data type.
 - `tests/lib/kademlia.hoon`: unit coverage for the core invariants.
+- `tests/lib/content-routing.hoon`: unit coverage for content-routing records,
+  validation, revision conflicts, and provider selection.
 
 ## Discovery and data transport
 
 Kademlia discovery and data retrieval are separate protocols. Iterative node
-lookup and value-location lookup use ordinary Ames messages. When a lookup
-finds published data, its discovery result carries the publisher's exact
-`$spar:ames`: `[ship path]`. The path includes the actual Gall revision in
-`/g/x/<revision>/...`; callers must not assume or synthesize that revision.
+lookup and value-location lookup use ordinary Ames messages. A value lookup
+returns signed content-routing records rather than application data. Those
+records provide either explicit retrieval locators or a digest used for a
+second provider lookup.
 
-The exact `$spar` can then be used for a remote scry. The fetched noun is
-publisher-owned application data and remains opaque to Kademlia: the overlay
-does not define its mold, revision scheme, expiry policy, or interpretation.
-The ordinary Ames discovery message protocol and its `$spar` result will be
-defined with the Gall agent, where message correlation and authentication also
-belong.
+An exact `$spar:ames` is one supported locator. Its path includes the actual
+Gall revision in `/g/x/<revision>/...`; callers must not assume or synthesize
+that revision. HTTP and application-defined custom locators are also supported.
+The ordinary Ames discovery protocol will be defined with the Gall agent, where
+message correlation and network authentication belong.
+
+## Content routing
+
+Content routing is layered above the generic node lookup.  A mutable application
+name derives a 128-bit pointer key from its namespace, publisher node ID, and an
+opaque name noun.  A valid signed pointer selects either a `%direct` list of
+retrieval locators or a `%content` digest whose current providers must be found
+under a second derived Kademlia key:
+
+```text
+stable name -> signed pointer -> direct locator -> fetch
+stable name -> signed pointer -> digest -> provider lookup -> locator -> fetch
+```
+
+A content digest is SHA-256 of `jam` over the complete `(cask)`, so both its mark
+and noun are committed.  After retrieval, `+verify-cask` checks the result
+without interpreting application data.  Locators may be exact remote-scry
+`$spar:ames` values, HTTP URLs, or application-defined `%custom` addresses.
+Routing records never embed content themselves.
+
+Pointers have monotonically increasing revisions and optional expiry.  Provider
+announcements have revisions and mandatory expiry.  Signature checking is
+supplied to the pure library as a gate; access to Urbit identity keys remains an
+agent responsibility.  Different signed bodies from one identity at the same
+greatest revision are treated as equivocation.  A pointer conflict fails the
+selection, while a conflicting provider is excluded without hiding other valid
+providers.
 
 The library implements the pure part of an iterative node lookup. `+start-lookup`
 seeds a lookup from the routing table. Each call to `+dispatch` marks up to the

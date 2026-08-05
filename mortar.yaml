@@ -1,0 +1,24 @@
+output: dist
+
+local kademlia:
+  path: ./desk
+  priority: 100
+
+github base-dev:
+  repo: urbit/urbit
+  branch: master
+  revision: 0a9a312e133891937de9c4df1ebecad5cf669c7c
+  root: pkg/base-dev
+  include:
+    - lib/dbug.hoon
+    - lib/default-agent.hoon
+    - lib/skeleton.hoon
+    - lib/verb.hoon
+    - mar/bill.hoon
+    - mar/hoon.hoon
+    - mar/kelvin.hoon
+    - mar/mime.hoon
+    - mar/noun.hoon
+    - mar/txt.hoon
+    - sur/verb.hoon
+  priority: 10

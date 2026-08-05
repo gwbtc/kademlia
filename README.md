@@ -13,6 +13,9 @@ overlay for Urbit:
 - `sur/content-routing.hoon` and `lib/content-routing.hoon`: a separate pure
   layer for signed mutable pointers, content-provider announcements, and
   content verification without coupling Kademlia to an application data type.
+- `app/kademlia.hoon`: a headless Gall agent that runs iterative `FIND_NODE`
+  lookups over ordinary Ames pokes, with its pure transitions in
+  `lib/kademlia-agent-logic.hoon`.
 - `tests/lib/kademlia.hoon`: unit coverage for the core invariants.
 - `tests/lib/content-routing.hoon`: unit coverage for content-routing records,
   validation, revision conflicts, and provider selection.
@@ -78,6 +81,29 @@ the routing table until they answer successfully. The lookup retains all valid
 discovered candidates so failed close peers can be replaced by farther ones,
 while its active frontier is always the closest `k` nonfailed candidates.
 
+## Peer-discovery agent
+
+The `%kademlia` agent implements the first ordinary-Ames protocol milestone.
+Peers exchange typed `%kademlia-message` pokes containing versioned
+`%find-node` requests and `%nodes` responses.  Each outbound peer request has a
+unique request ID, a ten-second Behn timer, and an expected sender identity.
+Poke nacks and timers apply the same routing failure policy; late, duplicate,
+unsolicited, and wrong-sender responses are ignored.
+
+Local `%kademlia-command` pokes can replace bootstrap ships, start a caller-ID'd
+lookup, and forget a completed result.  Commands are accepted only from the
+local ship.  Read-only diagnostics are available through `/summary`, `/table`,
+`/seeds`, and `/lookup/<id>` Gall scries using the `%noun` output mark.  For
+example:
+
+```hoon
+.^(* %gx /=kademlia=/summary/noun)
+.^(* %gx /=kademlia=/lookup/0v1/noun)
+```
+
+The agent currently implements peer discovery only.  Pointer and provider
+record transport, publication, and signing remain separate future milestones.
+
 ## Routing buckets
 
 A routing table starts as one empty leaf created by `+empty-table`. Leaves
@@ -112,3 +138,16 @@ overlay.
 `contact.id` is the canonical contact identity. Contacts do not also store a
 ship, since that would duplicate information and permit inconsistent pairs.
 Decode the node ID with `+node-to-ship` when addressing an Ames peer.
+
+## Building the desk
+
+Install [Mortar](https://github.com/tinnus-napbus/mortar), then assemble the
+complete desk from the local sources and pinned `%base-dev` dependencies:
+
+```sh
+mortar build
+```
+
+The assembled desk is written to `dist/`.  Dependency revisions are pinned in
+`mortar.yaml`; update the pin deliberately rather than building against a
+moving Urbit branch.

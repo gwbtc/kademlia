@@ -1,0 +1,110 @@
+::  Minimal ordinary-Ames Kademlia peer-discovery agent.
+::
+/-  *kademlia-agent
+/+  logic=kademlia-agent-logic, default-agent, dbug, verb
+|%
++$  card  card:agent:gall
+--
+::
+%+  verb  |
+%-  agent:dbug
+=|  state=state-0
+^-  agent:gall
+|_  =bowl:gall
++*  this  .
+    def   ~(. (default-agent this %|) bowl)
+::
+++  on-init
+  ^-  (quip card _this)
+  =.  state  ~(init logic [our.bowl now.bowl src.bowl state])
+  `this
+::
+++  on-save  !>(state)
+::
+++  on-load
+  |=  old=vase
+  ^-  (quip card _this)
+  =/  saved=versioned-state  !<(versioned-state old)
+  ?-  -.saved
+    %0  `this(state saved)
+  ==
+::
+++  on-poke
+  |=  [=mark =vase]
+  ^-  (quip card _this)
+  ?+    mark  (on-poke:def mark vase)
+      %kademlia-command
+    ?>  =(src.bowl our.bowl)
+    =/  command=command  !<(command vase)
+    ?-  -.command
+      %set-seeds
+        =.  state  (~(set-seeds logic [our.bowl now.bowl src.bowl state]) ships.command)
+        `this
+      %find
+        =^  cards  state
+          (~(start logic [our.bowl now.bowl src.bowl state]) id.command target.command)
+        [cards this]
+      %forget
+        =.  state  (~(forget logic [our.bowl now.bowl src.bowl state]) id.command)
+        `this
+    ==
+  ::
+      %kademlia-message
+    =/  message=peer-message  !<(peer-message vase)
+    ?.  =(%kademlia-v1 version.message)  `this
+    ?-    -.message
+        %find-node
+      =^  cards  state
+        (~(receive-find-node logic [our.bowl now.bowl src.bowl state]) id.message target.message)
+      [cards this]
+    ::
+        %nodes
+      =^  cards  state
+        (~(receive-nodes logic [our.bowl now.bowl src.bowl state]) id.message contacts.message)
+      [cards this]
+    ==
+  ==
+::
+++  on-peek
+  |=  =path
+  ^-  (unit (unit cage))
+  =/  engine  [our.bowl now.bowl src.bowl state]
+  ?+    path  (on-peek:def path)
+      [%x %summary ~]   ``noun+!>(~(get-summary logic engine))
+      [%x %table ~]     ``noun+!>(routing.state)
+      [%x %seeds ~]     ``noun+!>(~(seed-list logic engine))
+      [%x %lookup @ ~]
+    =/  parsed=(unit @uv)  (slaw %uv i.t.t.path)
+    ?~  parsed  ~
+    =/  view=(unit lookup-view)  (~(get-lookup logic engine) u.parsed)
+    ?~  view  ~
+    ``noun+!>(u.view)
+  ==
+::
+++  on-agent
+  |=  [=wire =sign:agent:gall]
+  ^-  (quip card _this)
+  ?.  ?=([%request @ ~] wire)  (on-agent:def wire sign)
+  ?.  ?=(%poke-ack -.sign)  (on-agent:def wire sign)
+  ?~  p.sign  `this
+  =/  request=(unit @uv)  (slaw %uv i.t.wire)
+  ?~  request  `this
+  =^  cards  state
+    (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request)
+  [cards this]
+::
+++  on-arvo
+  |=  [=wire =sign-arvo]
+  ^-  (quip card _this)
+  ?.  ?=([%timeout @ ~] wire)  (on-arvo:def wire sign-arvo)
+  ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
+  =/  request=(unit @uv)  (slaw %uv i.t.wire)
+  ?~  request  `this
+  =^  cards  state
+    (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request)
+  [cards this]
+::
+++  on-watch  on-watch:def
+++  on-leave  on-leave:def
+++  on-fail   on-fail:def
+--

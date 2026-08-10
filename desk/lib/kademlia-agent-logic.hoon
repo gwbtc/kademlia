@@ -4,7 +4,7 @@
 /+  kad=kademlia
 =/  cfg=config  [20 20 3 12 %kademlia-urbit-v1]
 =/  protocol=protocol-version  %kademlia-v1
-=/  request-timeout=@dr  ~s10
+=/  request-timeout=@dr  ~m5
 =/  max-fails=@ud  3
 |_  $:  our=@p
         now=@da

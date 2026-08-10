@@ -1,0 +1,35 @@
+output: dist-pill
+
+local kademlia:
+  path: ./desk
+  include:
+    - app
+    - desk.bill
+    - lib
+    - mar
+    - sur
+    - sys.kelvin
+  exclude:
+    - lib/test.hoon
+  priority: 100
+
+github base-dev:
+  repo: urbit/urbit
+  branch: master
+  revision: 8d66536e607d4ee2d0bbb51860c5c629a906095c
+  root: pkg/base-dev
+  include:
+    - lib/azimuth.hoon
+    - lib/dbug.hoon
+    - lib/default-agent.hoon
+    - lib/ethereum.hoon
+    - lib/skeleton.hoon
+    - lib/verb.hoon
+    - mar/bill.hoon
+    - mar/hoon.hoon
+    - mar/kelvin.hoon
+    - mar/mime.hoon
+    - mar/noun.hoon
+    - mar/txt.hoon
+    - sur/verb.hoon
+  priority: 10

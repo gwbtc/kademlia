@@ -16,6 +16,7 @@
 ::
 ++  on-init
   ^-  (quip card _this)
+  ~&  [%kademlia our.bowl %init]
   =.  state  ~(init logic [our.bowl now.bowl src.bowl state])
   `this
 ::
@@ -24,6 +25,7 @@
 ++  on-load
   |=  old=vase
   ^-  (quip card _this)
+  ~&  [%kademlia our.bowl %load]
   =/  saved=versioned-state  !<(versioned-state old)
   ?-  -.saved
     %0  `this(state saved)
@@ -38,29 +40,38 @@
     =/  command=command  !<(command vase)
     ?-  -.command
       %set-seeds
+        ~&  [%kademlia our.bowl %set-seeds ships.command]
         =.  state  (~(set-seeds logic [our.bowl now.bowl src.bowl state]) ships.command)
         `this
       %find
+        ~&  [%kademlia our.bowl %find id.command target.command]
         =^  cards  state
           (~(start logic [our.bowl now.bowl src.bowl state]) id.command target.command)
+        ~&  [%kademlia our.bowl %dispatch id.command ~(tap by pending.state)]
         [cards this]
       %forget
+        ~&  [%kademlia our.bowl %forget id.command]
         =.  state  (~(forget logic [our.bowl now.bowl src.bowl state]) id.command)
         `this
     ==
   ::
       %kademlia-message
     =/  message=peer-message  !<(peer-message vase)
-    ?.  =(%kademlia-v1 version.message)  `this
+    ?.  =(%kademlia-v1 version.message)
+      ~&  [%kademlia our.bowl %ignore-version src.bowl version.message]
+      `this
     ?-    -.message
         %find-node
+      ~&  [%kademlia our.bowl now.bowl %find-node src.bowl id.message target.message]
       =^  cards  state
         (~(receive-find-node logic [our.bowl now.bowl src.bowl state]) id.message target.message)
       [cards this]
     ::
         %nodes
+      ~&  [%kademlia our.bowl now.bowl %nodes src.bowl id.message contacts.message]
       =^  cards  state
         (~(receive-nodes logic [our.bowl now.bowl src.bowl state]) id.message contacts.message)
+      ~&  [%kademlia our.bowl %advance id.message ~(tap by pending.state)]
       [cards this]
     ==
   ==
@@ -70,9 +81,11 @@
   ^-  (unit (unit cage))
   =/  engine  [our.bowl now.bowl src.bowl state]
   ?+    path  (on-peek:def path)
+      [%x ~]            [~ ~]
       [%x %summary ~]   ``noun+!>(~(get-summary logic engine))
       [%x %table ~]     ``noun+!>(routing.state)
       [%x %seeds ~]     ``noun+!>(~(seed-list logic engine))
+      [%x %lookup ~]    [~ ~]
       [%x %lookup @ ~]
     =/  parsed=(unit @uv)  (slaw %uv i.t.t.path)
     ?~  parsed  ~
@@ -89,8 +102,10 @@
   ?~  p.sign  `this
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
+  ~&  [%kademlia our.bowl %poke-failed u.request]
   =^  cards  state
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request)
+  ~&  [%kademlia our.bowl %advance-after-failure u.request ~(tap by pending.state)]
   [cards this]
 ::
 ++  on-arvo
@@ -100,8 +115,10 @@
   ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
+  ~&  [%kademlia our.bowl now.bowl %timeout u.request]
   =^  cards  state
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request)
+  ~&  [%kademlia our.bowl %advance-after-timeout u.request ~(tap by pending.state)]
   [cards this]
 ::
 ++  on-watch  on-watch:def

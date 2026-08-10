@@ -65,6 +65,20 @@
     !>(contacts.result.view)
   ==
 ::
+++  test-lookup-prefix-scry
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
+  =/  initialized  on-init:~(. agent bol)
+  =/  peek=(unit (unit cage))  (on-peek:+.initialized /x/lookup)
+  %+  expect-eq  !>(`(unit (unit cage))`[~ ~])
+  !>(peek)
+::
+++  test-root-prefix-scry
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
+  =/  initialized  on-init:~(. agent bol)
+  =/  peek=(unit (unit cage))  (on-peek:+.initialized /x)
+  %+  expect-eq  !>(`(unit (unit cage))`[~ ~])
+  !>(peek)
+::
 ++  test-peer-find-node
   =/  bol=bowl:gall  (bowl ~zod ~nec ~2026.8.4)
   =/  initialized  on-init:~(. agent bol)

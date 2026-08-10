@@ -151,3 +151,27 @@ mortar build
 The assembled desk is written to `dist/`.  Dependency revisions are pinned in
 `mortar.yaml`; update the pin deliberately rather than building against a
 moving Urbit branch.
+
+For Aqua, also assemble the runtime-only desk that will be installed in the
+virtual ships:
+
+```sh
+mortar build --config mortar-pill.yaml
+```
+
+Mount `dist/` as `%kademlia-mortar` on the host ship and `dist-pill/` as
+`%kademlia`.  Keeping the Aqua test harness out of `%kademlia` also keeps its
+`/sys/vane/ames` source out of the secondary desk used by `+pill/solid`.
+
+The `kademlia-network-test` Aqua thread is the end-to-end integration test.  It
+creates four virtual ships and verifies iterative discovery over the strict
+route `~bud -> ~dev -> ~marbud -> ~mardev`:
+
+```hoon
+:aqua &pill +pill/solid %base %kademlia
+-kademlia-mortar!kademlia-network-test
+```
+
+The Aqua pill includes the runtime `%kademlia` desk as a secondary desk.  The
+virtual ships therefore boot with the agent already installed; the thread does
+not modify `%base` or copy source files into the ships.

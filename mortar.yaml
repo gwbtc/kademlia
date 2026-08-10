@@ -7,12 +7,18 @@ local kademlia:
 github base-dev:
   repo: urbit/urbit
   branch: master
-  revision: 0a9a312e133891937de9c4df1ebecad5cf669c7c
+  revision: 8d66536e607d4ee2d0bbb51860c5c629a906095c
   root: pkg/base-dev
   include:
+    - lib/azimuth.hoon
     - lib/dbug.hoon
     - lib/default-agent.hoon
+    - lib/ethereum.hoon
+    - lib/ph/io.hoon
+    - lib/ph/util.hoon
     - lib/skeleton.hoon
+    - lib/strand.hoon
+    - lib/strandio.hoon
     - lib/verb.hoon
     - mar/bill.hoon
     - mar/hoon.hoon
@@ -20,5 +26,24 @@ github base-dev:
     - mar/mime.hoon
     - mar/noun.hoon
     - mar/txt.hoon
+    - sur/aquarium.hoon
+    - sur/spider.hoon
     - sur/verb.hoon
+  priority: 10
+
+github arvo:
+  repo: urbit/urbit
+  branch: master
+  revision: 8d66536e607d4ee2d0bbb51860c5c629a906095c
+  root: pkg/arvo
+  include:
+    - lib/aqua-azimuth.hoon
+    - lib/aqua-vane-thread.hoon
+    - lib/vere.hoon
+    - mar/aqua/effect.hoon
+    - sys/vane/ames.hoon
+    - ted/aqua/ames.hoon
+    - ted/aqua/behn.hoon
+    - ted/aqua/dill.hoon
+    - ted/aqua/eyre.hoon
   priority: 10

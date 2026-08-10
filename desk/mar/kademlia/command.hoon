@@ -1,11 +1,11 @@
 ::  Local control commands for the Kademlia agent.
 ::
 /-  *kademlia-agent
-|_  command=command
+|_  cmd=command
 ++  grad  %noun
 ++  grow
   |%
-  ++  noun  command
+  ++  noun  cmd
   --
 ++  grab
   |%

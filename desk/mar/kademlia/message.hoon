@@ -9,6 +9,6 @@
   --
 ++  grab
   |%
-  ++  noun  message
+  ++  noun  peer-message
   --
 --

@@ -4,24 +4,39 @@
 /+  kad=kademlia
 =/  cfg=config  [20 20 3 12 %kademlia-urbit-v1]
 =/  protocol=protocol-version  %kademlia-v1
-=/  request-timeout=@dr  ~m5
+=/  default-request-timeout=@dr  ~m5
 =/  max-fails=@ud  3
 |_  $:  our=@p
         now=@da
         src=@p
-        state=state-0
+        state=state-1
     ==
 ++  self-id
   ^-  node-id
   (~(ship-to-node kad cfg) our)
 ::
 ++  init
-  ^-  state-0
-  [%0 ~(empty-table kad cfg) ~ ~ ~ ~ 0v1]
+  ^-  state-1
+  [%1 ~(empty-table kad cfg) ~ ~ ~ ~ 0v1 [default-request-timeout]]
+::
+::  migrate: preserve version-zero lookup/routing state and add defaults.
+::
+++  migrate
+  |=  old=state-0
+  ^-  state-1
+  :*  %1
+      routing.old
+      seeds.old
+      active.old
+      pending.old
+      completed.old
+      next-request.old
+      [default-request-timeout]
+  ==
 ::
 ++  complete
   |=  [id=lookup-id lup=lookup]
-  ^-  state-0
+  ^-  state-1
   =/  result=(unit (list node-id))  (~(lookup-result kad cfg) lup)
   ?~  result  state
   =.  active.state  (~(del by active.state) id)
@@ -30,7 +45,7 @@
 ::
 ++  advance
   |=  [id=lookup-id lup=lookup]
-  ^-  [(list card:agent:gall) state-0]
+  ^-  [(list card:agent:gall) state-1]
   =/  dispatched=[peers=(list node-id) state=lookup]
     (~(dispatch kad cfg) lup)
   =.  lup  state.dispatched
@@ -43,7 +58,7 @@
   ?~  peers  [(flop cards) state]
   =/  peer=node-id  i.peers
   =/  request=request-id  next-request.state
-  =/  deadline=@da  (add request-timeout now)
+  =/  deadline=@da  (add request-timeout.settings.state now)
   =/  pending=pending-request  [id peer now deadline]
   =.  pending.state  (~(put by pending.state) request pending)
   =.  next-request.state  +(request)
@@ -59,38 +74,49 @@
   $(peers t.peers, cards [timer poke cards])
 ::
 ++  fail-request
-  |=  request=request-id
-  ^-  [(list card:agent:gall) state-0]
+  |=  [request=request-id cancel=?]
+  ^-  [(list card:agent:gall) state-1]
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
   ?~  pending  [~ state]
   =/  pen=pending-request  u.pending
   =.  pending.state  (~(del by pending.state) request)
+  =/  cancellation=(list card:agent:gall)
+    ?:  cancel
+      :~  [%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen]
+      ==
+    ~
   =/  active=(unit lookup)  (~(get by active.state) lookup.pen)
-  ?~  active  [~ state]
+  ?~  active  [cancellation state]
   =/  failed=[routing=table state=lookup]
     (~(timeout kad cfg) self-id peer.pen max-fails routing.state u.active)
   =.  routing.state  routing.failed
-  (advance lookup.pen state.failed)
+  =/  advanced=[(list card:agent:gall) state-1]
+    (advance lookup.pen state.failed)
+  [(weld cancellation -.advanced) +.advanced]
 ::
 ++  receive-nodes
   |=  [request=request-id ids=(list node-id)]
-  ^-  [(list card:agent:gall) state-0]
+  ^-  [(list card:agent:gall) state-1]
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
   ?~  pending  [~ state]
   =/  pen=pending-request  u.pending
   =/  sender=node-id  (~(ship-to-node kad cfg) src)
   ?.  =(sender peer.pen)  [~ state]
   =.  pending.state  (~(del by pending.state) request)
+  =/  cancellation=card:agent:gall
+    [%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen]
   =/  active=(unit lookup)  (~(get by active.state) lookup.pen)
-  ?~  active  [~ state]
+  ?~  active  [[cancellation ~] state]
   =/  received=[routing=table state=lookup]
     (~(receive kad cfg) self-id sender now (scag k.cfg ids) routing.state u.active)
   =.  routing.state  routing.received
-  (advance lookup.pen state.received)
+  =/  advanced=[(list card:agent:gall) state-1]
+    (advance lookup.pen state.received)
+  [[cancellation -.advanced] +.advanced]
 ::
 ++  receive-find-node
   |=  [request=request-id target=node-id]
-  ^-  [(list card:agent:gall) state-0]
+  ^-  [(list card:agent:gall) state-1]
   ?.  (~(valid-node kad cfg) target)  [~ state]
   =/  sender=node-id  (~(ship-to-node kad cfg) src)
   =.  routing.state  (~(record-success kad cfg) self-id sender now routing.state)
@@ -110,7 +136,7 @@
 ::
 ++  set-seeds
   |=  ships=(list @p)
-  ^-  state-0
+  ^-  state-1
   =/  ids=(set node-id)  ~
   =/  remaining=(list @p)  ships
   |-
@@ -119,9 +145,17 @@
   =?  ids  !=(id self-id)  (~(put in ids) id)
   $(remaining t.remaining)
 ::
+::  set-request-timeout: update the positive timeout used for new requests.
+::
+++  set-request-timeout
+  |=  duration=@dr
+  ^-  state-1
+  ?>  (gth duration 0)
+  state(request-timeout.settings duration)
+::
 ++  start
   |=  [id=lookup-id target=node-id]
-  ^-  [(list card:agent:gall) state-0]
+  ^-  [(list card:agent:gall) state-1]
   ?>  (~(valid-node kad cfg) target)
   ?>  !(~(has by active.state) id)
   ?>  !(~(has by completed.state) id)
@@ -131,7 +165,7 @@
 ::
 ++  forget
   |=  id=lookup-id
-  ^-  state-0
+  ^-  state-1
   ?>  !(~(has by active.state) id)
   state(completed (~(del by completed.state) id))
 ::

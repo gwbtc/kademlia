@@ -8,7 +8,7 @@
 ::
 %+  verb  |
 %-  agent:dbug
-=|  state=state-0
+=|  state=state-1
 ^-  agent:gall
 |_  =bowl:gall
 +*  this  .
@@ -28,7 +28,8 @@
   ~&  [%kademlia our.bowl %load]
   =/  saved=versioned-state  !<(versioned-state old)
   ?-  -.saved
-    %0  `this(state saved)
+    %0  `this(state (~(migrate logic [our.bowl now.bowl src.bowl state]) saved))
+    %1  `this(state saved)
   ==
 ::
 ++  on-poke
@@ -42,6 +43,11 @@
       %set-seeds
         ~&  [%kademlia our.bowl %set-seeds ships.command]
         =.  state  (~(set-seeds logic [our.bowl now.bowl src.bowl state]) ships.command)
+        `this
+      %set-request-timeout
+        ~&  [%kademlia our.bowl %set-request-timeout duration.command]
+        =.  state
+          (~(set-request-timeout logic [our.bowl now.bowl src.bowl state]) duration.command)
         `this
       %find
         ~&  [%kademlia our.bowl %find id.command target.command]
@@ -85,6 +91,7 @@
       [%x %summary ~]   ``noun+!>(~(get-summary logic engine))
       [%x %table ~]     ``noun+!>(routing.state)
       [%x %seeds ~]     ``noun+!>(~(seed-list logic engine))
+      [%x %settings ~]  ``noun+!>(settings.state)
       [%x %lookup ~]    [~ ~]
       [%x %lookup @ ~]
     =/  parsed=(unit @uv)  (slaw %uv i.t.t.path)
@@ -104,7 +111,7 @@
   ?~  request  `this
   ~&  [%kademlia our.bowl %poke-failed u.request]
   =^  cards  state
-    (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request)
+    (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request &)
   ~&  [%kademlia our.bowl %advance-after-failure u.request ~(tap by pending.state)]
   [cards this]
 ::
@@ -115,9 +122,10 @@
   ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
+  ?.  (~(has by pending.state) u.request)  `this
   ~&  [%kademlia our.bowl now.bowl %timeout u.request]
   =^  cards  state
-    (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request)
+    (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request |)
   ~&  [%kademlia our.bowl %advance-after-timeout u.request ~(tap by pending.state)]
   [cards this]
 ::

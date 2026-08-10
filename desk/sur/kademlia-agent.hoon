@@ -7,6 +7,7 @@
 +$  request-id        @uv
 +$  command
   $%  [%set-seeds ships=(list @p)]
+      [%set-request-timeout duration=@dr]
       [%find id=lookup-id target=node-id]
       [%forget id=lookup-id]
   ==
@@ -33,6 +34,8 @@
       pending=@ud
       completed=@ud
   ==
++$  settings
+  [request-timeout=@dr]
 +$  state-0
   $:  %0
       routing=table
@@ -42,7 +45,18 @@
       completed=(map lookup-id lookup-result)
       next-request=request-id
   ==
++$  state-1
+  $:  %1
+      routing=table
+      seeds=(set node-id)
+      active=(map lookup-id lookup)
+      pending=(map request-id pending-request)
+      completed=(map lookup-id lookup-result)
+      next-request=request-id
+      settings=settings
+  ==
 +$  versioned-state
   $%  state-0
+      state-1
   ==
 --

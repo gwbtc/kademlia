@@ -86,15 +86,16 @@ while its active frontier is always the closest `k` nonfailed candidates.
 The `%kademlia` agent implements the first ordinary-Ames protocol milestone.
 Peers exchange typed `%kademlia-message` pokes containing versioned
 `%find-node` requests and `%nodes` responses.  Each outbound peer request has a
-unique request ID, a ten-second Behn timer, and an expected sender identity.
-Poke nacks and timers apply the same routing failure policy; late, duplicate,
-unsolicited, and wrong-sender responses are ignored.
+unique request ID, a configurable Behn timeout (five minutes by default), and
+an expected sender identity. Successful responses and poke nacks cancel their
+timers; timeout wakes consume the timer normally. Late, duplicate, unsolicited,
+and wrong-sender responses are ignored.
 
-Local `%kademlia-command` pokes can replace bootstrap ships, start a caller-ID'd
-lookup, and forget a completed result.  Commands are accepted only from the
-local ship.  Read-only diagnostics are available through `/summary`, `/table`,
-`/seeds`, and `/lookup/<id>` Gall scries using the `%noun` output mark.  For
-example:
+Local `%kademlia-command` pokes can replace bootstrap ships, set the request
+timeout with `%set-request-timeout`, start a caller-ID'd lookup, and forget a
+completed result. Commands are accepted only from the local ship. Read-only
+diagnostics are available through `/summary`, `/settings`, `/table`, `/seeds`,
+and `/lookup/<id>` Gall scries using the `%noun` output mark. For example:
 
 ```hoon
 .^(* %gx /=kademlia=/summary/noun)

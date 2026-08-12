@@ -1,7 +1,7 @@
 # Kademlia for Urbit
 
-This desk contains the first, deliberately pure layer of a Kademlia-style
-overlay for Urbit:
+This desk contains a Kademlia-style overlay for Urbit, including pure routing
+libraries and two headless Gall agents:
 
 - `lib/feistel.hoon`: the supplied Feistel permutation over the complete
   128-bit Ames ship-ID and Kademlia node-ID domain.
@@ -13,12 +13,19 @@ overlay for Urbit:
 - `sur/content-routing.hoon` and `lib/content-routing.hoon`: a separate pure
   layer for signed mutable pointers, content-provider announcements, and
   content verification without coupling Kademlia to an application data type.
+- `sur/content-routing-agent.hoon`, `lib/content-routing-agent-logic.hoon`, and
+  `app/content-routing.hoon`: the ordinary-Ames record transport, leased replica
+  store, publication/query state machine, Jael-backed signatures, and Gall
+  interface layered over node lookup.
 - `app/kademlia.hoon`: a headless Gall agent that runs iterative `FIND_NODE`
   lookups over ordinary Ames pokes, with its pure transitions in
   `lib/kademlia-agent-logic.hoon`.
 - `tests/lib/kademlia.hoon`: unit coverage for the core invariants.
 - `tests/lib/content-routing.hoon`: unit coverage for content-routing records,
   validation, revision conflicts, and provider selection.
+- `tests/lib/content-routing-agent-logic.hoon` and
+  `tests/app/content-routing.hoon`: transport storage, operation, refresh,
+  concurrency, callback, and Gall-interface coverage.
 
 ## Discovery and data transport
 
@@ -31,8 +38,8 @@ second provider lookup.
 An exact `$spar:ames` is one supported locator. Its path includes the actual
 Gall revision in `/g/x/<revision>/...`; callers must not assume or synthesize
 that revision. HTTP and application-defined custom locators are also supported.
-The ordinary Ames discovery protocol will be defined with the Gall agent, where
-message correlation and network authentication belong.
+The `%content-routing` agent transports those records over ordinary Ames pokes;
+remote scry remains one possible final retrieval mechanism, not a requirement.
 
 ## Content routing
 
@@ -93,7 +100,9 @@ and wrong-sender responses are ignored.
 
 Local `%kademlia-command` pokes can replace bootstrap ships, set the request
 timeout with `%set-request-timeout`, start a caller-ID'd lookup, and forget a
-completed result. Commands are accepted only from the local ship. Read-only
+completed result. `%find-for` is the internal callback form: it allocates a
+lookup ID and pokes a typed `%kademlia-result` notice to the requesting local
+agent when lookup completes. Commands are accepted only from the local ship. Read-only
 diagnostics are available through `/summary`, `/settings`, `/table`, `/seeds`,
 and `/lookup/<id>` Gall scries using the `%noun` output mark. For example:
 
@@ -102,8 +111,29 @@ and `/lookup/<id>` Gall scries using the `%noun` output mark. For example:
 .^(* %gx /=kademlia=/lookup/0v1/noun)
 ```
 
-The agent currently implements peer discovery only.  Pointer and provider
-record transport, publication, and signing remain separate future milestones.
+## Content-record transport agent
+
+The separate `%content-routing` agent keeps Kademlia itself agnostic about
+application data. Local `%content-routing-command` pokes publish signed pointer
+or provider records, start pointer/provider queries, forget completed operation
+results, or update transport limits. The agent asks `%kademlia` for the closest
+nodes through its callback API, then sends versioned `%content-routing-message`
+store/query RPCs to at most three peers concurrently. Each RPC has a five-minute
+Behn timeout. Publication completes only after every selected replica has been
+accounted for as accepted, rejected, or timed out.
+
+Unsigned local publication bodies are completed with the local 128-bit node ID
+and signed using the ship's current Jael Ames key. Receiving replicas resolve
+the signer's node ID back to a ship, obtain the public key for the stated life
+from Jael, and verify the domain-separated record digest. Replica leases last
+24 hours; locally originated records are republished every 12 hours. Defaults
+also limit records to 64 KiB, provider identities to 64 per content key, and
+the replica store to 10,000 keys with deterministic earliest-expiry eviction.
+
+Operation results are exposed at `/operation/<id>`. Stored records can be read
+at `/records/<key>`, pointer records at `/pointer/<key>`, and provider records at
+`/providers/<digest>`, all under the agent's `%gx` namespace with `%noun` output.
+The transport returns records and locators only—it does not fetch final content.
 
 ## Routing buckets
 
@@ -123,9 +153,10 @@ table capacity and coverage.
 
 Remote scry is read-only. Gall `+on-peek` is a pure namespace lookup and cannot
 mutate the publisher's state or learn the requester's identity. It therefore
-serves only as the final read after ordinary Ames discovery has supplied an
-exact locator. Kademlia's remote `STORE` RPC would require a separate write
-transport and is intentionally outside this design.
+serves only as a possible final read after ordinary Ames discovery has supplied
+an exact locator. Kademlia record `STORE` and `FIND_RECORDS` are ordinary Ames
+messages handled by `%content-routing`; HTTP and custom retrieval locators work
+the same way at the routing layer.
 
 ## Identity domain
 
@@ -164,9 +195,10 @@ Mount `dist/` as `%kademlia-mortar` on the host ship and `dist-pill/` as
 `%kademlia`.  Keeping the Aqua test harness out of `%kademlia` also keeps its
 `/sys/vane/ames` source out of the secondary desk used by `+pill/solid`.
 
-The `kademlia-network-test` Aqua thread is the end-to-end integration test.  It
-creates four virtual ships and verifies iterative discovery over the strict
-route `~bud -> ~dev -> ~marbud -> ~mardev`:
+The `kademlia-network-test` Aqua thread is the end-to-end integration test. It
+creates four virtual ships, verifies iterative discovery over the strict route
+`~bud -> ~dev -> ~marbud -> ~mardev`, publishes a signed provider record from
+`~mardev`, and resolves that record from `~bud` through the content transport:
 
 ```hoon
 :aqua &pill +pill/solid %base %kademlia

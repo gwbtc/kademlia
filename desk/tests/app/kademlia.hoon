@@ -15,7 +15,7 @@
 ++  test-init
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
   =/  out  on-init:~(. agent bol)
-  =/  saved=state-1  !<(state-1 on-save:+.out)
+  =/  saved=state-2  !<(state-2 on-save:+.out)
   ;:  weld
     %+  expect-eq  !>(2)
     !>((lent -.out))
@@ -30,7 +30,7 @@
   =/  old=state-0
     [%0 ~(empty-table kad [20 20 3 12 %kademlia-urbit-v1]) ~ ~ ~ ~ 0v42]
   =/  out  (on-load:~(. agent bol) !>(old))
-  =/  saved=state-1  !<(state-1 on-save:+.out)
+  =/  saved=state-2  !<(state-2 on-save:+.out)
   ;:  weld
     %+  expect-eq  !>(0v42)
     !>(next-request.saved)
@@ -38,12 +38,30 @@
     !>(request-timeout.settings.saved)
   ==
 ::
+++  test-state-one-migration
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
+  =/  old=state-1
+    :*  %1
+        ~(empty-table kad [20 20 3 12 %kademlia-urbit-v1])
+        ~  ~  ~  ~  0v42  [~s45]
+    ==
+  =/  out  (on-load:~(. agent bol) !>(old))
+  =/  saved=state-2  !<(state-2 on-save:+.out)
+  ;:  weld
+    %+  expect-eq  !>(0v42)
+    !>(next-request.saved)
+    %+  expect-eq  !>(~s45)
+    !>(request-timeout.settings.saved)
+    %+  expect-eq  !>(0v1)
+    !>(next-lookup.saved)
+  ==
+::
 ++  test-local-timeout-command-and-scry
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
   =/  initialized  on-init:~(. agent bol)
   =/  command=command  [%set-request-timeout ~m1]
   =/  out  (on-poke:+.initialized %kademlia-command !>(command))
-  =/  saved=state-1  !<(state-1 on-save:+.out)
+  =/  saved=state-2  !<(state-2 on-save:+.out)
   =/  peek=(unit (unit cage))  (on-peek:+.out /x/settings)
   =/  result=cage  (need (need peek))
   =/  got=settings  !<(settings q.result)
@@ -59,7 +77,7 @@
   =/  initialized  on-init:~(. agent bol)
   =/  command=command  [%set-seeds [~nec ~nec ~zod ~]]
   =/  out  (on-poke:+.initialized %kademlia-command !>(command))
-  =/  saved=state-1  !<(state-1 on-save:+.out)
+  =/  saved=state-2  !<(state-2 on-save:+.out)
   =/  peek=(unit (unit cage))  (on-peek:+.out /x/seeds)
   =/  result=cage  (need (need peek))
   =/  seeds=(list node-id)  !<((list node-id) q.result)
@@ -115,7 +133,7 @@
   =/  initialized  on-init:~(. agent bol)
   =/  message=peer-message  [%find-node %kademlia-v1 0v7 0x1234]
   =/  out  (on-poke:+.initialized %kademlia-message !>(message))
-  =/  saved=state-1  !<(state-1 on-save:+.out)
+  =/  saved=state-2  !<(state-2 on-save:+.out)
   ;:  weld
     %+  expect-eq  !>(3)
     !>((lent -.out))
@@ -126,10 +144,10 @@
 ++  test-wrong-protocol-ignored
   =/  bol=bowl:gall  (bowl ~zod ~nec ~2026.8.4)
   =/  initialized  on-init:~(. agent bol)
-  =/  before=state-1  !<(state-1 on-save:+.initialized)
+  =/  before=state-2  !<(state-2 on-save:+.initialized)
   =/  message=peer-message  [%find-node %other 0v7 0x1234]
   =/  out  (on-poke:+.initialized %kademlia-message !>(message))
-  =/  after=state-1  !<(state-1 on-save:+.out)
+  =/  after=state-2  !<(state-2 on-save:+.out)
   ;:  weld
     %+  expect-eq  !>(2)
     !>((lent -.out))

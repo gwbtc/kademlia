@@ -25,7 +25,7 @@
       target=target
   ==
 +$  pointer
-  [body=pointer-body signature=*]
+  [body=pointer-body signature=record-signature]
 +$  pointers  (list pointer)
 +$  provider-body
   $:  content=digest
@@ -35,8 +35,10 @@
       locations=locators
   ==
 +$  provider
-  [body=provider-body signature=*]
+  [body=provider-body signature=record-signature]
 +$  providers  (list provider)
++$  record-signature
+  [life=@ud value=@ux]
 +$  verifier
   $-([signer=node-id message=digest signature=*] ?)
 +$  pointer-selection

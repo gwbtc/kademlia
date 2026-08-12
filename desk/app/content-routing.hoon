@@ -1,0 +1,263 @@
+::  Signed, leased content-record transport layered over %kademlia.
+::
+/-  *kademlia, *kademlia-agent, *content-routing, *content-routing-agent
+/+  logic=content-routing-agent-logic, kad=kademlia, cr=content-routing
+/+  default-agent, dbug, verb
+|%
++$  card  card:agent:gall
+--
+::
+%+  verb  |
+%-  agent:dbug
+=|  state=content-state-0
+=>  |%
+::
+++  sign-digest
+  |=  [=bowl:gall message=digest]
+  ^-  record-signature
+  =/  life=@ud
+    .^(@ud %j /(scot %p our.bowl)/life/(scot %da now.bowl)/(scot %p our.bowl))
+  =/  secret=ring
+    .^(ring %j /(scot %p our.bowl)/vein/(scot %da now.bowl)/(scot %ud life))
+  =/  cub  (nol:nu:crub:crypto secret)
+  [life (sigh:as:cub message)]
+::
+++  fake-public
+  |=  ship=@p
+  ^-  pass
+  =/  cub  (pit:nu:crub:crypto 512 ship)
+  pub:ex:cub
+::
+++  normalize-public
+  |=  raw=*
+  ^-  (unit [crypto-suite=@ud =pass])
+  ?@  raw  ~
+  ?.  =(~ -.raw)  ~
+  =/  value=*  +.raw
+  ?@  value  `[1 `pass`value]
+  ?.  ?&  ?=(@ -.value)
+          ?=(@ +.value)
+      ==
+    ~
+  `[`@ud`-.value `pass`+.value]
+::
+++  verify-record
+  |=  [=bowl:gall signer=node-id message=digest signature=*]
+  ^-  ?
+  =/  sig=record-signature  ;;(record-signature signature)
+  =/  ship=@p  (~(node-to-ship kad [20 20 3 12 %kademlia-urbit-v1]) signer)
+  =/  raw=*
+    .^  *
+      %j
+      /(scot %p our.bowl)/puby/(scot %da now.bowl)/(scot %p ship)/(scot %ud life.sig)
+    ==
+  =/  public=(unit [crypto-suite=@ud =pass])  (normalize-public raw)
+  =/  public=(unit [crypto-suite=@ud =pass])
+    ?^  public  public
+    =/  fake=?
+      .^(? %j /(scot %p our.bowl)/fake/(scot %da now.bowl))
+    ?.  ?&  fake
+            =(1 life.sig)
+        ==
+      ~
+    `[1 (fake-public ship)]
+  ?~  public
+    ~&  [%content-routing our.bowl %verify-no-public ship life.sig]
+    |
+  ?.  =(1 crypto-suite.u.public)
+    ~&  [%content-routing our.bowl %verify-unsupported-suite ship crypto-suite.u.public]
+    |
+  =/  them  (com:nu:crub:crypto pass.u.public)
+  =/  valid  (safe:as:them value.sig message)
+  ?.  valid
+    ~&  [%content-routing our.bowl %verify-failed ship life.sig]
+    |
+  &
+::
+++  send-message
+  |=  [ship=@p message=content-message]
+  ^-  card
+  :*  %pass  /peer/(scot %p ship)
+      %agent  [ship %content-routing]
+      %poke  %content-routing-message  !>(message)
+  ==
+::
+++  records-for
+  |=  [=bowl:gall state=content-state-0 request=query]
+  ^-  records
+  =/  verify=verifier
+    |=  sample=[signer=node-id message=digest signature=*]
+    (verify-record bowl sample)
+  =/  engine  [our.bowl now.bowl src.bowl state verify]
+  ?-  -.request
+    %pointer
+      =/  all=records  (~(values-for logic engine) key.request)
+      (skim all |=(rec=record ?=(%pointer -.rec)))
+    %providers
+      =/  key=key  (provider-key:cr content.request)
+      =/  all=records  (~(values-for logic engine) key)
+      (scag max-providers.config.state (skim all |=(rec=record ?=(%provider -.rec))))
+  ==
+--
+::
+^-  agent:gall
+|_  =bowl:gall
++*  this    .
+    def     ~(. (default-agent this %|) bowl)
+    verify
+      |=(sample=[signer=node-id message=digest signature=*] (verify-record bowl sample))
+    engine  [our.bowl now.bowl src.bowl state verify]
+::
+++  on-init
+  ^-  (quip card _this)
+  ~&  [%content-routing our.bowl %init]
+  =.  state  ~(init logic engine)
+  [[~(refresh-card logic engine) ~] this]
+::
+++  on-save  !>(state)
+::
+++  on-load
+  |=  old=vase
+  ^-  (quip card _this)
+  =.  state  !<(content-state-0 old)
+  [[~(refresh-card logic engine) ~] this]
+::
+++  on-poke
+  |=  [=mark =vase]
+  ^-  (quip card _this)
+  ?+    mark  (on-poke:def mark vase)
+      %content-routing-command
+    ?>  =(src.bowl our.bowl)
+    =/  command=content-command  !<(content-command vase)
+    ?-  -.command
+      %publish-pointer
+        =/  publisher=node-id  ~(self-id logic engine)
+        =/  key=key  (pointer-key:cr namespace.command publisher name.command)
+        =/  body=pointer-body
+          [namespace.command key publisher revision.command expires.command target.command]
+        =/  rec=record  [%pointer body (sign-digest bowl (pointer-message:cr body))]
+        =^  cards  state  (~(start-publish logic engine) id.command rec)
+        [cards this]
+      %publish-provider
+        =/  body=provider-body
+          [content.command ~(self-id logic engine) revision.command expires.command locations.command]
+        =/  rec=record  [%provider body (sign-digest bowl (provider-message:cr body))]
+        =^  cards  state  (~(start-publish logic engine) id.command rec)
+        [cards this]
+      %find-pointer
+        =^  cards  state
+          %+  ~(start-find-pointer logic engine)
+            id.command
+          [namespace.command publisher.command name.command]
+        [cards this]
+      %find-providers
+        =^  cards  state  (~(start-find-providers logic engine) id.command content.command)
+        [cards this]
+      %forget
+        =.  state  (~(forget logic engine) id.command)
+        `this
+      %set-config
+        =.  state  (~(set-config logic engine) value.command)
+        `this
+    ==
+  ::
+      %kademlia-result
+    ?>  =(src.bowl our.bowl)
+    =/  notice=lookup-notice  !<(lookup-notice vase)
+    ?.  ?=([%operation @ ~] wire.notice)  `this
+    =/  id=(unit @uv)  (slaw %uv i.t.wire.notice)
+    ?~  id  `this
+    =^  cards  state
+      (~(receive-lookup logic engine) u.id contacts.result.notice)
+    [cards this]
+  ::
+      %content-routing-message
+    =/  message=content-message  !<(content-message vase)
+    ?.  =(version.message %content-routing-v1)  `this
+    ?-  -.message
+      %store
+        =/  stored=[store-status content-state-0]  (~(put-replica logic engine) value.message)
+        =.  state  +.stored
+        ~&  [%content-routing our.bowl %store src.bowl id.message -.stored]
+        =/  response=content-message  [%stored %content-routing-v1 id.message -.stored]
+        [[(send-message src.bowl response) ~] this]
+      %find-records
+        =/  values=records  (records-for bowl state request.message)
+        ~&  [%content-routing our.bowl %find-records src.bowl id.message request.message (lent values)]
+        =/  response=content-message
+          [%records %content-routing-v1 id.message values]
+        [[(send-message src.bowl response) ~] this]
+      %stored
+        ~&  [%content-routing our.bowl %stored src.bowl id.message status.message]
+        =^  cards  state  (~(receive-stored logic engine) id.message status.message)
+        [cards this]
+      %records
+        ~&  [%content-routing our.bowl %records src.bowl id.message (lent values.message)]
+        =^  cards  state  (~(receive-records logic engine) id.message values.message)
+        [cards this]
+    ==
+  ==
+::
+++  on-peek
+  |=  =path
+  ^-  (unit (unit cage))
+  ?+    path  (on-peek:def path)
+      [%x ~]             [~ ~]
+      [%x %settings ~]   ``noun+!>(config.state)
+      [%x %operation ~]  [~ ~]
+      [%x %operation @ ~]
+    =/  id=(unit @uv)  (slaw %uv i.t.t.path)
+    ?~  id  ~
+    =/  view=(unit operation-view)  (~(get-operation logic engine) u.id)
+    ?~  view  ~
+    ``noun+!>(u.view)
+  ::
+      [%x %records @ ~]
+    =/  key=(unit @ux)  (slaw %ux i.t.t.path)
+    ?~  key  ~
+    =/  values=records  (~(values-for logic engine) u.key)
+    ``noun+!>(values)
+  ::
+      [%x %pointer @ ~]
+    =/  key=(unit @ux)  (slaw %ux i.t.t.path)
+    ?~  key  ~
+    =/  values=records  (~(values-for logic engine) u.key)
+    ``noun+!>((skim values |=(rec=record ?=(%pointer -.rec))))
+  ::
+      [%x %providers @ ~]
+    =/  parsed=(unit @uv)  (slaw %uv i.t.t.path)
+    ?~  parsed  ~
+    =/  content=digest  u.parsed
+    ``noun+!>((records-for bowl state [%providers content]))
+  ==
+::
+++  on-agent
+  |=  [=wire =sign:agent:gall]
+  ^-  (quip card _this)
+  ?.  ?=([%request @ ~] wire)  (on-agent:def wire sign)
+  ?.  ?=(%poke-ack -.sign)  (on-agent:def wire sign)
+  ?~  p.sign  `this
+  =/  request=(unit @uv)  (slaw %uv i.t.wire)
+  ?~  request  `this
+  =^  cards  state  (~(fail-request logic engine) u.request &)
+  [cards this]
+::
+++  on-arvo
+  |=  [=wire =sign-arvo]
+  ^-  (quip card _this)
+  ?:  =(/refresh wire)
+    ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
+    =^  cards  state  ~(refresh-origins logic engine)
+    [cards this]
+  ?.  ?=([%timeout @ ~] wire)  (on-arvo:def wire sign-arvo)
+  ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
+  =/  request=(unit @uv)  (slaw %uv i.t.wire)
+  ?~  request  `this
+  ?.  (~(has by pending.state) u.request)  `this
+  =^  cards  state  (~(fail-request logic engine) u.request |)
+  [cards this]
+::
+++  on-watch  on-watch:def
+++  on-leave  on-leave:def
+++  on-fail   on-fail:def
+--

@@ -9,6 +9,7 @@
   $%  [%set-seeds ships=(list @p)]
       [%set-request-timeout duration=@dr]
       [%find id=lookup-id target=node-id]
+      [%find-for target=node-id recipient=@tas wire=wire]
       [%forget id=lookup-id]
   ==
 +$  peer-message
@@ -23,6 +24,10 @@
   ==
 +$  lookup-result
   [target=node-id contacts=(list node-id)]
++$  lookup-callback
+  [recipient=@tas wire=wire]
++$  lookup-notice
+  [wire=wire result=lookup-result]
 +$  lookup-view
   $%  [%running state=lookup]
       [%complete result=lookup-result]
@@ -55,8 +60,21 @@
       next-request=request-id
       settings=settings
   ==
++$  state-2
+  $:  %2
+      routing=table
+      seeds=(set node-id)
+      active=(map lookup-id lookup)
+      pending=(map request-id pending-request)
+      completed=(map lookup-id lookup-result)
+      next-request=request-id
+      settings=settings
+      callbacks=(map lookup-id lookup-callback)
+      next-lookup=lookup-id
+  ==
 +$  versioned-state
   $%  state-0
       state-1
+      state-2
   ==
 --

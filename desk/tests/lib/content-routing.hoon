@@ -90,9 +90,9 @@
 ++  test-pointer-selection
   =/  now=@da  ~2026.8.4
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
-  =/  old=pointer  [[%app 0x12 0x34 1 ~ [%content dig]] %old]
-  =/  newest=pointer  [[%app 0x12 0x34 2 `~2026.8.5 [%content dig]] %new]
-  =/  wrong=pointer  [[%other 0x12 0x34 9 ~ [%content dig]] %wrong]
+  =/  old=pointer  [[%app 0x12 0x34 1 ~ [%content dig]] [1 0x1]]
+  =/  newest=pointer  [[%app 0x12 0x34 2 `~2026.8.5 [%content dig]] [1 0x2]]
+  =/  wrong=pointer  [[%other 0x12 0x34 9 ~ [%content dig]] [1 0x3]]
   ;:  weld
     %+  expect-eq  !>(`pointer-selection`[%found newest])
     !>((select-pointer:content-routing now %app 0x12 0x34 allow [old wrong newest ~]))
@@ -108,9 +108,9 @@
   =/  now=@da  ~2026.8.4
   =/  a=digest  (digest-cask:content-routing `(cask)`[%noun 1])
   =/  b=digest  (digest-cask:content-routing `(cask)`[%noun 2])
-  =/  one=pointer  [[%app 0x12 0x34 7 ~ [%content a]] %one]
-  =/  duplicate=pointer  [[%app 0x12 0x34 7 ~ [%content a]] %two]
-  =/  conflict=pointer  [[%app 0x12 0x34 7 ~ [%content b]] %three]
+  =/  one=pointer  [[%app 0x12 0x34 7 ~ [%content a]] [1 0x1]]
+  =/  duplicate=pointer  [[%app 0x12 0x34 7 ~ [%content a]] [1 0x2]]
+  =/  conflict=pointer  [[%app 0x12 0x34 7 ~ [%content b]] [1 0x3]]
   ;:  weld
     %+  expect-eq  !>(`pointer-selection`[%found one])
     !>((select-pointer:content-routing now %app 0x12 0x34 allow [duplicate one ~]))
@@ -122,13 +122,13 @@
   =/  now=@da  ~2026.8.4
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
   =/  low=provider
-    [[dig 0x20 1 ~2026.8.5 ~[(http 'https://old.test/data')]] %low]
+    [[dig 0x20 1 ~2026.8.5 ~[(http 'https://old.test/data')]] [1 0x1]]
   =/  high=provider
-    [[dig 0x20 2 ~2026.8.6 ~[(http 'https://new.test/data')]] %high]
+    [[dig 0x20 2 ~2026.8.6 ~[(http 'https://new.test/data')]] [1 0x2]]
   =/  other=provider
-    [[dig 0x10 1 ~2026.8.5 ~[[%custom %ipfs [%cid 42]]]] %other]
+    [[dig 0x10 1 ~2026.8.5 ~[[%custom %ipfs [%cid 42]]]] [1 0x3]]
   =/  expired=provider
-    [[dig 0x30 1 now ~[(http 'https://expired.test/data')]] %expired]
+    [[dig 0x30 1 now ~[(http 'https://expired.test/data')]] [1 0x4]]
   =/  out=provider-selection
     (select-providers:content-routing now dig allow [low other expired high ~])
   =/  reordered=provider-selection
@@ -146,11 +146,11 @@
   =/  now=@da  ~2026.8.4
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
   =/  a=provider
-    [[dig 0x20 4 ~2026.8.6 ~[(http 'https://a.test/data')]] %a]
+    [[dig 0x20 4 ~2026.8.6 ~[(http 'https://a.test/data')]] [1 0x1]]
   =/  b=provider
-    [[dig 0x20 4 ~2026.8.6 ~[(http 'https://b.test/data')]] %b]
+    [[dig 0x20 4 ~2026.8.6 ~[(http 'https://b.test/data')]] [1 0x2]]
   =/  good=provider
-    [[dig 0x10 1 ~2026.8.5 ~[(http 'https://good.test/data')]] %good]
+    [[dig 0x10 1 ~2026.8.5 ~[(http 'https://good.test/data')]] [1 0x3]]
   =/  out=provider-selection
     (select-providers:content-routing now dig allow [a good b ~])
   ;:  weld

@@ -8,7 +8,7 @@
 ::
 %+  verb  |
 %-  agent:dbug
-=|  state=state-1
+=|  state=state-2
 ^-  agent:gall
 |_  =bowl:gall
 +*  this  .
@@ -27,10 +27,7 @@
   ^-  (quip card _this)
   ~&  [%kademlia our.bowl %load]
   =/  saved=versioned-state  !<(versioned-state old)
-  ?-  -.saved
-    %0  `this(state (~(migrate logic [our.bowl now.bowl src.bowl state]) saved))
-    %1  `this(state saved)
-  ==
+  `this(state (~(migrate logic [our.bowl now.bowl src.bowl state]) saved))
 ::
 ++  on-poke
   |=  [=mark =vase]
@@ -55,6 +52,14 @@
           (~(start logic [our.bowl now.bowl src.bowl state]) id.command target.command)
         ~&  [%kademlia our.bowl %dispatch id.command ~(tap by pending.state)]
         [cards this]
+      %find-for
+        ~&  [%kademlia our.bowl %find-for target.command recipient.command]
+        =^  cards  state
+          %+  ~(start-for logic [our.bowl now.bowl src.bowl state])
+            target.command
+          [recipient.command wire.command]
+        =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
+        [(weld cards notices) this]
       %forget
         ~&  [%kademlia our.bowl %forget id.command]
         =.  state  (~(forget logic [our.bowl now.bowl src.bowl state]) id.command)
@@ -77,8 +82,9 @@
       ~&  [%kademlia our.bowl now.bowl %nodes src.bowl id.message contacts.message]
       =^  cards  state
         (~(receive-nodes logic [our.bowl now.bowl src.bowl state]) id.message contacts.message)
+      =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
       ~&  [%kademlia our.bowl %advance id.message ~(tap by pending.state)]
-      [cards this]
+      [(weld cards notices) this]
     ==
   ==
 ::
@@ -112,8 +118,9 @@
   ~&  [%kademlia our.bowl %poke-failed u.request]
   =^  cards  state
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request &)
+  =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
   ~&  [%kademlia our.bowl %advance-after-failure u.request ~(tap by pending.state)]
-  [cards this]
+  [(weld cards notices) this]
 ::
 ++  on-arvo
   |=  [=wire =sign-arvo]
@@ -126,8 +133,9 @@
   ~&  [%kademlia our.bowl now.bowl %timeout u.request]
   =^  cards  state
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request |)
+  =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
   ~&  [%kademlia our.bowl %advance-after-timeout u.request ~(tap by pending.state)]
-  [cards this]
+  [(weld cards notices) this]
 ::
 ++  on-watch  on-watch:def
 ++  on-leave  on-leave:def

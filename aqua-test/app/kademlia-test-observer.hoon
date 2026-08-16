@@ -61,8 +61,8 @@
     %kademlia-result
       =/  notice=lookup-notice  !<(lookup-notice vase)
       ?>  =(src.bowl our.bowl)
-      ?>  ?=([%lookup @ ~] wire.notice)
-      =/  id=(unit @uv)  (slaw %uv i.t.wire.notice)
+      ?>  ?=([%lookup @ ~] reply-path.notice)
+      =/  id=(unit @uv)  (slaw %uv i.t.reply-path.notice)
       ?~  id  (on-poke:def mark vase)
       =/  expected=(unit lookup-expectation)
         (~(get by lookup-expectations) u.id)
@@ -76,13 +76,13 @@
       :_  ~
       :*  %pass  /kademlia-test-observer  %arvo  %d
           %flog  %text
-          "kademlia-test-observer {(spud wire.notice)} complete"
+          "kademlia-test-observer {(spud reply-path.notice)} complete"
       ==
     %content-routing-result
       =/  notice=operation-notice  !<(operation-notice vase)
       ?>  =(src.bowl our.bowl)
-      ?>  ?=([%operation @ ~] wire.notice)
-      =/  id=(unit @uv)  (slaw %uv i.t.wire.notice)
+      ?>  ?=([%operation @ ~] reply-path.notice)
+      =/  id=(unit @uv)  (slaw %uv i.t.reply-path.notice)
       ?~  id  (on-poke:def mark vase)
       =/  expected=(unit operation-expectation)
         (~(get by operation-expectations) u.id)
@@ -93,7 +93,7 @@
       :_  ~
       :*  %pass  /kademlia-test-observer  %arvo  %d
           %flog  %text
-          "kademlia-test-observer {(spud wire.notice)} complete"
+          "kademlia-test-observer {(spud reply-path.notice)} complete"
       ==
     %noun
       ?>  =(src.bowl our.bowl)

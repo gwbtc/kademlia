@@ -187,7 +187,7 @@
   =/  callback=lookup-callback  +.i.remaining
   =/  result=(unit lookup-result)  (~(get by completed.state) id)
   ?~  result  $(remaining t.remaining)
-  =/  notice=lookup-notice  [wire.callback u.result]
+  =/  notice=lookup-notice  [reply-path.callback u.result]
   =/  card=card:agent:gall
     :*  %pass  /callback/(scot %uv id)
         %agent  [our recipient.callback]

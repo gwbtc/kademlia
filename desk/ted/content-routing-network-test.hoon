@@ -70,11 +70,11 @@
           command=content-command
       ==
   =/  m  (strand ,~)
-  =/  wire=wire  /operation/(scot %uv id)
+  =/  reply-path=path  /operation/(scot %uv id)
   ;<  ~  bind:m
     (poke-observer who [%expect-operation id expected])
   ;<  ~  bind:m
-    (poke-content who [%observe id %kademlia-test-observer wire])
+    (poke-content who [%observe id %kademlia-test-observer reply-path])
   (poke-content who command)
 ::
 ++  await-operation

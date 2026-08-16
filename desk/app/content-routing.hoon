@@ -118,7 +118,7 @@
   =/  callback=(unit operation-callback)  (~(get by callbacks) id)
   ?~  callback
     $(entries t.entries)
-  =/  notice=operation-notice  [wire.u.callback result]
+  =/  notice=operation-notice  [reply-path.u.callback result]
   =/  card=card
     :*  %pass  /callback/(scot %uv id)
         %agent  [our recipient.u.callback]
@@ -195,7 +195,7 @@
       %observe
         ?>  !(~(has by callbacks) id.command)
         =.  callbacks
-          (~(put by callbacks) id.command [recipient.command wire.command])
+          (~(put by callbacks) id.command [recipient.command reply-path.command])
         `this
       %forget
         =.  state  (~(forget logic engine) id.command)
@@ -208,8 +208,8 @@
       %kademlia-result
     ?>  =(src.bowl our.bowl)
     =/  notice=lookup-notice  !<(lookup-notice vase)
-    ?.  ?=([%operation @ ~] wire.notice)  `this
-    =/  id=(unit @uv)  (slaw %uv i.t.wire.notice)
+    ?.  ?=([%operation @ ~] reply-path.notice)  `this
+    =/  id=(unit @uv)  (slaw %uv i.t.reply-path.notice)
     ?~  id  `this
     =/  old=(map operation-id operation-result)  completed.state
     =^  cards  state

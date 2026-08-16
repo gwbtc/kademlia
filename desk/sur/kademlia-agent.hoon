@@ -9,7 +9,7 @@
   $%  [%set-seeds ships=(list @p)]
       [%set-request-timeout duration=@dr]
       [%find id=lookup-id target=node-id]
-      [%find-for target=node-id recipient=@tas wire=wire]
+      [%find-for target=node-id recipient=@tas reply-path=path]
       [%forget id=lookup-id]
   ==
 +$  peer-message
@@ -25,9 +25,9 @@
 +$  lookup-result
   [target=node-id contacts=(list node-id)]
 +$  lookup-callback
-  [recipient=@tas wire=wire]
+  [recipient=@tas reply-path=path]
 +$  lookup-notice
-  [wire=wire result=lookup-result]
+  [reply-path=path result=lookup-result]
 +$  lookup-view
   $%  [%running state=lookup]
       [%complete result=lookup-result]

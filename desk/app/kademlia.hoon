@@ -57,7 +57,7 @@
         =^  cards  state
           %+  ~(start-for logic [our.bowl now.bowl src.bowl state])
             target.command
-          [recipient.command wire.command]
+          [recipient.command reply-path.command]
         =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
         [(weld cards notices) this]
       %forget

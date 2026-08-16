@@ -5,6 +5,8 @@
 +$  content-version  @tas
 +$  operation-id     @uv
 +$  content-request-id  @uv
++$  operation-callback  [recipient=@tas wire=wire]
++$  operation-notice  [wire=wire result=operation-result]
 +$  content-config
   $:  replication=@ud
       concurrency=@ud
@@ -54,6 +56,7 @@
       ==
       [%find-pointer id=operation-id namespace=@tas publisher=node-id name=*]
       [%find-providers id=operation-id content=digest]
+      [%observe id=operation-id recipient=@tas wire=wire]
       [%forget id=operation-id]
       [%set-config value=content-config]
   ==

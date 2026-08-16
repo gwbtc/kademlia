@@ -1,16 +1,20 @@
-output: dist-pill
+output: dist-aqua-test
 
-local kademlia:
-  path: ./desk
+local aqua-test:
+  path: ./aqua-test
   include:
     - app
     - desk.bill
-    - lib
-    - mar
+    - sur
+  priority: 110
+
+local kademlia-test:
+  path: ./desk
+  include:
+    - mar/content-routing/result.hoon
+    - mar/kademlia/result.hoon
     - sur
     - sys.kelvin
-  exclude:
-    - lib/test.hoon
   priority: 100
 
 github base-dev:
@@ -19,10 +23,8 @@ github base-dev:
   revision: 0a9a312e133891937de9c4df1ebecad5cf669c7c
   root: pkg/base-dev
   include:
-    - lib/azimuth.hoon
     - lib/dbug.hoon
     - lib/default-agent.hoon
-    - lib/ethereum.hoon
     - lib/skeleton.hoon
     - lib/verb.hoon
     - mar/bill.hoon

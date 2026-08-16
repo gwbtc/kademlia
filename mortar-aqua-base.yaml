@@ -1,0 +1,19 @@
+output: dist-aqua-base
+
+local aqua-base:
+  path: ./aqua-base
+  priority: 100
+
+github base-dev:
+  repo: urbit/urbit
+  branch: master
+  revision: 0a9a312e133891937de9c4df1ebecad5cf669c7c
+  root: pkg/base-dev
+  priority: 20
+
+github arvo:
+  repo: urbit/urbit
+  branch: master
+  revision: 0a9a312e133891937de9c4df1ebecad5cf669c7c
+  root: pkg/arvo
+  priority: 10

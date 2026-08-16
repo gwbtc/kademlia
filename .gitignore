@@ -1,4 +1,6 @@
 .tags
 /dist/
 /dist-pill/
+/dist-aqua-base/
+/dist-aqua-test/
 /.mortar/

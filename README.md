@@ -189,22 +189,34 @@ virtual ships:
 
 ```sh
 mortar build --config mortar-pill.yaml
+mortar build --config mortar-aqua-base.yaml
+mortar build --config mortar-aqua-test.yaml
 ```
 
-Mount `dist/` as `%kademlia-mortar` on the host ship and `dist-pill/` as
-`%kademlia`.  Keeping the Aqua test harness out of `%kademlia` also keeps its
-`/sys/vane/ames` source out of the secondary desk used by `+pill/solid`.
+Mount `dist/` as `%kademlia-mortar`, `dist-pill/` as `%kademlia`, and
+`dist-aqua-base/` as `%kademlia-aqua-base`, and `dist-aqua-test/` as
+`%kademlia-test`. The Aqua base is a complete Arvo source desk with a minimal
+`/desk/bill`; it omits unrelated background agents whose timers otherwise
+dominate a network test. The test-only desk contains the completion observer,
+while `%kademlia` contains only the production agents.
 
-The `kademlia-network-test` Aqua thread is the end-to-end integration test. It
-creates four virtual ships, verifies iterative discovery over the strict route
-`~bud -> ~dev -> ~marbud -> ~mardev`, publishes a signed provider record from
-`~mardev`, and resolves that record from `~bud` through the content transport:
+The Aqua integration coverage is split so each run boots only the fleet it
+needs.  `kademlia-network-test` creates three virtual ships and verifies
+iterative discovery over the strict route `~bud -> ~dev -> ~wes`:
 
 ```hoon
-:aqua &pill +pill/solid %base %kademlia
+:aqua &pill +pill/solid %kademlia-aqua-base %kademlia %kademlia-test
 -kademlia-mortar!kademlia-network-test
 ```
 
-The Aqua pill includes the runtime `%kademlia` desk as a secondary desk.  The
-virtual ships therefore boot with the agent already installed; the thread does
-not modify `%base` or copy source files into the ships.
+`content-routing-network-test` creates two ships, publishes a signed mutable
+pointer and provider record from `~wes`, then has `~bud` resolve the pointer's
+content digest and use it to discover the provider locator:
+
+```hoon
+-kademlia-mortar!content-routing-network-test
+```
+
+The Aqua pill includes both secondary desks. Virtual ships therefore boot with
+the production agents and test observer already installed; the threads do not
+modify `%base` or copy source files into the ships.

@@ -4,10 +4,17 @@ local kademlia:
   path: ./desk
   priority: 100
 
+local aqua-test:
+  path: ./aqua-test
+  include:
+    - app
+    - sur
+  priority: 110
+
 github base-dev:
   repo: urbit/urbit
   branch: master
-  revision: 8d66536e607d4ee2d0bbb51860c5c629a906095c
+  revision: 0a9a312e133891937de9c4df1ebecad5cf669c7c
   root: pkg/base-dev
   include:
     - lib/azimuth.hoon
@@ -34,13 +41,16 @@ github base-dev:
 github arvo:
   repo: urbit/urbit
   branch: master
-  revision: 8d66536e607d4ee2d0bbb51860c5c629a906095c
+  revision: 0a9a312e133891937de9c4df1ebecad5cf669c7c
   root: pkg/arvo
   include:
     - lib/aqua-azimuth.hoon
     - lib/aqua-vane-thread.hoon
+    - lib/naive.hoon
+    - lib/tiny.hoon
     - lib/vere.hoon
     - mar/aqua/effect.hoon
+    - sur/dice.hoon
     - sys/vane/ames.hoon
     - ted/aqua/ames.hoon
     - ted/aqua/behn.hoon

@@ -10,6 +10,7 @@
 %+  verb  |
 %-  agent:dbug
 =|  state=content-state-0
+=|  callbacks=(map operation-id operation-callback)
 =>  |%
 ::
 ++  sign-digest
@@ -98,6 +99,32 @@
       =/  all=records  (~(values-for logic engine) key)
       (scag max-providers.config.state (skim all |=(rec=record ?=(%provider -.rec))))
   ==
+::
+++  new-operation-notices
+  |=  $:  our=@p
+          old=(map operation-id operation-result)
+          new=(map operation-id operation-result)
+          callbacks=(map operation-id operation-callback)
+      ==
+  ^-  [(list card) (map operation-id operation-callback)]
+  =/  entries=(list [operation-id operation-result])  ~(tap by new)
+  =/  cards=(list card)  ~
+  |-
+  ?~  entries  [(flop cards) callbacks]
+  =/  id=operation-id  -.i.entries
+  =/  result=operation-result  +.i.entries
+  ?:  (~(has by old) id)
+    $(entries t.entries)
+  =/  callback=(unit operation-callback)  (~(get by callbacks) id)
+  ?~  callback
+    $(entries t.entries)
+  =/  notice=operation-notice  [wire.u.callback result]
+  =/  card=card
+    :*  %pass  /callback/(scot %uv id)
+        %agent  [our recipient.u.callback]
+        %poke  %content-routing-result  !>(notice)
+    ==
+  $(entries t.entries, cards [card cards], callbacks (~(del by callbacks) id))
 --
 ::
 ^-  agent:gall
@@ -131,28 +158,45 @@
     =/  command=content-command  !<(content-command vase)
     ?-  -.command
       %publish-pointer
+        =/  old=(map operation-id operation-result)  completed.state
         =/  publisher=node-id  ~(self-id logic engine)
         =/  key=key  (pointer-key:cr namespace.command publisher name.command)
         =/  body=pointer-body
           [namespace.command key publisher revision.command expires.command target.command]
         =/  rec=record  [%pointer body (sign-digest bowl (pointer-message:cr body))]
         =^  cards  state  (~(start-publish logic engine) id.command rec)
-        [cards this]
+        =^  notices  callbacks
+          (new-operation-notices our.bowl old completed.state callbacks)
+        [(weld notices cards) this]
       %publish-provider
+        =/  old=(map operation-id operation-result)  completed.state
         =/  body=provider-body
           [content.command ~(self-id logic engine) revision.command expires.command locations.command]
         =/  rec=record  [%provider body (sign-digest bowl (provider-message:cr body))]
         =^  cards  state  (~(start-publish logic engine) id.command rec)
-        [cards this]
+        =^  notices  callbacks
+          (new-operation-notices our.bowl old completed.state callbacks)
+        [(weld notices cards) this]
       %find-pointer
+        =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state
           %+  ~(start-find-pointer logic engine)
             id.command
           [namespace.command publisher.command name.command]
-        [cards this]
+        =^  notices  callbacks
+          (new-operation-notices our.bowl old completed.state callbacks)
+        [(weld notices cards) this]
       %find-providers
+        =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(start-find-providers logic engine) id.command content.command)
-        [cards this]
+        =^  notices  callbacks
+          (new-operation-notices our.bowl old completed.state callbacks)
+        [(weld notices cards) this]
+      %observe
+        ?>  !(~(has by callbacks) id.command)
+        =.  callbacks
+          (~(put by callbacks) id.command [recipient.command wire.command])
+        `this
       %forget
         =.  state  (~(forget logic engine) id.command)
         `this
@@ -167,9 +211,12 @@
     ?.  ?=([%operation @ ~] wire.notice)  `this
     =/  id=(unit @uv)  (slaw %uv i.t.wire.notice)
     ?~  id  `this
+    =/  old=(map operation-id operation-result)  completed.state
     =^  cards  state
       (~(receive-lookup logic engine) u.id contacts.result.notice)
-    [cards this]
+    =^  notices  callbacks
+      (new-operation-notices our.bowl old completed.state callbacks)
+    [(weld notices cards) this]
   ::
       %content-routing-message
     =/  message=content-message  !<(content-message vase)
@@ -189,12 +236,18 @@
         [[(send-message src.bowl response) ~] this]
       %stored
         ~&  [%content-routing our.bowl %stored src.bowl id.message status.message]
+        =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(receive-stored logic engine) id.message status.message)
-        [cards this]
+        =^  notices  callbacks
+          (new-operation-notices our.bowl old completed.state callbacks)
+        [(weld notices cards) this]
       %records
         ~&  [%content-routing our.bowl %records src.bowl id.message (lent values.message)]
+        =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(receive-records logic engine) id.message values.message)
-        [cards this]
+        =^  notices  callbacks
+          (new-operation-notices our.bowl old completed.state callbacks)
+        [(weld notices cards) this]
     ==
   ==
 ::
@@ -239,8 +292,11 @@
   ?~  p.sign  `this
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
+  =/  old=(map operation-id operation-result)  completed.state
   =^  cards  state  (~(fail-request logic engine) u.request &)
-  [cards this]
+  =^  notices  callbacks
+    (new-operation-notices our.bowl old completed.state callbacks)
+  [(weld notices cards) this]
 ::
 ++  on-arvo
   |=  [=wire =sign-arvo]
@@ -254,8 +310,11 @@
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
   ?.  (~(has by pending.state) u.request)  `this
+  =/  old=(map operation-id operation-result)  completed.state
   =^  cards  state  (~(fail-request logic engine) u.request |)
-  [cards this]
+  =^  notices  callbacks
+    (new-operation-notices our.bowl old completed.state callbacks)
+  [(weld notices cards) this]
 ::
 ++  on-watch  on-watch:def
 ++  on-leave  on-leave:def

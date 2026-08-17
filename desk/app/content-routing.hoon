@@ -245,7 +245,9 @@
     ?-  -.message
       %store
         ?.  (~(valid-id logic engine) id.message)  `this
-        =/  stored=[store-status content-state]  (~(put-replica logic engine) value.message)
+        =/  decoded=(unit record)  (~(unpack-record logic engine) payload.message)
+        ?~  decoded  `this
+        =/  stored=[store-status content-state]  (~(put-replica logic engine) u.decoded)
         =.  state  +.stored
         ~&  [%content-routing our.bowl %store src.bowl id.message -.stored]
         =/  response=content-message  [%stored %content-routing-v1 id.message -.stored]
@@ -253,9 +255,10 @@
       %find-records
         ?.  (~(valid-id logic engine) id.message)  `this
         =/  values=records  (records-for bowl state request.message)
-        ~&  [%content-routing our.bowl %find-records src.bowl id.message request.message (lent values)]
+        =/  packed=[count=@ud payload=@]  (~(pack-records logic engine) values)
+        ~&  [%content-routing our.bowl %find-records src.bowl id.message request.message count.packed]
         =/  response=content-message
-          [%records %content-routing-v1 id.message values]
+          [%records %content-routing-v1 id.message count.packed payload.packed]
         [[(send-message src.bowl response) ~] this]
       %stored
         ?.  (~(valid-id logic engine) id.message)  `this
@@ -267,9 +270,16 @@
         [(weld notices cards) this]
       %records
         ?.  (~(valid-id logic engine) id.message)  `this
-        ~&  [%content-routing our.bowl %records src.bowl id.message (lent values.message)]
+        =/  decoded=(unit records)
+          (~(unpack-records logic engine) count.message payload.message)
         =/  old=(map operation-id operation-result)  completed.state
-        =^  cards  state  (~(receive-records logic engine) id.message values.message)
+        ?~  decoded
+          =^  cards  state  (~(fail-request logic engine) id.message &)
+          =^  notices  callbacks.state
+            (new-operation-notices our.bowl old completed.state callbacks.state)
+          [(weld notices cards) this]
+        ~&  [%content-routing our.bowl %records src.bowl id.message count.message]
+        =^  cards  state  (~(receive-records logic engine) id.message u.decoded)
         =^  notices  callbacks.state
           (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]

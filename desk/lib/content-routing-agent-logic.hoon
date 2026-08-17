@@ -5,6 +5,9 @@
 =/  kad-cfg=config  [20 20 3 12 %kademlia-urbit-v1]
 =/  protocol=content-version  %content-routing-v1
 =/  defaults=content-config  [20 3 ~m5 ~d1 ~h12 65.536 64 10.000]
+=/  max-wire-record-bytes=@ud  65.536
+=/  max-wire-records=@ud  64
+=/  max-wire-response-bytes=@ud  262.144
 |_  $:  our=@p
         now=@da
         src=@p
@@ -40,6 +43,63 @@
   =.  next-request.state  (bump-id id)
   [id state]
 ::
+::  pack-record: encode one record for bounded transport.
+::
+++  pack-record
+  |=  rec=record
+  ^-  @
+  =/  payload=@  (jam rec)
+  ?>  (lte (met 3 payload) max-wire-record-bytes)
+  payload
+::
+::  unpack-record: decode one record only after enforcing its byte ceiling.
+::
+++  unpack-record
+  |=  payload=@
+  ^-  (unit record)
+  ?.  (lte (met 3 payload) max-wire-record-bytes)  ~
+  ?.  (lte (met 3 payload) max-record-bytes.config.state)  ~
+  =/  decoded  (mule |.(;;(record (cue payload))))
+  ?:  ?=(%| -.decoded)  ~
+  `p.decoded
+::
+::  pack-records: retain the longest prefix fitting both response ceilings.
+::
+++  pack-records
+  |=  values=records
+  ^-  [count=@ud payload=@]
+  =/  remaining=records  (scag max-wire-records values)
+  =/  kept=records  ~
+  =/  count=@ud  0
+  =/  payload=@  (jam `records`~)
+  |-
+  ?~  remaining  [count payload]
+  =/  candidate=records  (flop [i.remaining kept])
+  =/  candidate-payload=@  (jam candidate)
+  ?:  (gth (met 3 candidate-payload) max-wire-response-bytes)
+    [count payload]
+  $(remaining t.remaining, kept [i.remaining kept], count +(count), payload candidate-payload)
+::
+::  unpack-records: bound the atom before cueing and require the declared count.
+::
+++  unpack-records
+  |=  [count=@ud payload=@]
+  ^-  (unit records)
+  ?:  (gth count max-wire-records)  ~
+  ?.  (lte (met 3 payload) max-wire-response-bytes)  ~
+  =/  decoded  (mule |.(;;(records (cue payload))))
+  ?:  ?=(%| -.decoded)  ~
+  ?.  =(count (lent p.decoded))  ~
+  =/  remaining=records  p.decoded
+  |-
+  ?~  remaining  `p.decoded
+  =/  size=@ud  (met 3 (jam i.remaining))
+  ?.  ?&  (lte size max-wire-record-bytes)
+          (lte size max-record-bytes.config.state)
+      ==
+    ~
+  $(remaining t.remaining)
+::
 ++  init
   ^-  content-state
   [defaults ~ ~ ~ ~ ~ 0v1 (add refresh.defaults now) 0v1 ~ ~]
@@ -55,7 +115,9 @@
       (gth refresh.cfg 0)
       (lth refresh.cfg lease.cfg)
       (gth max-record-bytes.cfg 0)
+      (lte max-record-bytes.cfg max-wire-record-bytes)
       (gth max-providers.cfg 0)
+      (lte max-providers.cfg max-wire-records)
       (gth max-replica-keys.cfg 0)
   ==
 ::
@@ -318,7 +380,7 @@
   ?:  (publishing target)
     $(entries t.entries)
   =^  id  state  next-operation-id
-  =^  started  state  (start-operation id [%publish rec target])
+  =^  started  state  (start-operation id [%publish rec target (pack-record rec)])
   =.  background.state  (~(put in background.state) id)
   $(entries t.entries, cards (weld (flop started) cards))
 ::
@@ -326,7 +388,7 @@
   |=  [id=operation-id rec=record]
   ^-  [(list card:agent:gall) content-state]
   =.  state  (put-origin rec)
-  (start-operation id [%publish rec (record-key rec)])
+  (start-operation id [%publish rec (record-key rec) (pack-record rec)])
 ::
 ++  start-find-pointer
   |=  [id=operation-id namespace=@tas publisher=node-id name=*]
@@ -393,7 +455,7 @@
   ^-  content-message
   ?-  -.kind.op
     %publish
-      [%store protocol request value.kind.op]
+      [%store protocol request payload.kind.op]
     %find-pointer
       [%find-records protocol request [%pointer key.kind.op]]
     %find-providers

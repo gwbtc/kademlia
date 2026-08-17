@@ -38,6 +38,60 @@
     !>(refresh.config.state)
   ==
 ::
+++  test-record-payload-round-trip
+  =/  state=content-state  initial
+  =/  engine  [~zod now ~zod state allow]
+  =/  rec=record  (provider 0x12 1 'https://one.test')
+  =/  payload=@  (~(pack-record logic engine) rec)
+  =/  decoded=(unit record)  (~(unpack-record logic engine) payload)
+  =/  got=record  (need decoded)
+  ;:  weld
+    (expect !>(?=(^ decoded)))
+    %+  expect-eq  !>(rec)
+    !>(got)
+  ==
+::
+++  test-records-payload-round-trip
+  =/  state=content-state  initial
+  =/  engine  [~zod now ~zod state allow]
+  =/  values=records
+    [(provider 0x12 1 'https://one.test') (provider 0x13 1 'https://two.test') ~]
+  =/  packed=[count=@ud payload=@]  (~(pack-records logic engine) values)
+  =/  decoded=(unit records)
+    (~(unpack-records logic engine) count.packed payload.packed)
+  =/  got=records  (need decoded)
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>(count.packed)
+    (expect !>(?=(^ decoded)))
+    %+  expect-eq  !>(values)
+    !>(got)
+  ==
+::
+++  test-malformed-record-payloads-rejected
+  =/  state=content-state  initial
+  =/  engine  [~zod now ~zod state allow]
+  =/  valid=[count=@ud payload=@]
+    (~(pack-records logic engine) [(provider 0x12 1 'https://one.test') ~])
+  ;:  weld
+    %+  expect-eq  !>(`(unit record)`~)
+    !>((~(unpack-record logic engine) 0))
+    %+  expect-eq  !>(`(unit records)`~)
+    !>((~(unpack-records logic engine) 2 payload.valid))
+    %+  expect-eq  !>(`(unit records)`~)
+    !>((~(unpack-records logic engine) 65 payload.valid))
+    %+  expect-eq  !>(`(unit records)`~)
+    !>((~(unpack-records logic engine) 0 (pow 2 (mul 8 262.144))))
+  ==
+::
+++  test-config-cannot-exceed-wire-limits
+  =/  state=content-state  initial
+  =/  engine  [~zod now ~zod state allow]
+  ;:  weld
+    (expect !>(!(~(config-valid logic engine) config.state(max-record-bytes 65.537))))
+    (expect !>(!(~(config-valid logic engine) config.state(max-providers 65))))
+  ==
+::
 ++  test-id-boundaries
   =/  state=content-state  initial
   =/  engine  [~zod now ~zod state allow]

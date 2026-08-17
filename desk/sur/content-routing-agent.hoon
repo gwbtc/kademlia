@@ -33,10 +33,10 @@
       [%rejected reason=reject-reason]
   ==
 +$  content-message
-  $%  [%store version=content-version id=content-request-id value=record]
+  $%  [%store version=content-version id=content-request-id payload=@]
       [%stored version=content-version id=content-request-id status=store-status]
       [%find-records version=content-version id=content-request-id request=query]
-      [%records version=content-version id=content-request-id values=records]
+      [%records version=content-version id=content-request-id count=@ud payload=@]
   ==
 +$  content-command
   $%  $:  %publish-pointer
@@ -85,7 +85,7 @@
       [%providers value=providers-result]
   ==
 +$  operation-kind
-  $%  [%publish value=record key=key]
+  $%  [%publish value=record key=key payload=@]
       [%find-pointer namespace=@tas publisher=node-id key=key]
       [%find-providers content=digest key=key]
   ==

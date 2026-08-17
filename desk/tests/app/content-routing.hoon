@@ -119,4 +119,18 @@
     %+  expect-eq  !>(before)
     !>(after)
   ==
+::
+++  test-malformed-store-payload-is-ignored
+  =/  bol=bowl:gall  (bowl ~zod ~nec)
+  =/  initialized  on-init:~(. agent bol)
+  =/  before=content-state  !<(content-state on-save:+.initialized)
+  =/  message=content-message  [%store %content-routing-v1 0v1 0]
+  =/  out  (on-poke:+.initialized %content-routing-message !>(message))
+  =/  after=content-state  !<(content-state on-save:+.out)
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>((lent -.out))
+    %+  expect-eq  !>(before)
+    !>(after)
+  ==
 --

@@ -5,6 +5,8 @@
 =/  cfg=config  [20 20 3 12 %kademlia-urbit-v1]
 =/  protocol=protocol-version  %kademlia-v1
 =/  default-request-timeout=@dr  ~m5
+=/  default-refresh-interval=@dr  ~h1
+=/  refresh-yield=@dr  ~s1
 =/  max-fails=@ud  3
 |_  $:  our=@p
         now=@da
@@ -17,7 +19,21 @@
 ::
 ++  init
   ^-  agent-state
-  [~(empty-table kad cfg) ~ ~ ~ ~ 0v1 [default-request-timeout] ~ 0v1]
+  :*  (~(empty-table kad cfg) now)
+      ~  ~  ~  ~  0v1
+      [default-request-timeout default-refresh-interval]
+      ~  0v1
+      `(add default-refresh-interval now)
+      ~
+  ==
+::
+::  refresh-card: recreate the one currently expected global refresh wake.
+::
+++  refresh-card
+  ^-  (list card:agent:gall)
+  ?~  refresh-at.state  ~
+  :~  [%pass /refresh/(scot %da u.refresh-at.state) %arvo %b %wait u.refresh-at.state]
+  ==
 ::
 ++  complete
   |=  [id=lookup-id lup=lookup]
@@ -130,6 +146,25 @@
   =?  ids  !=(id self-id)  (~(put in ids) id)
   $(remaining t.remaining)
 ::
+::  bootstrap: advance the global wake when fresh seeds can populate an empty table.
+::
+++  bootstrap
+  ^-  [(list card:agent:gall) agent-state]
+  ?:  ?|  ?=(~ seeds.state)
+          ?=(^ maintenance.state)
+          ?=(^ (~(contacts kad cfg) routing.state))
+      ==
+    [~ state]
+  =/  cards=(list card:agent:gall)  ~
+  =.  cards
+    ?~  refresh-at.state  cards
+    [[%pass /refresh/(scot %da u.refresh-at.state) %arvo %b %rest u.refresh-at.state] cards]
+  =/  deadline=@da  +(now)
+  =.  refresh-at.state  `deadline
+  =.  cards
+    [[%pass /refresh/(scot %da deadline) %arvo %b %wait deadline] cards]
+  [(flop cards) state]
+::
 ::  set-request-timeout: update the positive timeout used for new requests.
 ::
 ++  set-request-timeout
@@ -138,15 +173,141 @@
   ?>  (gth duration 0)
   state(request-timeout.settings duration)
 ::
+::  set-refresh-interval: replace the cadence and the one outstanding wake.
+::
+++  set-refresh-interval
+  |=  duration=@dr
+  ^-  [(list card:agent:gall) agent-state]
+  ?>  (gth duration 0)
+  =.  refresh-interval.settings.state  duration
+  =/  cards=(list card:agent:gall)  ~
+  =.  cards
+    ?~  refresh-at.state  cards
+    [[%pass /refresh/(scot %da u.refresh-at.state) %arvo %b %rest u.refresh-at.state] cards]
+  =.  refresh-at.state  ~
+  ?:  ?=(^ maintenance.state)
+    [(flop cards) state]
+  =/  scheduled=[(list card:agent:gall) agent-state]  schedule-next-refresh
+  [(weld (flop cards) -.scheduled) +.scheduled]
+::
 ++  start
   |=  [id=lookup-id target=node-id]
   ^-  [(list card:agent:gall) agent-state]
   ?>  (~(valid-node kad cfg) target)
   ?>  !(~(has by active.state) id)
   ?>  !(~(has by completed.state) id)
+  =.  routing.state  (~(touch-bucket kad cfg) target now routing.state)
   =/  lup=lookup  (~(start-lookup kad cfg) self-id target routing.state)
   =.  lup  (~(learn kad cfg) self-id ~(tap in seeds.state) lup)
   (advance id lup)
+::
+::  refresh-ref-before: order bucket references by age, then prefix identity.
+::
+++  refresh-ref-before
+  |=  [a=bucket-ref b=bucket-ref]
+  ^-  ?
+  ?:  !=(refreshed.a refreshed.b)  (lth refreshed.a refreshed.b)
+  ?:  !=(depth.a depth.b)  (lth depth.a depth.b)
+  (lth prefix.a prefix.b)
+::
+::  due-refresh: return the stalest leaf whose interval has elapsed.
+::
+++  due-refresh
+  ^-  (unit bucket-ref)
+  =/  refs=(list bucket-ref)  (~(bucket-refs kad cfg) routing.state)
+  =/  chosen=(unit bucket-ref)  ~
+  |-
+  ?~  refs  chosen
+  =/  ref=bucket-ref  i.refs
+  ?:  (gth (add refresh-interval.settings.state refreshed.ref) now)
+    $(refs t.refs)
+  ?~  chosen
+    $(refs t.refs, chosen `ref)
+  ?:  (refresh-ref-before ref u.chosen)
+    $(refs t.refs, chosen `ref)
+  $(refs t.refs)
+::
+::  next-refresh-deadline: find the earliest future due time across all leaves.
+::
+++  next-refresh-deadline
+  ^-  @da
+  =/  tab=table  routing.state
+  |-
+  ?-  -.tab
+    %leaf  (add refresh-interval.settings.state refreshed.buc.tab)
+    %fork
+      =/  zero-due=@da  $(tab zero.tab)
+      =/  one-due=@da  $(tab one.tab)
+      ?:  (lth zero-due one-due)  zero-due
+      one-due
+  ==
+::
+::  schedule-next-refresh: install the sole global wake for the earliest leaf.
+::
+++  schedule-next-refresh
+  ^-  [(list card:agent:gall) agent-state]
+  ?>  ?=(~ maintenance.state)
+  =/  due=@da  next-refresh-deadline
+  =/  deadline=@da  ?:((lte due now) +(now) due)
+  =.  refresh-at.state  `deadline
+  :-  :~  [%pass /refresh/(scot %da deadline) %arvo %b %wait deadline]
+      ==
+  state
+::
+::  drive-refresh: start one stale-bucket lookup or schedule the next wake.
+::
+++  drive-refresh
+  |=  entropy=@
+  ^-  [(list card:agent:gall) agent-state]
+  ?.  =(~ maintenance.state)  [~ state]
+  =/  due=(unit bucket-ref)  due-refresh
+  ?~  due  schedule-next-refresh
+  =/  target=node-id  (~(refresh-target kad cfg) u.due entropy)
+  =/  id=lookup-id  next-lookup.state
+  |-
+  ?:  ?|  (~(has by active.state) id)
+          (~(has by completed.state) id)
+          (~(has by callbacks.state) id)
+      ==
+    $(id +(id))
+  =.  next-lookup.state  +(id)
+  =.  maintenance.state  `id
+  =/  started=[(list card:agent:gall) agent-state]  (start id target)
+  =.  state  +.started
+  ?:  (~(has by active.state) id)
+    [-.started state]
+  ::  An empty lookup completed synchronously.  Reap it and yield via Behn.
+  =.  completed.state  (~(del by completed.state) id)
+  =.  maintenance.state  ~
+  =/  deadline=@da  (add refresh-yield now)
+  =.  refresh-at.state  `deadline
+  =/  timer=card:agent:gall
+    [%pass /refresh/(scot %da deadline) %arvo %b %wait deadline]
+  [(weld -.started [timer ~]) state]
+::
+::  run-refresh: consume a matching global wake and begin a refresh step.
+::
+++  run-refresh
+  |=  [deadline=@da entropy=@]
+  ^-  [(list card:agent:gall) agent-state]
+  ?.  =(refresh-at.state `deadline)  [~ state]
+  =.  refresh-at.state  ~
+  ?:  ?=(^ maintenance.state)  [~ state]
+  (drive-refresh entropy)
+::
+::  continue-refresh: after a maintenance lookup settles, start the next due leaf.
+::
+++  continue-refresh
+  |=  entropy=@
+  ^-  [(list card:agent:gall) agent-state]
+  =/  current=(unit lookup-id)  maintenance.state
+  ?~  current  [~ state]
+  =/  id=lookup-id  u.current
+  ?:  (~(has by active.state) id)  [~ state]
+  ?.  (~(has by completed.state) id)  [~ state]
+  =.  completed.state  (~(del by completed.state) id)
+  =.  maintenance.state  ~
+  (drive-refresh entropy)
 ::
 ::  start-for: allocate an internal lookup ID and remember its local callback.
 ::
@@ -199,6 +360,8 @@
       (lent ~(tap by active.state))
       (lent ~(tap by pending.state))
       (lent ~(tap by completed.state))
+      refresh-at.state
+      maintenance.state
   ==
 ::
 ++  seed-list

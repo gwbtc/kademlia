@@ -4,6 +4,8 @@
 ::
 ++  cfg  [20 20 3 12 %kademlia-urbit-v1]
 ::
+++  now  ~2026.7.14..10.00.00
+::
 ++  test-identity-roundtrip
   =/  who  ~sampel-palnet
   %+  expect-eq  !>(who)
@@ -64,7 +66,7 @@
     !>((~(closest kademlia cfg) 0x0 2 [far near middle ~]))
   ==
 ::
-++  empty-bucket  ^-  bucket  [[0 ~] [0 ~]]
+++  empty-bucket  ^-  bucket  [now [0 ~] [0 ~]]
 ::
 ++  spine
   |=  length=@ud
@@ -75,13 +77,53 @@
   [%fork $(remaining (dec remaining)) [%leaf empty-bucket]]
 ::
 ++  test-empty-prefix-table
-  =/  tab=table  ~(empty-table kademlia cfg)
+  =/  tab=table  (~(empty-table kademlia cfg) now)
   ;:  weld
-    %+  expect-eq  !>(`table`[%leaf [[0 ~] [0 ~]]])
+    %+  expect-eq  !>(`table`[%leaf now [0 ~] [0 ~]])
     !>(tab)
     %+  expect-eq  !>(0)
     !>((~(bucket-depth kademlia cfg) 0x0 tab))
     (expect !>((~(table-valid kademlia cfg) 0x0 tab)))
+  ==
+::
+++  test-refresh-metadata
+  =/  small-cfg=config  [1 2 3 12 %kademlia-urbit-v1]
+  =/  self=node-id  0x0
+  =/  high=node-id  (@ux (pow 2 127))
+  =/  quarter=node-id  (@ux (pow 2 126))
+  =/  latest=@da  (add ~h1 now)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
+  =.  tab  (~(record-success kademlia small-cfg) self high now tab)
+  =.  tab  (~(record-success kademlia small-cfg) self quarter +(now) tab)
+  =/  before-high=bucket  (~(get-bucket kademlia small-cfg) high tab)
+  =/  before-quarter=bucket  (~(get-bucket kademlia small-cfg) quarter tab)
+  =.  tab  (~(touch-bucket kademlia small-cfg) high latest tab)
+  =/  after-high=bucket  (~(get-bucket kademlia small-cfg) high tab)
+  =/  after-quarter=bucket  (~(get-bucket kademlia small-cfg) quarter tab)
+  ;:  weld
+    %+  expect-eq  !>(now)
+    !>(refreshed.before-high)
+    %+  expect-eq  !>(now)
+    !>(refreshed.before-quarter)
+    %+  expect-eq  !>(latest)
+    !>(refreshed.after-high)
+    %+  expect-eq  !>(now)
+    !>(refreshed.after-quarter)
+    %+  expect-eq  !>(2)
+    !>((lent (~(bucket-refs kademlia small-cfg) tab)))
+  ==
+::
+++  test-refresh-target-prefix
+  =/  max=node-id  (@ux (dec (pow 2 128)))
+  =/  ref=bucket-ref  [4 0xa now]
+  =/  target=node-id  (~(refresh-target kademlia cfg) ref max)
+  ;:  weld
+    (expect !>((~(valid-node kademlia cfg) target)))
+    (expect !>((~(prefix-match kademlia cfg) 4 0xa target)))
+    %+  expect-eq  !>(0xa)
+    !>((rsh [0 124] target))
+    %+  expect-eq  !>((dec (pow 2 124)))
+    !>((end [0 124] target))
   ==
 ::
 ++  test-self-range-splits-recursively
@@ -91,7 +133,7 @@
   =/  quarter=node-id  (@ux (pow 2 126))
   =/  eighth=node-id  (@ux (pow 2 125))
   =/  now=@da  ~2026.7.14..10.00.00
-  =/  tab=table  ~(empty-table kademlia small-cfg)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
   =.  tab  (~(record-success kademlia small-cfg) self high now tab)
   =.  tab  (~(record-success kademlia small-cfg) self quarter +(now) tab)
   =.  tab  (~(record-success kademlia small-cfg) self eighth (add 2 now) tab)
@@ -114,7 +156,7 @@
   =/  high=node-id  (@ux (pow 2 127))
   =/  high-quarter=node-id  (@ux (add high quarter))
   =/  now=@da  ~2026.7.14..10.00.00
-  =/  tab=table  ~(empty-table kademlia small-cfg)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
   =.  tab  (~(record-success kademlia small-cfg) self quarter now tab)
   =.  tab  (~(record-success kademlia small-cfg) self high +(now) tab)
   =.  tab  (~(record-success kademlia small-cfg) self high-quarter (add 2 now) tab)
@@ -135,7 +177,7 @@
   =/  high=node-id  (@ux (pow 2 127))
   =/  first=@da  ~2026.7.14..10.00.00
   =/  latest=@da  ~2026.7.14..12.00.00
-  =/  tab=table  ~(empty-table kademlia small-cfg)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
   =.  tab  (~(record-success kademlia small-cfg) self high first tab)
   =.  tab  (~(record-success kademlia small-cfg) self high latest tab)
   =/  buc=bucket  (~(get-bucket kademlia small-cfg) high tab)
@@ -156,7 +198,7 @@
   =/  b=node-id  (@ux (add high (pow 2 125)))
   =/  now=@da  ~2026.7.14..10.00.00
   =/  latest=@da  ~2026.7.14..15.00.00
-  =/  tab=table  ~(empty-table kademlia small-cfg)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
   =.  tab  (~(record-success kademlia small-cfg) self quarter now tab)
   =.  tab  (~(record-success kademlia small-cfg) self high +(now) tab)
   =.  tab  (~(record-success kademlia small-cfg) self a (add 2 now) tab)
@@ -179,7 +221,7 @@
   =/  eighth=node-id  (@ux (pow 2 125))
   =/  now=@da  ~2026.7.14..10.00.00
   =/  initial=table
-    [%leaf [[1 [[high now 0] ~]] [1 [[quarter +(now) 0] ~]]]]
+    [%leaf now [1 [[high now 0] ~]] [1 [[quarter +(now) 0] ~]]]
   =/  tab=table
     (~(record-success kademlia small-cfg) self eighth (add 2 now) initial)
   =/  quarter-bucket=bucket
@@ -199,7 +241,7 @@
   =/  high=node-id  (@ux (pow 2 127))
   =/  replacement=node-id  (@ux (add high quarter))
   =/  now=@da  ~2026.7.14..10.00.00
-  =/  tab=table  ~(empty-table kademlia small-cfg)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
   =.  tab  (~(record-success kademlia small-cfg) self quarter now tab)
   =.  tab  (~(record-success kademlia small-cfg) self high +(now) tab)
   =.  tab  (~(record-success kademlia small-cfg) self replacement (add 2 now) tab)
@@ -220,7 +262,7 @@
   =/  id=node-id  (@ux (pow 2 127))
   =/  first=@da  ~2026.7.14..10.00.00
   =/  recovered=@da  ~2026.7.14..12.00.00
-  =/  tab=table  ~(empty-table kademlia small-cfg)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
   =.  tab  (~(record-success kademlia small-cfg) self id first tab)
   =.  tab  (~(record-failure kademlia small-cfg) self id 3 tab)
   =.  tab  (~(record-success kademlia small-cfg) self id recovered tab)
@@ -234,18 +276,18 @@
 ++  test-record-failure-unknown
   =/  small-cfg=config  [2 2 3 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0
-  =/  tab=table  ~(empty-table kademlia small-cfg)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
   %+  expect-eq  !>(tab)
   !>((~(record-failure kademlia small-cfg) self 0x8 2 tab))
 ::
 ++  test-zero-capacity-bucket
   =/  zero-cfg=config  [0 0 3 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0
-  =/  tab=table  ~(empty-table kademlia zero-cfg)
+  =/  tab=table  (~(empty-table kademlia zero-cfg) now)
   =.  tab
     (~(record-success kademlia zero-cfg) self 0x8 ~2026.7.14..10.00.00 tab)
   ;:  weld
-    %+  expect-eq  !>(`table`[%leaf [[0 ~] [0 ~]]])
+    %+  expect-eq  !>(`table`[%leaf now [0 ~] [0 ~]])
     !>(tab)
     (expect !>((~(table-valid kademlia zero-cfg) self tab)))
   ==
@@ -257,7 +299,7 @@
   =/  quarter=node-id  (@ux (pow 2 126))
   =/  eighth=node-id  (@ux (pow 2 125))
   =/  now=@da  ~2026.7.14..10.00.00
-  =/  tab=table  ~(empty-table kademlia small-cfg)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
   =.  tab  (~(record-success kademlia small-cfg) self high now tab)
   =.  tab  (~(record-success kademlia small-cfg) self quarter +(now) tab)
   =.  tab  (~(record-success kademlia small-cfg) self eighth (add 2 now) tab)
@@ -291,8 +333,8 @@
   =/  a=contact  [0x8 ~2026.7.14..10.00.00 0]
   =/  b=contact  [0x9 ~2026.7.14..11.00.00 0]
   ;:  weld
-    (expect !>((~(bucket-valid kademlia small-cfg) [[1 [a ~]] [1 [b ~]]])))
-    (expect !>(!(~(bucket-valid kademlia small-cfg) [[1 [a ~]] [1 [a ~]]])))
+    (expect !>((~(bucket-valid kademlia small-cfg) [now [1 [a ~]] [1 [b ~]]])))
+    (expect !>(!(~(bucket-valid kademlia small-cfg) [now [1 [a ~]] [1 [a ~]]])))
   ==
 ::
 ++  test-prefix-table-validation
@@ -300,12 +342,12 @@
   =/  self=node-id  0x0
   =/  high=node-id  (@ux (pow 2 127))
   =/  now=@da  ~2026.7.14..10.00.00
-  =/  good=table  ~(empty-table kademlia small-cfg)
+  =/  good=table  (~(empty-table kademlia small-cfg) now)
   =.  good  (~(record-success kademlia small-cfg) self high now good)
   =/  misplaced=table
-    [%fork [%leaf [[1 [[high now 0] ~]] [0 ~]]] [%leaf empty-bucket]]
+    [%fork [%leaf now [1 [[high now 0] ~]] [0 ~]] [%leaf empty-bucket]]
   =/  self-entry=table
-    [%leaf [[1 [[self now 0] ~]] [0 ~]]]
+    [%leaf now [1 [[self now 0] ~]] [0 ~]]
   =/  nonself-fork=table
     [%fork [%leaf empty-bucket] [%fork [%leaf empty-bucket] [%leaf empty-bucket]]]
   ;:  weld
@@ -321,7 +363,7 @@
 ++  test-lookup-dispatch-alpha
   =/  small-cfg=config  [3 3 2 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0
-  =/  initial=table  ~(empty-table kademlia small-cfg)
+  =/  initial=table  (~(empty-table kademlia small-cfg) now)
   =/  lup=lookup  (~(start-lookup kademlia small-cfg) self 0xf initial)
   =.  lup  (~(learn kademlia small-cfg) self [0x8 0xe 0xf ~] lup)
   =/  out=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) lup)
@@ -342,7 +384,7 @@
   =/  small-cfg=config  [3 3 2 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0
   =/  now=@da  ~2026.8.3..10.00.00
-  =/  initial=table  ~(empty-table kademlia small-cfg)
+  =/  initial=table  (~(empty-table kademlia small-cfg) now)
   =/  lup=lookup  (~(start-lookup kademlia small-cfg) self 0x0 initial)
   =.  lup  (~(learn kademlia small-cfg) self [0x8 0x9 0xa ~] lup)
   =/  sent=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) lup)
@@ -368,7 +410,7 @@
   =/  small-cfg=config  [2 2 2 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0
   =/  now=@da  ~2026.8.3..10.00.00
-  =/  tab=table  ~(empty-table kademlia small-cfg)
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
   =.  tab  (~(record-success kademlia small-cfg) self 0x1 now tab)
   =/  lup=lookup  (~(start-lookup kademlia small-cfg) self 0x0 tab)
   =.  lup  (~(learn kademlia small-cfg) self [0x2 0x3 ~] lup)
@@ -394,7 +436,7 @@
   =/  small-cfg=config  [2 2 2 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0
   =/  now=@da  ~2026.8.3..10.00.00
-  =/  initial=table  ~(empty-table kademlia small-cfg)
+  =/  initial=table  (~(empty-table kademlia small-cfg) now)
   =/  lup=lookup  (~(start-lookup kademlia small-cfg) self 0x0 initial)
   =.  lup  (~(learn kademlia small-cfg) self [0x1 0x2 0x3 ~] lup)
   =/  sent=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) lup)
@@ -416,7 +458,7 @@
   =/  small-cfg=config  [3 3 2 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0
   =/  now=@da  ~2026.8.3..10.00.00
-  =/  initial=table  ~(empty-table kademlia small-cfg)
+  =/  initial=table  (~(empty-table kademlia small-cfg) now)
   =/  lup=lookup  (~(start-lookup kademlia small-cfg) self 0x0 initial)
   =.  lup  (~(learn kademlia small-cfg) self [0x1 0x2 ~] lup)
   =/  sent=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) lup)
@@ -433,7 +475,7 @@
 ::
 ++  test-lookup-empty-completes
   =/  small-cfg=config  [2 2 3 12 %kademlia-urbit-v1]
-  =/  initial=table  ~(empty-table kademlia small-cfg)
+  =/  initial=table  (~(empty-table kademlia small-cfg) now)
   =/  lup=lookup  (~(start-lookup kademlia small-cfg) 0x0 0xf initial)
   =/  sent=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) lup)
   ;:  weld
@@ -447,7 +489,7 @@
 ++  test-lookup-stale-events-ignored
   =/  small-cfg=config  [2 2 1 12 %kademlia-urbit-v1]
   =/  now=@da  ~2026.8.3..10.00.00
-  =/  initial=table  ~(empty-table kademlia small-cfg)
+  =/  initial=table  (~(empty-table kademlia small-cfg) now)
   =/  lup=lookup  (~(start-lookup kademlia small-cfg) 0x0 0xf initial)
   =.  lup  (~(learn kademlia small-cfg) 0x0 [0x8 ~] lup)
   =/  success=[table lookup]
@@ -470,7 +512,7 @@
   =/  self=node-id  0x0
   =/  now=@da  ~2026.8.3..10.00.00
   =/  too-wide=node-id  (@ux (pow 2 128))
-  =/  initial=table  ~(empty-table kademlia small-cfg)
+  =/  initial=table  (~(empty-table kademlia small-cfg) now)
   =/  lup=lookup  (~(start-lookup kademlia small-cfg) self 0x0 initial)
   =.  lup  (~(learn kademlia small-cfg) self [0x8 ~] lup)
   =/  sent=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) lup)

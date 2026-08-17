@@ -17,12 +17,29 @@
   =/  out  on-init:~(. agent bol)
   =/  saved=agent-state  !<(agent-state on-save:+.out)
   ;:  weld
-    %+  expect-eq  !>(2)
+    %+  expect-eq  !>(3)
     !>((lent -.out))
     %+  expect-eq  !>(0v1)
     !>(next-request.saved)
     %+  expect-eq  !>(~m5)
     !>(request-timeout.settings.saved)
+    %+  expect-eq  !>(~h1)
+    !>(refresh-interval.settings.saved)
+    %+  expect-eq  !>(`(unit @da)`[~ (add ~h1 now.bol)])
+    !>(refresh-at.saved)
+  ==
+::
+++  test-load-recreates-refresh-wake
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
+  =/  initialized  on-init:~(. agent bol)
+  =/  saved=agent-state  !<(agent-state on-save:+.initialized)
+  =/  loaded  (on-load:~(. agent bol) !>(saved))
+  =/  restored=agent-state  !<(agent-state on-save:+.loaded)
+  ;:  weld
+    %+  expect-eq  !>(3)
+    !>((lent -.loaded))
+    %+  expect-eq  !>(saved)
+    !>(restored)
   ==
 ::
 ++  test-local-timeout-command-and-scry
@@ -37,6 +54,22 @@
   ;:  weld
     %+  expect-eq  !>(~m1)
     !>(request-timeout.settings.saved)
+    %+  expect-eq  !>(settings.saved)
+    !>(got)
+  ==
+::
+++  test-local-refresh-command-and-scry
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
+  =/  initialized  on-init:~(. agent bol)
+  =/  command=command  [%set-refresh-interval ~m30]
+  =/  out  (on-poke:+.initialized %kademlia-command !>(command))
+  =/  saved=agent-state  !<(agent-state on-save:+.out)
+  =/  peek=(unit (unit cage))  (on-peek:+.out /x/settings)
+  =/  result=cage  (need (need peek))
+  =/  got=settings  !<(settings q.result)
+  ;:  weld
+    %+  expect-eq  !>(~m30)
+    !>(refresh-interval.settings.saved)
     %+  expect-eq  !>(settings.saved)
     !>(got)
   ==

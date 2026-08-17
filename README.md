@@ -99,7 +99,8 @@ timers; timeout wakes consume the timer normally. Late, duplicate, unsolicited,
 and wrong-sender responses are ignored.
 
 Local `%kademlia-command` pokes can replace bootstrap ships, set the request
-timeout with `%set-request-timeout`, start a caller-ID'd lookup, and forget a
+timeout with `%set-request-timeout`, set the positive per-bucket refresh
+interval with `%set-refresh-interval`, start a caller-ID'd lookup, and forget a
 completed result. `%find-for` is the internal callback form: it allocates a
 lookup ID and pokes a typed `%kademlia-result` notice to the requesting local
 agent when lookup completes. Commands are accepted only from the local ship. Read-only
@@ -142,6 +143,15 @@ partition the 128-bit node-ID space by most-significant-bit prefixes. When a
 newly verified contact reaches a full leaf whose range contains the local node,
 that leaf splits and its contacts are redistributed by the next prefix bit.
 Splitting repeats down the local node's branch when necessary.
+
+Each leaf records when a lookup was last started in its range. One global Behn
+wake scans the prefix tree and refreshes stale leaves serially, using Gall
+entropy to choose a target within each stale prefix. Completion of one
+maintenance lookup starts the next overdue leaf; when none remain, the agent
+schedules its sole wake for the earliest future deadline. Ordinary lookups also
+refresh their target leaf, and split children inherit the parent's timestamp.
+Installing seeds into an empty table advances the wake so initial bootstrap
+does not wait for the default one-hour interval.
 
 A full leaf outside the local node's range does not split. New verified contacts
 enter its bounded replacement roster and may be promoted after live contacts

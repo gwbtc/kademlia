@@ -8,6 +8,7 @@
 +$  command
   $%  [%set-seeds ships=(list @p)]
       [%set-request-timeout duration=@dr]
+      [%set-refresh-interval duration=@dr]
       [%find id=lookup-id target=node-id]
       [%find-for target=node-id recipient=@tas reply-path=path]
       [%forget id=lookup-id]
@@ -38,9 +39,11 @@
       active=@ud
       pending=@ud
       completed=@ud
+      refresh-at=(unit @da)
+      maintenance=(unit lookup-id)
   ==
 +$  settings
-  [request-timeout=@dr]
+  [request-timeout=@dr refresh-interval=@dr]
 +$  agent-state
   $:  routing=table
       seeds=(set node-id)
@@ -51,5 +54,7 @@
       settings=settings
       callbacks=(map lookup-id lookup-callback)
       next-lookup=lookup-id
+      refresh-at=(unit @da)
+      maintenance=(unit lookup-id)
   ==
 --

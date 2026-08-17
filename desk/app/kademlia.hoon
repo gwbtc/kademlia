@@ -18,7 +18,7 @@
   ^-  (quip card _this)
   ~&  [%kademlia our.bowl %init]
   =.  state  ~(init logic [our.bowl now.bowl src.bowl state])
-  `this
+  [~(refresh-card logic [our.bowl now.bowl src.bowl state]) this]
 ::
 ++  on-save  !>(state)
 ::
@@ -26,7 +26,8 @@
   |=  old=vase
   ^-  (quip card _this)
   ~&  [%kademlia our.bowl %load]
-  `this(state !<(agent-state old))
+  =.  state  !<(agent-state old)
+  [~(refresh-card logic [our.bowl now.bowl src.bowl state]) this]
 ::
 ++  on-poke
   |=  [=mark =vase]
@@ -39,12 +40,18 @@
       %set-seeds
         ~&  [%kademlia our.bowl %set-seeds ships.command]
         =.  state  (~(set-seeds logic [our.bowl now.bowl src.bowl state]) ships.command)
-        `this
+        =^  cards  state  ~(bootstrap logic [our.bowl now.bowl src.bowl state])
+        [cards this]
       %set-request-timeout
         ~&  [%kademlia our.bowl %set-request-timeout duration.command]
         =.  state
           (~(set-request-timeout logic [our.bowl now.bowl src.bowl state]) duration.command)
         `this
+      %set-refresh-interval
+        ~&  [%kademlia our.bowl %set-refresh-interval duration.command]
+        =^  cards  state
+          (~(set-refresh-interval logic [our.bowl now.bowl src.bowl state]) duration.command)
+        [cards this]
       %find
         ~&  [%kademlia our.bowl %find id.command target.command]
         =^  cards  state
@@ -82,8 +89,10 @@
       =^  cards  state
         (~(receive-nodes logic [our.bowl now.bowl src.bowl state]) id.message contacts.message)
       =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
+      =^  maintenance-cards  state
+        (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)
       ~&  [%kademlia our.bowl %advance id.message ~(tap by pending.state)]
-      [(weld cards notices) this]
+      [(weld cards (weld notices maintenance-cards)) this]
     ==
   ==
 ::
@@ -118,12 +127,22 @@
   =^  cards  state
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request &)
   =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
+  =^  maintenance-cards  state
+    (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)
   ~&  [%kademlia our.bowl %advance-after-failure u.request ~(tap by pending.state)]
-  [(weld cards notices) this]
+  [(weld cards (weld notices maintenance-cards)) this]
 ::
 ++  on-arvo
   |=  [=wire =sign-arvo]
   ^-  (quip card _this)
+  ?:  ?=([%refresh @ ~] wire)
+    ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
+    =/  deadline=(unit @da)  (slaw %da i.t.wire)
+    ?~  deadline  `this
+    ~&  [%kademlia our.bowl %refresh u.deadline]
+    =^  cards  state
+      (~(run-refresh logic [our.bowl now.bowl src.bowl state]) u.deadline eny.bowl)
+    [cards this]
   ?.  ?=([%timeout @ ~] wire)  (on-arvo:def wire sign-arvo)
   ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
@@ -133,8 +152,10 @@
   =^  cards  state
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request |)
   =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
+  =^  maintenance-cards  state
+    (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)
   ~&  [%kademlia our.bowl %advance-after-timeout u.request ~(tap by pending.state)]
-  [(weld cards notices) this]
+  [(weld cards (weld notices maintenance-cards)) this]
 ::
 ++  on-watch  on-watch:def
 ++  on-leave  on-leave:def

@@ -36,6 +36,10 @@
     !>(pending.summary)
     %+  expect-eq  !>(~m5)
     !>(request-timeout.settings.state)
+    %+  expect-eq  !>(~h1)
+    !>(refresh-interval.settings.state)
+    %+  expect-eq  !>(`(unit @da)`[~ (add ~h1 now)])
+    !>(refresh-at.state)
     (expect !>(!(~(has in seeds.state) (node ~zod))))
   ==
 ::
@@ -57,6 +61,102 @@
   =/  state=agent-state  (initial ~zod ~zod)
   %-  expect-fail
   |.  (~(set-request-timeout logic [~zod now ~zod state]) `@dr`0)
+::
+++  test-refresh-interval-setting
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  old=@da  (add ~h1 now)
+  =/  out=[(list card:agent:gall) agent-state]
+    (~(set-refresh-interval logic [~zod now ~zod state]) ~m45)
+  =/  rest=card:agent:gall
+    [%pass /refresh/(scot %da old) %arvo %b %rest old]
+  =/  fresh=@da  (add ~m45 now)
+  =/  wait=card:agent:gall
+    [%pass /refresh/(scot %da fresh) %arvo %b %wait fresh]
+  ;:  weld
+    %+  expect-eq  !>(~m45)
+    !>(refresh-interval.settings.+.out)
+    %+  expect-eq  !>(`(unit @da)`[~ fresh])
+    !>(refresh-at.+.out)
+    (expect !>((lien -.out |=(card=card:agent:gall =(rest card)))))
+    (expect !>((lien -.out |=(card=card:agent:gall =(wait card)))))
+  ==
+::
+++  test-zero-refresh-interval-rejected
+  =/  state=agent-state  (initial ~zod ~zod)
+  %-  expect-fail
+  |.  (~(set-refresh-interval logic [~zod now ~zod state]) `@dr`0)
+::
+++  test-seeds-trigger-bootstrap-wake
+  =/  state=agent-state  (initial ~zod ~zod)
+  =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
+  =/  out=[(list card:agent:gall) agent-state]
+    ~(bootstrap logic [~zod now ~zod state])
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>((lent -.out))
+    %+  expect-eq  !>(`(unit @da)`[~ +(now)])
+    !>(refresh-at.+.out)
+  ==
+::
+++  test-stale-refresh-wake-ignored
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  out=[(list card:agent:gall) agent-state]
+    (~(run-refresh logic [~zod now ~zod state]) +(now) 0x1234)
+  ;:  weld
+    %+  expect-eq  !>(`(list card:agent:gall)`~)
+    !>(-.out)
+    %+  expect-eq  !>(state)
+    !>(+.out)
+  ==
+::
+++  test-refresh-completion-schedules-next-wake
+  =/  state=agent-state  (initial ~zod ~zod)
+  =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
+  =/  deadline=@da  (add ~h1 now)
+  =/  fired=[(list card:agent:gall) agent-state]
+    (~(run-refresh logic [~zod deadline ~zod state]) deadline 0x1234)
+  =/  id=lookup-id  (need maintenance.+.fired)
+  =/  pen=[request-id pending-request]  (first-pending +.fired)
+  =/  answered=[(list card:agent:gall) agent-state]
+    (~(receive-nodes logic [~zod +(deadline) ~nec +.fired]) -.pen ~)
+  =/  continued=[(list card:agent:gall) agent-state]
+    (~(continue-refresh logic [~zod +(deadline) ~zod +.answered]) 0xabcd)
+  =/  next=@da  (add ~h1 deadline)
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>((lent -.fired))
+    (expect !>((~(has by active.+.fired) id)))
+    %+  expect-eq  !>(`(unit lookup-id)`~)
+    !>(maintenance.+.continued)
+    %+  expect-eq  !>(`(unit @da)`[~ next])
+    !>(refresh-at.+.continued)
+    %+  expect-eq  !>(1)
+    !>((lent -.continued))
+    (expect !>(!(~(has by completed.+.continued) id)))
+  ==
+::
+++  test-refresh-completion-starts-next-stale-bucket
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  empty=bucket  [now [0 ~] [0 ~]]
+  =.  routing.state  [%fork [%leaf empty] [%leaf empty]]
+  =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
+  =/  deadline=@da  (add ~h1 now)
+  =/  first=[(list card:agent:gall) agent-state]
+    (~(run-refresh logic [~zod deadline ~zod state]) deadline 0x0)
+  =/  first-id=lookup-id  (need maintenance.+.first)
+  =/  pen=[request-id pending-request]  (first-pending +.first)
+  =/  answered=[(list card:agent:gall) agent-state]
+    (~(receive-nodes logic [~zod +(deadline) ~nec +.first]) -.pen ~)
+  =/  second=[(list card:agent:gall) agent-state]
+    (~(continue-refresh logic [~zod +(deadline) ~zod +.answered]) 0x0)
+  =/  second-id=lookup-id  (need maintenance.+.second)
+  =/  second-lookup=lookup  (need (~(get by active.+.second) second-id))
+  ;:  weld
+    (expect !>(!=(first-id second-id)))
+    (expect !>(?=(~ refresh-at.+.second)))
+    (expect !>((~(prefix-match kad [20 20 3 12 %kademlia-urbit-v1]) 1 0x1 target.second-lookup)))
+    (expect !>((gth (lent -.second) 0)))
+  ==
 ::
 ++  test-empty-lookup-completes
   =/  state=agent-state  (initial ~zod ~zod)

@@ -20,12 +20,18 @@
       items=contacts
   ==
 +$  bucket
-  $:  live=roster                   ::  most-recently seen first
+  $:  refreshed=@da                 ::  last lookup begun in this range
+      live=roster                   ::  most-recently seen first
       replacements=roster           ::  most-recent candidate first
+  ==
++$  bucket-ref
+  $:  depth=@ud
+      prefix=@ux
+      refreshed=@da
   ==
 +$  table
   $+  table
-  $~  [%leaf [[0 ~] [0 ~]]]
+  $~  [%leaf [`@da`0 [0 ~] [0 ~]]]
   $%  [%leaf buc=bucket]
       [%fork zero=table one=table]
   ==

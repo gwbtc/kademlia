@@ -67,8 +67,9 @@
 ::  empty-table: construct the initial bucket covering the whole ID space.
 ::
 ++  empty-table
+  |=  refreshed=@da
   ^-  table
-  [%leaf [[0 ~] [0 ~]]]
+  [%leaf refreshed [0 ~] [0 ~]]
 ::
 ::  node-bit: read one node-ID bit, most-significant bit first.
 ::
@@ -107,6 +108,51 @@
               $(tab zero.tab, depth +(depth))
             $(tab one.tab, depth +(depth))
   ==
+::
+::  bucket-refs: enumerate leaves with their compact prefixes and timestamps.
+::
+++  bucket-refs
+  |=  tab=table
+  ^-  (list bucket-ref)
+  =/  depth=@ud  0
+  =/  prefix=@ux  0x0
+  |-
+  ?-  -.tab
+    %leaf  [[depth prefix refreshed.buc.tab] ~]
+    %fork
+      =/  zero-refs=(list bucket-ref)
+        $(tab zero.tab, depth +(depth), prefix (mul 2 prefix))
+      =/  one-refs=(list bucket-ref)
+        $(tab one.tab, depth +(depth), prefix (add 1 (mul 2 prefix)))
+      (weld zero-refs one-refs)
+  ==
+::
+::  touch-bucket: record that a lookup has begun in the target's leaf.
+::
+++  touch-bucket
+  |=  [id=node-id refreshed=@da tab=table]
+  ^-  table
+  ?>  (valid-node id)
+  =/  depth=@ud  0
+  |-
+  ?-  -.tab
+    %leaf  [%leaf [refreshed live.buc.tab replacements.buc.tab]]
+    %fork
+      ?:  =(0b0 (node-bit depth id))
+        tab(zero $(tab zero.tab, depth +(depth)))
+      tab(one $(tab one.tab, depth +(depth)))
+  ==
+::
+::  refresh-target: combine a compact leaf prefix with an entropy suffix.
+::
+++  refresh-target
+  |=  [ref=bucket-ref entropy=@]
+  ^-  node-id
+  ?>  (lte depth.ref 128)
+  =/  suffix-bits=@ud  (sub 128 depth.ref)
+  =/  high=node-id  (lsh [0 suffix-bits] prefix.ref)
+  =/  low=node-id  (end [0 suffix-bits] entropy)
+  (con high low)
 ::
 ::  take: remove one contact by ID while preserving order and count.
 ::
@@ -252,7 +298,7 @@
   =/  replacements=roster
     :-  (sub count.replacements.buc (lent promoted))
     (slag room items.replacements.buc)
-  [live replacements]
+  [refreshed.buc live replacements]
 ::
 ::  split-bucket: partition a bucket at one prefix bit and fill both children.
 ::
@@ -260,9 +306,9 @@
   |=  [depth=@ud buc=bucket]
   ^-  [zero=bucket one=bucket]
   =/  zero=bucket
-    [(roster-side depth 0b0 live.buc) (roster-side depth 0b0 replacements.buc)]
+    [refreshed.buc (roster-side depth 0b0 live.buc) (roster-side depth 0b0 replacements.buc)]
   =/  one=bucket
-    [(roster-side depth 0b1 live.buc) (roster-side depth 0b1 replacements.buc)]
+    [refreshed.buc (roster-side depth 0b1 live.buc) (roster-side depth 0b1 replacements.buc)]
   [(fill-bucket zero) (fill-bucket one)]
 ::
 ::  prefix-match: test whether an ID begins with one compact prefix.
@@ -352,14 +398,14 @@
       =^  old-live  live  (take id live)
       =^  old-replacement  replacements  (take id replacements)
       ?:  ?=(^ old-live)
-        [%leaf [(push k.cfg con live) replacements]]
+        [%leaf refreshed.buc.tab (push k.cfg con live) replacements]
       ?:  (lth count.live k.cfg)
-        [%leaf [(push k.cfg con live) replacements]]
+        [%leaf refreshed.buc.tab (push k.cfg con live) replacements]
       ?:  ?&(owns-self !=(0 k.cfg) (lth depth 128))
         =/  children=[zero=bucket one=bucket]
-          (split-bucket depth [live replacements])
+          (split-bucket depth [refreshed.buc.tab live replacements])
         $(tab [%fork [%leaf zero.children] [%leaf one.children]])
-      [%leaf [live (push replacement-k.cfg con replacements)]]
+      [%leaf refreshed.buc.tab live (push replacement-k.cfg con replacements)]
   ==
 ::
 ::  record-failure: count a failed request to a live routing contact.
@@ -389,12 +435,12 @@
       ?~  old-live  tab
       =/  failed=contact  u.old-live(fails +(fails.u.old-live))
       ?:  (lth fails.failed max-fails)
-        [%leaf [(push k.cfg failed live) replacements]]
+        [%leaf refreshed.buc.tab (push k.cfg failed live) replacements]
       =/  repl-items=contacts  items.replacements
-      ?~  repl-items  [%leaf [live replacements]]
+      ?~  repl-items  [%leaf refreshed.buc.tab live replacements]
       =/  promoted=contact  i.repl-items
       =.  replacements  [(dec count.replacements) t.repl-items]
-      [%leaf [(push k.cfg promoted live) replacements]]
+      [%leaf refreshed.buc.tab (push k.cfg promoted live) replacements]
   ==
 ::
 ::  contacts: collect every live contact in the routing table.

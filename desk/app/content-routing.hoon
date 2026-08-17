@@ -9,8 +9,7 @@
 ::
 %+  verb  |
 %-  agent:dbug
-=|  state=content-state-0
-=|  callbacks=(map operation-id operation-callback)
+=|  state=content-state
 =>  |%
 ::
 ++  sign-digest
@@ -84,7 +83,7 @@
   ==
 ::
 ++  records-for
-  |=  [=bowl:gall state=content-state-0 request=query]
+  |=  [=bowl:gall state=content-state request=query]
   ^-  records
   =/  verify=verifier
     |=  sample=[signer=node-id message=digest signature=*]
@@ -98,6 +97,19 @@
       =/  key=key  (provider-key:cr content.request)
       =/  all=records  (~(values-for logic engine) key)
       (scag max-providers.config.state (skim all |=(rec=record ?=(%provider -.rec))))
+  ==
+::
+++  operation-notice-card
+  |=  $:  our=@p
+          id=operation-id
+          callback=operation-callback
+          result=operation-result
+      ==
+  ^-  card
+  =/  notice=operation-notice  [reply-path.callback result]
+  :*  %pass  /callback/(scot %uv id)
+      %agent  [our recipient.callback]
+      %poke  %content-routing-result  !>(notice)
   ==
 ::
 ++  new-operation-notices
@@ -118,12 +130,7 @@
   =/  callback=(unit operation-callback)  (~(get by callbacks) id)
   ?~  callback
     $(entries t.entries)
-  =/  notice=operation-notice  [reply-path.u.callback result]
-  =/  card=card
-    :*  %pass  /callback/(scot %uv id)
-        %agent  [our recipient.u.callback]
-        %poke  %content-routing-result  !>(notice)
-    ==
+  =/  card=card  (operation-notice-card our id u.callback result)
   $(entries t.entries, cards [card cards], callbacks (~(del by callbacks) id))
 --
 ::
@@ -146,7 +153,7 @@
 ++  on-load
   |=  old=vase
   ^-  (quip card _this)
-  =.  state  !<(content-state-0 old)
+  =.  state  !<(content-state old)
   [[~(refresh-card logic engine) ~] this]
 ::
 ++  on-poke
@@ -165,8 +172,8 @@
           [namespace.command key publisher revision.command expires.command target.command]
         =/  rec=record  [%pointer body (sign-digest bowl (pointer-message:cr body))]
         =^  cards  state  (~(start-publish logic engine) id.command rec)
-        =^  notices  callbacks
-          (new-operation-notices our.bowl old completed.state callbacks)
+        =^  notices  callbacks.state
+          (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %publish-provider
         =/  old=(map operation-id operation-result)  completed.state
@@ -174,8 +181,8 @@
           [content.command ~(self-id logic engine) revision.command expires.command locations.command]
         =/  rec=record  [%provider body (sign-digest bowl (provider-message:cr body))]
         =^  cards  state  (~(start-publish logic engine) id.command rec)
-        =^  notices  callbacks
-          (new-operation-notices our.bowl old completed.state callbacks)
+        =^  notices  callbacks.state
+          (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %find-pointer
         =/  old=(map operation-id operation-result)  completed.state
@@ -183,22 +190,29 @@
           %+  ~(start-find-pointer logic engine)
             id.command
           [namespace.command publisher.command name.command]
-        =^  notices  callbacks
-          (new-operation-notices our.bowl old completed.state callbacks)
+        =^  notices  callbacks.state
+          (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %find-providers
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(start-find-providers logic engine) id.command content.command)
-        =^  notices  callbacks
-          (new-operation-notices our.bowl old completed.state callbacks)
+        =^  notices  callbacks.state
+          (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %observe
-        ?>  !(~(has by callbacks) id.command)
-        =.  callbacks
-          (~(put by callbacks) id.command [recipient.command reply-path.command])
+        =/  callback=operation-callback
+          [recipient.command reply-path.command]
+        =/  result=(unit operation-result)
+          (~(get by completed.state) id.command)
+        ?^  result
+          [[(operation-notice-card our.bowl id.command callback u.result) ~] this]
+        ?>  !(~(has by callbacks.state) id.command)
+        =.  callbacks.state
+          (~(put by callbacks.state) id.command callback)
         `this
       %forget
         =.  state  (~(forget logic engine) id.command)
+        =.  callbacks.state  (~(del by callbacks.state) id.command)
         `this
       %set-config
         =.  state  (~(set-config logic engine) value.command)
@@ -214,8 +228,8 @@
     =/  old=(map operation-id operation-result)  completed.state
     =^  cards  state
       (~(receive-lookup logic engine) u.id contacts.result.notice)
-    =^  notices  callbacks
-      (new-operation-notices our.bowl old completed.state callbacks)
+    =^  notices  callbacks.state
+      (new-operation-notices our.bowl old completed.state callbacks.state)
     [(weld notices cards) this]
   ::
       %content-routing-message
@@ -223,7 +237,7 @@
     ?.  =(version.message %content-routing-v1)  `this
     ?-  -.message
       %store
-        =/  stored=[store-status content-state-0]  (~(put-replica logic engine) value.message)
+        =/  stored=[store-status content-state]  (~(put-replica logic engine) value.message)
         =.  state  +.stored
         ~&  [%content-routing our.bowl %store src.bowl id.message -.stored]
         =/  response=content-message  [%stored %content-routing-v1 id.message -.stored]
@@ -238,15 +252,15 @@
         ~&  [%content-routing our.bowl %stored src.bowl id.message status.message]
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(receive-stored logic engine) id.message status.message)
-        =^  notices  callbacks
-          (new-operation-notices our.bowl old completed.state callbacks)
+        =^  notices  callbacks.state
+          (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %records
         ~&  [%content-routing our.bowl %records src.bowl id.message (lent values.message)]
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(receive-records logic engine) id.message values.message)
-        =^  notices  callbacks
-          (new-operation-notices our.bowl old completed.state callbacks)
+        =^  notices  callbacks.state
+          (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
     ==
   ==
@@ -294,8 +308,8 @@
   ?~  request  `this
   =/  old=(map operation-id operation-result)  completed.state
   =^  cards  state  (~(fail-request logic engine) u.request &)
-  =^  notices  callbacks
-    (new-operation-notices our.bowl old completed.state callbacks)
+  =^  notices  callbacks.state
+    (new-operation-notices our.bowl old completed.state callbacks.state)
   [(weld notices cards) this]
 ::
 ++  on-arvo
@@ -312,8 +326,8 @@
   ?.  (~(has by pending.state) u.request)  `this
   =/  old=(map operation-id operation-result)  completed.state
   =^  cards  state  (~(fail-request logic engine) u.request |)
-  =^  notices  callbacks
-    (new-operation-notices our.bowl old completed.state callbacks)
+  =^  notices  callbacks.state
+    (new-operation-notices our.bowl old completed.state callbacks.state)
   [(weld notices cards) this]
 ::
 ++  on-watch  on-watch:def

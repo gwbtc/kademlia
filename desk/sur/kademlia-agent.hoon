@@ -41,28 +41,8 @@
   ==
 +$  settings
   [request-timeout=@dr]
-+$  state-0
-  $:  %0
-      routing=table
-      seeds=(set node-id)
-      active=(map lookup-id lookup)
-      pending=(map request-id pending-request)
-      completed=(map lookup-id lookup-result)
-      next-request=request-id
-  ==
-+$  state-1
-  $:  %1
-      routing=table
-      seeds=(set node-id)
-      active=(map lookup-id lookup)
-      pending=(map request-id pending-request)
-      completed=(map lookup-id lookup-result)
-      next-request=request-id
-      settings=settings
-  ==
-+$  state-2
-  $:  %2
-      routing=table
++$  agent-state
+  $:  routing=table
       seeds=(set node-id)
       active=(map lookup-id lookup)
       pending=(map request-id pending-request)
@@ -71,10 +51,5 @@
       settings=settings
       callbacks=(map lookup-id lookup-callback)
       next-lookup=lookup-id
-  ==
-+$  versioned-state
-  $%  state-0
-      state-1
-      state-2
   ==
 --

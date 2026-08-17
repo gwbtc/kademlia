@@ -9,30 +9,19 @@
 |_  $:  our=@p
         now=@da
         src=@p
-        state=state-2
+        state=agent-state
     ==
 ++  self-id
   ^-  node-id
   (~(ship-to-node kad cfg) our)
 ::
 ++  init
-  ^-  state-2
-  [%2 ~(empty-table kad cfg) ~ ~ ~ ~ 0v1 [default-request-timeout] ~ 0v1]
-::
-::  migrate: preserve version-zero lookup/routing state and add defaults.
-::
-++  migrate
-  |=  old=versioned-state
-  ^-  state-2
-  ?-  -.old
-    %0  [%2 routing.old seeds.old active.old pending.old completed.old next-request.old [default-request-timeout] ~ 0v1]
-    %1  [%2 routing.old seeds.old active.old pending.old completed.old next-request.old settings.old ~ 0v1]
-    %2  old
-  ==
+  ^-  agent-state
+  [~(empty-table kad cfg) ~ ~ ~ ~ 0v1 [default-request-timeout] ~ 0v1]
 ::
 ++  complete
   |=  [id=lookup-id lup=lookup]
-  ^-  state-2
+  ^-  agent-state
   =/  result=(unit (list node-id))  (~(lookup-result kad cfg) lup)
   ?~  result  state
   =.  active.state  (~(del by active.state) id)
@@ -41,7 +30,7 @@
 ::
 ++  advance
   |=  [id=lookup-id lup=lookup]
-  ^-  [(list card:agent:gall) state-2]
+  ^-  [(list card:agent:gall) agent-state]
   =/  dispatched=[peers=(list node-id) state=lookup]
     (~(dispatch kad cfg) lup)
   =.  lup  state.dispatched
@@ -71,7 +60,7 @@
 ::
 ++  fail-request
   |=  [request=request-id cancel=?]
-  ^-  [(list card:agent:gall) state-2]
+  ^-  [(list card:agent:gall) agent-state]
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
   ?~  pending  [~ state]
   =/  pen=pending-request  u.pending
@@ -86,13 +75,13 @@
   =/  failed=[routing=table state=lookup]
     (~(timeout kad cfg) self-id peer.pen max-fails routing.state u.active)
   =.  routing.state  routing.failed
-  =/  advanced=[(list card:agent:gall) state-2]
+  =/  advanced=[(list card:agent:gall) agent-state]
     (advance lookup.pen state.failed)
   [(weld cancellation -.advanced) +.advanced]
 ::
 ++  receive-nodes
   |=  [request=request-id ids=(list node-id)]
-  ^-  [(list card:agent:gall) state-2]
+  ^-  [(list card:agent:gall) agent-state]
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
   ?~  pending  [~ state]
   =/  pen=pending-request  u.pending
@@ -106,13 +95,13 @@
   =/  received=[routing=table state=lookup]
     (~(receive kad cfg) self-id sender now (scag k.cfg ids) routing.state u.active)
   =.  routing.state  routing.received
-  =/  advanced=[(list card:agent:gall) state-2]
+  =/  advanced=[(list card:agent:gall) agent-state]
     (advance lookup.pen state.received)
   [[cancellation -.advanced] +.advanced]
 ::
 ++  receive-find-node
   |=  [request=request-id target=node-id]
-  ^-  [(list card:agent:gall) state-2]
+  ^-  [(list card:agent:gall) agent-state]
   ?.  (~(valid-node kad cfg) target)  [~ state]
   =/  sender=node-id  (~(ship-to-node kad cfg) src)
   =.  routing.state  (~(record-success kad cfg) self-id sender now routing.state)
@@ -132,7 +121,7 @@
 ::
 ++  set-seeds
   |=  ships=(list @p)
-  ^-  state-2
+  ^-  agent-state
   =/  ids=(set node-id)  ~
   =/  remaining=(list @p)  ships
   |-
@@ -145,13 +134,13 @@
 ::
 ++  set-request-timeout
   |=  duration=@dr
-  ^-  state-2
+  ^-  agent-state
   ?>  (gth duration 0)
   state(request-timeout.settings duration)
 ::
 ++  start
   |=  [id=lookup-id target=node-id]
-  ^-  [(list card:agent:gall) state-2]
+  ^-  [(list card:agent:gall) agent-state]
   ?>  (~(valid-node kad cfg) target)
   ?>  !(~(has by active.state) id)
   ?>  !(~(has by completed.state) id)
@@ -163,7 +152,7 @@
 ::
 ++  start-for
   |=  [target=node-id callback=lookup-callback]
-  ^-  [(list card:agent:gall) state-2]
+  ^-  [(list card:agent:gall) agent-state]
   =/  id=lookup-id  next-lookup.state
   |-
   ?:  ?|  (~(has by active.state) id)
@@ -178,7 +167,7 @@
 ::  notify: emit each completed callback exactly once.
 ::
 ++  notify
-  ^-  [(list card:agent:gall) state-2]
+  ^-  [(list card:agent:gall) agent-state]
   =/  remaining=(list [lookup-id lookup-callback])  ~(tap by callbacks.state)
   =/  cards=(list card:agent:gall)  ~
   |-
@@ -199,7 +188,7 @@
 ::
 ++  forget
   |=  id=lookup-id
-  ^-  state-2
+  ^-  agent-state
   ?>  !(~(has by active.state) id)
   state(completed (~(del by completed.state) id))
 ::

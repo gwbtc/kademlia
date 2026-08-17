@@ -111,9 +111,8 @@
       kind=?                                      :: %.n store, %.y query
       deadline=@da
   ==
-+$  content-state-0
-  $:  %0
-      config=content-config
++$  content-state
+  $:  config=content-config
       replicas=(map key leased-records)
       origins=(map key record)
       active=(map operation-id operation)
@@ -123,8 +122,6 @@
       refresh-at=@da
       next-operation=operation-id
       background=(set operation-id)
-  ==
-+$  content-versioned-state
-  $%  content-state-0
+      callbacks=(map operation-id operation-callback)
   ==
 --

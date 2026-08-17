@@ -8,7 +8,7 @@
 ::
 %+  verb  |
 %-  agent:dbug
-=|  state=state-2
+=|  state=agent-state
 ^-  agent:gall
 |_  =bowl:gall
 +*  this  .
@@ -26,8 +26,7 @@
   |=  old=vase
   ^-  (quip card _this)
   ~&  [%kademlia our.bowl %load]
-  =/  saved=versioned-state  !<(versioned-state old)
-  `this(state (~(migrate logic [our.bowl now.bowl src.bowl state]) saved))
+  `this(state !<(agent-state old))
 ::
 ++  on-poke
   |=  [=mark =vase]

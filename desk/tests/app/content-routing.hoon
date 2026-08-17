@@ -17,7 +17,7 @@
 ++  test-init-and-settings-scry
   =/  bol=bowl:gall  (bowl ~zod ~zod)
   =/  out  on-init:~(. agent bol)
-  =/  saved=content-state-0  !<(content-state-0 on-save:+.out)
+  =/  saved=content-state  !<(content-state on-save:+.out)
   =/  peek=(unit (unit cage))  (on-peek:+.out /x/settings)
   =/  got=content-config  !<(content-config q:(need (need peek)))
   ;:  weld
@@ -33,11 +33,15 @@
   =/  bol=bowl:gall  (bowl ~zod ~zod)
   =/  initialized  on-init:~(. agent bol)
   =/  content=digest  (digest-cask:cr `(cask)`[%noun 42])
+  =/  observe=content-command
+    [%observe 0v7 %test-recipient /test/reply]
+  =/  observed  (on-poke:+.initialized %content-routing-command !>(observe))
   =/  command=content-command  [%find-providers 0v7 content]
-  =/  started  (on-poke:+.initialized %content-routing-command !>(command))
-  =/  saved=content-state-0  !<(content-state-0 on-save:+.started)
+  =/  started  (on-poke:+.observed %content-routing-command !>(command))
+  =/  saved=content-state  !<(content-state on-save:+.started)
   =/  notice=lookup-notice  [/operation/(scot %uv 0v7) [(provider-key:cr content) ~]]
   =/  finished  (on-poke:+.started %kademlia-result !>(notice))
+  =/  final=content-state  !<(content-state on-save:+.finished)
   =/  path=path  /x/operation/(scot %uv 0v7)
   =/  peek=(unit (unit cage))  (on-peek:+.finished path)
   =/  view=operation-view  !<(operation-view q:(need (need peek)))
@@ -48,5 +52,48 @@
     !>((lent ~(tap by active.saved)))
     %+  expect-eq  !>(`providers`~)
     !>(records.selection.value.value.view)
+    %+  expect-eq  !>(3)
+    !>((lent -.finished))
+    %+  expect-eq  !>(0)
+    !>((lent ~(tap by callbacks.final)))
+  ==
+::
+++  test-callback-persists-and-forget-cleans-up
+  =/  bol=bowl:gall  (bowl ~zod ~zod)
+  =/  initialized  on-init:~(. agent bol)
+  =/  observe=content-command
+    [%observe 0v8 %test-recipient /test/reply]
+  =/  observed  (on-poke:+.initialized %content-routing-command !>(observe))
+  =/  saved=content-state  !<(content-state on-save:+.observed)
+  =/  loaded  (on-load:~(. agent bol) !>(saved))
+  =/  restored=content-state  !<(content-state on-save:+.loaded)
+  =/  forget=content-command  [%forget 0v8]
+  =/  forgotten  (on-poke:+.loaded %content-routing-command !>(forget))
+  =/  final=content-state  !<(content-state on-save:+.forgotten)
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>((lent ~(tap by callbacks.restored)))
+    %+  expect-eq  !>(0)
+    !>((lent ~(tap by callbacks.final)))
+  ==
+::
+++  test-observe-completed-operation-notifies-immediately
+  =/  bol=bowl:gall  (bowl ~zod ~zod)
+  =/  initialized  on-init:~(. agent bol)
+  =/  content=digest  (digest-cask:cr `(cask)`[%noun 42])
+  =/  command=content-command  [%find-providers 0v9 content]
+  =/  started  (on-poke:+.initialized %content-routing-command !>(command))
+  =/  notice=lookup-notice
+    [/operation/(scot %uv 0v9) [(provider-key:cr content) ~]]
+  =/  finished  (on-poke:+.started %kademlia-result !>(notice))
+  =/  observe=content-command
+    [%observe 0v9 %test-recipient /test/reply]
+  =/  observed  (on-poke:+.finished %content-routing-command !>(observe))
+  =/  final=content-state  !<(content-state on-save:+.observed)
+  ;:  weld
+    %+  expect-eq  !>(3)
+    !>((lent -.observed))
+    %+  expect-eq  !>(0)
+    !>((lent ~(tap by callbacks.final)))
   ==
 --

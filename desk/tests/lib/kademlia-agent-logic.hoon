@@ -5,25 +5,25 @@
 ::
 ++  initial
   |=  [our=@p src=@p]
-  ^-  state-2
-  ~(init logic [our now src *state-2])
+  ^-  agent-state
+  ~(init logic [our now src *agent-state])
 ::
 ++  node
   |=  ship=@p
   ^-  node-id
-  ~(self-id logic [ship now ship *state-2])
+  ~(self-id logic [ship now ship *agent-state])
 ::
 ++  pending-count
-  |=  state=state-2
+  |=  state=agent-state
   (lent ~(tap by pending.state))
 ::
 ++  first-pending
-  |=  state=state-2
+  |=  state=agent-state
   ^-  [request-id pending-request]
   (head ~(tap by pending.state))
 ::
 ++  test-init-and-seeds
-  =/  state=state-2  (initial ~zod ~zod)
+  =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~bud ~nec ~zod ~])
   =/  seeds=(list node-id)  ~(seed-list logic [~zod now ~zod state])
   =/  summary=summary  ~(get-summary logic [~zod now ~zod state])
@@ -40,10 +40,10 @@
   ==
 ::
 ++  test-request-timeout-setting
-  =/  state=state-2  (initial ~zod ~zod)
+  =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-request-timeout logic [~zod now ~zod state]) ~s45)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) state-2]
+  =/  started=[(list card:agent:gall) agent-state]
     (~(start logic [~zod now ~zod state]) 0v20 0x1234)
   =/  pen=[request-id pending-request]  (first-pending +.started)
   ;:  weld
@@ -54,13 +54,13 @@
   ==
 ::
 ++  test-zero-request-timeout-rejected
-  =/  state=state-2  (initial ~zod ~zod)
+  =/  state=agent-state  (initial ~zod ~zod)
   %-  expect-fail
   |.  (~(set-request-timeout logic [~zod now ~zod state]) `@dr`0)
 ::
 ++  test-empty-lookup-completes
-  =/  state=state-2  (initial ~zod ~zod)
-  =/  out=[(list card:agent:gall) state-2]
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  out=[(list card:agent:gall) agent-state]
     (~(start logic [~zod now ~zod state]) 0v1 0x1234)
   =/  view=(unit lookup-view)
     (~(get-lookup logic [~zod now ~zod +.out]) 0v1)
@@ -74,12 +74,12 @@
   ==
 ::
 ++  test-empty-callback-lookup-notifies
-  =/  state=state-2  (initial ~zod ~zod)
-  =/  started=[(list card:agent:gall) state-2]
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  started=[(list card:agent:gall) agent-state]
     %+  ~(start-for logic [~zod now ~zod state])
       0x1234
     [%sink /lookup-result]
-  =/  notified=[(list card:agent:gall) state-2]
+  =/  notified=[(list card:agent:gall) agent-state]
     ~(notify logic [~zod now ~zod +.started])
   =/  result=lookup-result  [0x1234 ~]
   =/  notice=lookup-notice  [/lookup-result result]
@@ -102,9 +102,9 @@
   ==
 ::
 ++  test-seeded-dispatch
-  =/  state=state-2  (initial ~zod ~zod)
+  =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~bud ~])
-  =/  out=[(list card:agent:gall) state-2]
+  =/  out=[(list card:agent:gall) agent-state]
     (~(start logic [~zod now ~zod state]) 0v2 0x1234)
   =/  summary=summary  ~(get-summary logic [~zod now ~zod +.out])
   ;:  weld
@@ -119,13 +119,13 @@
   ==
 ::
 ++  test-response-admits-only-sender
-  =/  state=state-2  (initial ~zod ~zod)
+  =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) state-2]
+  =/  started=[(list card:agent:gall) agent-state]
     (~(start logic [~zod now ~zod state]) 0v3 0x0)
   =/  pen=[request-id pending-request]  (first-pending +.started)
   =/  returned=node-id  (node ~bud)
-  =/  received=[(list card:agent:gall) state-2]
+  =/  received=[(list card:agent:gall) agent-state]
     (~(receive-nodes logic [~zod +(now) ~nec +.started]) -.pen [returned ~])
   =/  cancellation=card:agent:gall
     [%pass /timeout/(scot %uv -.pen) %arvo %b %rest deadline.+.pen]
@@ -143,12 +143,12 @@
   ==
 ::
 ++  test-wrong-sender-is-ignored
-  =/  state=state-2  (initial ~zod ~zod)
+  =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) state-2]
+  =/  started=[(list card:agent:gall) agent-state]
     (~(start logic [~zod now ~zod state]) 0v4 0x0)
   =/  pen=[request-id pending-request]  (first-pending +.started)
-  =/  received=[(list card:agent:gall) state-2]
+  =/  received=[(list card:agent:gall) agent-state]
     (~(receive-nodes logic [~zod +(now) ~bud +.started]) -.pen ~)
   ;:  weld
     %+  expect-eq  !>(`(list card:agent:gall)`~)
@@ -158,14 +158,14 @@
   ==
 ::
 ++  test-timeout-completes-and-is-stale-safe
-  =/  state=state-2  (initial ~zod ~zod)
+  =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) state-2]
+  =/  started=[(list card:agent:gall) agent-state]
     (~(start logic [~zod now ~zod state]) 0v5 0x0)
   =/  pen=[request-id pending-request]  (first-pending +.started)
-  =/  failed=[(list card:agent:gall) state-2]
+  =/  failed=[(list card:agent:gall) agent-state]
     (~(fail-request logic [~zod (add ~s10 now) ~zod +.started]) -.pen |)
-  =/  stale=[(list card:agent:gall) state-2]
+  =/  stale=[(list card:agent:gall) agent-state]
     (~(fail-request logic [~zod (add ~s20 now) ~zod +.failed]) -.pen |)
   =/  view=(unit lookup-view)
     (~(get-lookup logic [~zod (add ~s20 now) ~zod +.stale]) 0v5)
@@ -178,14 +178,14 @@
   ==
 ::
 ++  test-poke-failure-cancels-timer
-  =/  state=state-2  (initial ~zod ~zod)
+  =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) state-2]
+  =/  started=[(list card:agent:gall) agent-state]
     (~(start logic [~zod now ~zod state]) 0v21 0x0)
   =/  pen=[request-id pending-request]  (first-pending +.started)
   =/  cancellation=card:agent:gall
     [%pass /timeout/(scot %uv -.pen) %arvo %b %rest deadline.+.pen]
-  =/  failed=[(list card:agent:gall) state-2]
+  =/  failed=[(list card:agent:gall) agent-state]
     (~(fail-request logic [~zod +(now) ~zod +.started]) -.pen &)
   ;:  weld
     %+  expect-eq  !>(`(list card:agent:gall)`[cancellation ~])
@@ -195,10 +195,10 @@
   ==
 ::
 ++  test-incoming-find-node
-  =/  state=state-2  (initial ~zod ~zod)
-  =/  first=[(list card:agent:gall) state-2]
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  first=[(list card:agent:gall) agent-state]
     (~(receive-find-node logic [~zod now ~nec state]) 0v10 0x0)
-  =/  second=[(list card:agent:gall) state-2]
+  =/  second=[(list card:agent:gall) agent-state]
     (~(receive-find-node logic [~zod +(now) ~bud +.first]) 0v11 (node ~nec))
   =/  contacts=(list contact)
     (~(contacts kad [20 20 3 12 %kademlia-urbit-v1]) routing.+.second)
@@ -212,10 +212,10 @@
   ==
 ::
 ++  test-forget-result
-  =/  state=state-2  (initial ~zod ~zod)
-  =/  completed=[(list card:agent:gall) state-2]
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  completed=[(list card:agent:gall) agent-state]
     (~(start logic [~zod now ~zod state]) 0v12 0x1)
-  =/  forgotten=state-2
+  =/  forgotten=agent-state
     (~(forget logic [~zod now ~zod +.completed]) 0v12)
   %+  expect-eq  !>(`(unit lookup-view)`~)
   !>((~(get-lookup logic [~zod now ~zod forgotten]) 0v12))

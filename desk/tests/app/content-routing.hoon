@@ -120,6 +120,39 @@
     !>(after)
   ==
 ::
+++  test-oversized-peer-queries-are-ignored
+  =/  bol=bowl:gall  (bowl ~zod ~nec)
+  =/  initialized  on-init:~(. agent bol)
+  =/  before=content-state  !<(content-state on-save:+.initialized)
+  =/  pointer=content-message
+    [%find-records %content-routing-v1 0v1 [%pointer ;;(@ux (pow 2 128))]]
+  =/  pointer-out  (on-poke:+.initialized %content-routing-message !>(pointer))
+  =/  pointer-state=content-state  !<(content-state on-save:+.pointer-out)
+  =/  providers=content-message
+    [%find-records %content-routing-v1 0v2 [%providers ;;(@uvI (pow 2 256))]]
+  =/  providers-out  (on-poke:+.pointer-out %content-routing-message !>(providers))
+  =/  providers-state=content-state  !<(content-state on-save:+.providers-out)
+  ;:  weld
+    %+  expect-eq  !>(before)
+    !>(pointer-state)
+    %+  expect-eq  !>(before)
+    !>(providers-state)
+  ==
+::
+++  test-oversized-local-query-inputs-nack
+  =/  bol=bowl:gall  (bowl ~zod ~zod)
+  =/  initialized  on-init:~(. agent bol)
+  ;:  weld
+    %-  expect-fail
+    |.  %+  on-poke:+.initialized
+          %content-routing-command
+        !>(`content-command`[%find-pointer 0v1 %test ;;(@ux (pow 2 128)) 0])
+    %-  expect-fail
+    |.  %+  on-poke:+.initialized
+          %content-routing-command
+        !>(`content-command`[%find-providers 0v2 ;;(@uvI (pow 2 256))])
+  ==
+::
 ++  test-malformed-store-payload-is-ignored
   =/  bol=bowl:gall  (bowl ~zod ~nec)
   =/  initialized  on-init:~(. agent bol)

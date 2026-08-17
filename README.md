@@ -136,6 +136,9 @@ accounted for as accepted, rejected, or timed out.
 
 Content operation IDs and transport request IDs follow the same 64-bit local
 conflict, internal allocation, and remote rejection rules as Kademlia IDs.
+Pointer lookup keys are limited to 128 bits and provider-query content digests
+to 256 bits before hashing or replica-map access. Oversized local query inputs
+nack, while oversized remote queries are silently dropped.
 `%store` and `%records` carry jammed atoms rather than structurally unbounded
 record nouns. Receivers check atom size before `cue`; the wire protocol permits
 at most 64 KiB per record, 64 records, and 256 KiB for an entire response.

@@ -25,6 +25,16 @@
   ^-  ?
   (lte (met 0 id) 64)
 ::
+::  valid-query: enforce the fixed-width key and digest domains before use.
+::
+++  valid-query
+  |=  request=query
+  ^-  ?
+  ?-  -.request
+    %pointer    (identity-valid:cr key.request)
+    %providers  (digest-valid:cr content.request)
+  ==
+::
 ::  bump-id: advance a counter modulo the 64-bit ID space.
 ::
 ++  bump-id
@@ -393,12 +403,14 @@
 ++  start-find-pointer
   |=  [id=operation-id namespace=@tas publisher=node-id name=*]
   ^-  [(list card:agent:gall) content-state]
+  ?>  (identity-valid:cr publisher)
   =/  target=key  (pointer-key:cr namespace publisher name)
   (start-operation id [%find-pointer namespace publisher target])
 ::
 ++  start-find-providers
   |=  [id=operation-id content=digest]
   ^-  [(list card:agent:gall) content-state]
+  ?>  (digest-valid:cr content)
   (start-operation id [%find-providers content (provider-key:cr content)])
 ::
 ++  merge-records

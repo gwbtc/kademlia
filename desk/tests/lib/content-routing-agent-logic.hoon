@@ -102,6 +102,20 @@
     |.  (~(start-find-providers logic engine) ;;(@uv (pow 2 64)) content-id)
   ==
 ::
+++  test-query-domain-boundaries
+  =/  state=content-state  initial
+  =/  engine  [~zod now ~zod state allow]
+  ;:  weld
+    (expect !>((~(valid-query logic engine) [%pointer ;;(@ux (dec (pow 2 128)))])))
+    (expect !>(!(~(valid-query logic engine) [%pointer ;;(@ux (pow 2 128))])))
+    (expect !>((~(valid-query logic engine) [%providers ;;(@uvI (dec (pow 2 256)))])))
+    (expect !>(!(~(valid-query logic engine) [%providers ;;(@uvI (pow 2 256))])))
+    %-  expect-fail
+    |.  (~(start-find-pointer logic engine) 0v1 %test ;;(@ux (pow 2 128)) 0)
+    %-  expect-fail
+    |.  (~(start-find-providers logic engine) 0v1 ;;(@uvI (pow 2 256)))
+  ==
+::
 ++  test-content-request-id-wrap-skips-pending
   =/  state=content-state  initial
   =/  max=content-request-id  ;;(@uv (dec (pow 2 64)))

@@ -166,6 +166,7 @@
     ?-  -.command
       %publish-pointer
         ?>  (~(valid-id logic engine) id.command)
+        ?>  (target-valid:cr target.command)
         =/  old=(map operation-id operation-result)  completed.state
         =/  publisher=node-id  ~(self-id logic engine)
         =/  key=key  (pointer-key:cr namespace.command publisher name.command)
@@ -178,6 +179,8 @@
         [(weld notices cards) this]
       %publish-provider
         ?>  (~(valid-id logic engine) id.command)
+        ?>  (digest-valid:cr content.command)
+        ?>  (locators-valid:cr locations.command)
         =/  old=(map operation-id operation-result)  completed.state
         =/  body=provider-body
           [content.command ~(self-id logic engine) revision.command expires.command locations.command]
@@ -188,6 +191,7 @@
         [(weld notices cards) this]
       %find-pointer
         ?>  (~(valid-id logic engine) id.command)
+        ?>  (identity-valid:cr publisher.command)
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state
           %+  ~(start-find-pointer logic engine)
@@ -198,6 +202,7 @@
         [(weld notices cards) this]
       %find-providers
         ?>  (~(valid-id logic engine) id.command)
+        ?>  (digest-valid:cr content.command)
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(start-find-providers logic engine) id.command content.command)
         =^  notices  callbacks.state
@@ -254,6 +259,7 @@
         [[(send-message src.bowl response) ~] this]
       %find-records
         ?.  (~(valid-id logic engine) id.message)  `this
+        ?.  (~(valid-query logic engine) request.message)  `this
         =/  values=records  (records-for bowl state request.message)
         =/  packed=[count=@ud payload=@]  (~(pack-records logic engine) values)
         ~&  [%content-routing our.bowl %find-records src.bowl id.message request.message count.packed]

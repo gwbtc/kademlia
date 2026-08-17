@@ -144,6 +144,9 @@ record nouns. Receivers check atom size before `cue`; the wire protocol permits
 at most 64 KiB per record, 64 records, and 256 KiB for an entire response.
 Malformed stores are dropped, while a malformed response immediately fails its
 matching pending request.
+Response IDs, kinds, and senders are matched against pending state before any
+response payload is decoded. Unsolicited, late, duplicate, and wrong-sender
+responses are therefore dropped without decode work.
 
 Unsigned local publication bodies are completed with the local 128-bit node ID
 and signed using the ship's current Jael Ames key. Receiving replicas resolve

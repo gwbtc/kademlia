@@ -267,7 +267,7 @@
           [%records %content-routing-v1 id.message count.packed payload.packed]
         [[(send-message src.bowl response) ~] this]
       %stored
-        ?.  (~(valid-id logic engine) id.message)  `this
+        ?.  (~(response-expected logic engine) id.message %.n)  `this
         ~&  [%content-routing our.bowl %stored src.bowl id.message status.message]
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(receive-stored logic engine) id.message status.message)
@@ -275,7 +275,7 @@
           (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %records
-        ?.  (~(valid-id logic engine) id.message)  `this
+        ?.  (~(response-expected logic engine) id.message %.y)  `this
         =/  decoded=(unit records)
           (~(unpack-records logic engine) count.message payload.message)
         =/  old=(map operation-id operation-result)  completed.state

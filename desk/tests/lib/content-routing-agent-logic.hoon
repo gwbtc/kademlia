@@ -116,6 +116,20 @@
     |.  (~(start-find-providers logic engine) 0v1 ;;(@uvI (pow 2 256)))
   ==
 ::
+++  test-response-admission
+  =/  state=content-state  initial
+  =/  peer=node-id  ~(self-id logic [~nec now ~nec state allow])
+  =/  pen=pending-content-request  [0v9 peer %.y +(now)]
+  =.  pending.state  (~(put by pending.state) 0v1 pen)
+  =/  correct  [~zod now ~nec state allow]
+  =/  wrong  [~zod now ~bud state allow]
+  ;:  weld
+    (expect !>((~(response-expected logic correct) 0v1 %.y)))
+    (expect !>(!(~(response-expected logic correct) 0v1 %.n)))
+    (expect !>(!(~(response-expected logic wrong) 0v1 %.y)))
+    (expect !>(!(~(response-expected logic correct) 0v2 %.y)))
+  ==
+::
 ++  test-content-request-id-wrap-skips-pending
   =/  state=content-state  initial
   =/  max=content-request-id  ;;(@uv (dec (pow 2 64)))

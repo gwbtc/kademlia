@@ -35,6 +35,20 @@
     %providers  (digest-valid:cr content.request)
   ==
 ::
+::  response-expected: admit only a pending response of the expected kind and
+::  sender.  Call this before decoding any response payload.
+::
+++  response-expected
+  |=  [request=content-request-id query=?]
+  ^-  ?
+  ?.  (valid-id request)  |
+  =/  found=(unit pending-content-request)  (~(get by pending.state) request)
+  ?~  found  |
+  =/  pen=pending-content-request  u.found
+  ?&  =(peer.pen (~(ship-to-node kad kad-cfg) src))
+      =(query kind.pen)
+  ==
+::
 ::  bump-id: advance a counter modulo the 64-bit ID space.
 ::
 ++  bump-id
@@ -530,12 +544,9 @@
 ++  receive-stored
   |=  [request=content-request-id status=store-status]
   ^-  [(list card:agent:gall) content-state]
-  ?.  (valid-id request)  [~ state]
+  ?.  (response-expected request %.n)  [~ state]
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
-  ?~  found  [~ state]
-  =/  pen=pending-content-request  u.found
-  ?.  =(peer.pen (~(ship-to-node kad kad-cfg) src))  [~ state]
-  ?.  =(%.n kind.pen)  [~ state]
+  =/  pen=pending-content-request  (need found)
   =.  pending.state  (~(del by pending.state) request)
   =/  active=(unit operation)  (~(get by active.state) operation.pen)
   ?~  active  [~ state]
@@ -554,12 +565,9 @@
 ++  receive-records
   |=  [request=content-request-id values=records]
   ^-  [(list card:agent:gall) content-state]
-  ?.  (valid-id request)  [~ state]
+  ?.  (response-expected request %.y)  [~ state]
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
-  ?~  found  [~ state]
-  =/  pen=pending-content-request  u.found
-  ?.  =(peer.pen (~(ship-to-node kad kad-cfg) src))  [~ state]
-  ?.  =(%.y kind.pen)  [~ state]
+  =/  pen=pending-content-request  (need found)
   =.  pending.state  (~(del by pending.state) request)
   =/  active=(unit operation)  (~(get by active.state) operation.pen)
   ?~  active  [~ state]

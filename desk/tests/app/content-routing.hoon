@@ -1,5 +1,5 @@
 /-  *kademlia, *kademlia-agent, *content-routing, *content-routing-agent
-/+  cr=content-routing, *test
+/+  kad=kademlia, cr=content-routing, *test
 /=  agent  /app/content-routing
 |%
 ++  now  ~2026.8.10..12.00.00
@@ -151,6 +151,45 @@
     |.  %+  on-poke:+.initialized
           %content-routing-command
         !>(`content-command`[%find-providers 0v2 ;;(@uvI (pow 2 256))])
+  ==
+::
+++  test-response-admission-precedes-processing
+  =/  home=bowl:gall  (bowl ~zod ~zod)
+  =/  initialized  on-init:~(. agent home)
+  =/  state=content-state  !<(content-state on-save:+.initialized)
+  =/  cfg=config  [20 20 3 12 %kademlia-urbit-v1]
+  =/  peer=node-id  (~(ship-to-node kad cfg) ~nec)
+  =.  pending.state
+    (~(put by pending.state) 0v3 `pending-content-request`[0v30 peer %.y +(now)])
+  =.  pending.state
+    (~(put by pending.state) 0v4 `pending-content-request`[0v40 peer %.n +(now)])
+  =/  records-message=content-message
+    [%records %content-routing-v1 0v3 1 0]
+  =/  stored-message=content-message
+    [%stored %content-routing-v1 0v4 [%accepted ~]]
+  =/  wrong-loaded  (on-load:~(. agent (bowl ~zod ~bud)) !>(state))
+  =/  wrong-records
+    (on-poke:+.wrong-loaded %content-routing-message !>(records-message))
+  =/  wrong-records-state=content-state
+    !<(content-state on-save:+.wrong-records)
+  =/  wrong-stored
+    (on-poke:+.wrong-loaded %content-routing-message !>(stored-message))
+  =/  wrong-stored-state=content-state
+    !<(content-state on-save:+.wrong-stored)
+  =/  correct-loaded  (on-load:~(. agent (bowl ~zod ~nec)) !>(state))
+  =/  correct-records
+    (on-poke:+.correct-loaded %content-routing-message !>(records-message))
+  =/  correct-records-state=content-state
+    !<(content-state on-save:+.correct-records)
+  =/  correct-stored
+    (on-poke:+.correct-loaded %content-routing-message !>(stored-message))
+  =/  correct-stored-state=content-state
+    !<(content-state on-save:+.correct-stored)
+  ;:  weld
+    (expect !>((~(has by pending.wrong-records-state) 0v3)))
+    (expect !>((~(has by pending.wrong-stored-state) 0v4)))
+    (expect !>(!(~(has by pending.correct-records-state) 0v3)))
+    (expect !>(!(~(has by pending.correct-stored-state) 0v4)))
   ==
 ::
 ++  test-malformed-store-payload-is-ignored

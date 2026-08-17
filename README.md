@@ -151,6 +151,9 @@ matching pending request.
 Response IDs, kinds, and senders are matched against pending state before any
 response payload is decoded. Unsolicited, late, duplicate, and wrong-sender
 responses are therefore dropped without decode work.
+Logic transitions explicitly return an optional operation-completion event.
+The agent uses that event for a single callback-map lookup instead of comparing
+and scanning the complete retained-result map after every response or timeout.
 
 Unsigned local publication bodies are completed with the local 128-bit node ID
 and signed using the ship's current Jael Ames key. Receiving replicas resolve

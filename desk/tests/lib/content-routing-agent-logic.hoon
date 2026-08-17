@@ -289,10 +289,11 @@
   =/  rec=record  (provider 0x12 1 'https://one.test')
   =/  started=[(list card:agent:gall) content-state]
     (~(start-publish logic [~zod now ~zod state allow]) 0v1 rec)
-  =/  found=[(list card:agent:gall) content-state]
+  =/  found=[(list card:agent:gall) operation-update]
     (~(receive-lookup logic [~zod now ~zod +.started allow]) 0v1 ~)
   =/  view=(unit operation-view)
-    (~(get-operation logic [~zod now ~zod +.found allow]) 0v1)
+    (~(get-operation logic [~zod now ~zod state.+.found allow]) 0v1)
+  =/  completion=operation-completion  (need completion.+.found)
   =/  got=operation-view  (need view)
   ?>  ?=(%complete -.got)
   ?>  ?=(%published -.value.got)
@@ -301,7 +302,9 @@
     !>(-.found)
     %+  expect-eq  !>(1)
     !>((lent ~(tap in accepted.value.value.got)))
-    (expect !>((~(has in accepted.value.value.got) ~(self-id logic [~zod now ~zod +.found allow]))))
+    (expect !>((~(has in accepted.value.value.got) ~(self-id logic [~zod now ~zod state.+.found allow]))))
+    %+  expect-eq  !>(0v1)
+    !>(id.completion)
   ==
 ::
 ++  test-local-provider-query
@@ -311,10 +314,10 @@
   =.  state  (~(put-origin logic [~zod now ~zod state allow]) rec)
   =/  started=[(list card:agent:gall) content-state]
     (~(start-find-providers logic [~zod now ~zod state allow]) 0v2 content-id)
-  =/  found=[(list card:agent:gall) content-state]
+  =/  found=[(list card:agent:gall) operation-update]
     (~(receive-lookup logic [~zod now ~zod +.started allow]) 0v2 ~)
   =/  view=(unit operation-view)
-    (~(get-operation logic [~zod now ~zod +.found allow]) 0v2)
+    (~(get-operation logic [~zod now ~zod state.+.found allow]) 0v2)
   =/  got=operation-view  (need view)
   ?>  ?=(%complete -.got)
   ?>  ?=(%providers -.value.got)
@@ -326,13 +329,14 @@
   =/  rec=record  (provider 0x12 1 'https://one.test')
   =/  started=[(list card:agent:gall) content-state]
     (~(start-publish logic [~zod now ~zod state allow]) 0v3 rec)
-  =/  found=[(list card:agent:gall) content-state]
+  =/  found=[(list card:agent:gall) operation-update]
     (~(receive-lookup logic [~zod now ~zod +.started allow]) 0v3 [0x10 0x20 0x30 0x40 ~])
   ;:  weld
     %+  expect-eq  !>(3)
-    !>((lent ~(tap by pending.+.found)))
+    !>((lent ~(tap by pending.state.+.found)))
     %+  expect-eq  !>(6)
     !>((lent -.found))
+    (expect !>(?=(~ completion.+.found)))
   ==
 ::
 ++  test-origin-refresh-is-background
@@ -351,5 +355,25 @@
     !>((lent ~(tap by active.+.refreshed)))
     %+  expect-eq  !>((add ~h12 later))
     !>(refresh-at.+.refreshed)
+  ==
+::
+++  test-background-completion-is-emitted-but-not-retained
+  =/  state=content-state  initial
+  =/  rec=record  (provider 0x12 1 'https://one.test')
+  =.  state  (~(put-origin logic [~zod now ~zod state allow]) rec)
+  =/  later=@da  (add ~h12 now)
+  =/  refreshed=[(list card:agent:gall) content-state]
+    ~(refresh-origins logic [~zod later ~zod state allow])
+  =/  entries=(list [operation-id operation])  ~(tap by active.+.refreshed)
+  ?>  ?=(^ entries)
+  =/  id=operation-id  -.i.entries
+  =/  finished=[(list card:agent:gall) operation-update]
+    (~(receive-lookup logic [~zod later ~zod +.refreshed allow]) id ~)
+  =/  completion=operation-completion  (need completion.+.finished)
+  ;:  weld
+    %+  expect-eq  !>(id)
+    !>(id.completion)
+    (expect !>(!(~(has in background.state.+.finished) id)))
+    (expect !>(!(~(has by completed.state.+.finished) id)))
   ==
 --

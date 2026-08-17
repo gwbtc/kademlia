@@ -84,6 +84,8 @@
       [%pointer value=pointer-result]
       [%providers value=providers-result]
   ==
++$  operation-completion
+  [id=operation-id result=operation-result]
 +$  operation-kind
   $%  [%publish value=record key=key payload=@]
       [%find-pointer namespace=@tas publisher=node-id key=key]
@@ -124,4 +126,6 @@
       background=(set operation-id)
       callbacks=(map operation-id operation-callback)
   ==
++$  operation-update
+  [completion=(unit operation-completion) state=content-state]
 --

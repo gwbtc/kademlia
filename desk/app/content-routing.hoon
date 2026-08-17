@@ -112,26 +112,31 @@
       %poke  %content-routing-result  !>(notice)
   ==
 ::
-++  new-operation-notices
+++  operation-completion-notice
   |=  $:  our=@p
-          old=(map operation-id operation-result)
-          new=(map operation-id operation-result)
+          completion=(unit operation-completion)
           callbacks=(map operation-id operation-callback)
       ==
   ^-  [(list card) (map operation-id operation-callback)]
-  =/  entries=(list [operation-id operation-result])  ~(tap by new)
-  =/  cards=(list card)  ~
-  |-
-  ?~  entries  [(flop cards) callbacks]
-  =/  id=operation-id  -.i.entries
-  =/  result=operation-result  +.i.entries
-  ?:  (~(has by old) id)
-    $(entries t.entries)
+  ?~  completion  [~ callbacks]
+  =/  id=operation-id  id.u.completion
   =/  callback=(unit operation-callback)  (~(get by callbacks) id)
-  ?~  callback
-    $(entries t.entries)
-  =/  card=card  (operation-notice-card our id u.callback result)
-  $(entries t.entries, cards [card cards], callbacks (~(del by callbacks) id))
+  ?~  callback  [~ callbacks]
+  =/  card=card
+    (operation-notice-card our id u.callback result.u.completion)
+  [[card ~] (~(del by callbacks) id)]
+::
+++  apply-operation-transition
+  |=  $:  our=@p
+          transition=[cards=(list card) update=operation-update]
+      ==
+  ^-  [(list card) content-state]
+  =/  noticed=[(list card) (map operation-id operation-callback)]
+    %+  operation-completion-notice  our
+    [completion.update.transition callbacks.state.update.transition]
+  =/  out=content-state  state.update.transition
+  =.  callbacks.out  +.noticed
+  [(weld -.noticed cards.transition) out]
 --
 ::
 ^-  agent:gall
@@ -167,47 +172,35 @@
       %publish-pointer
         ?>  (~(valid-id logic engine) id.command)
         ?>  (target-valid:cr target.command)
-        =/  old=(map operation-id operation-result)  completed.state
         =/  publisher=node-id  ~(self-id logic engine)
         =/  key=key  (pointer-key:cr namespace.command publisher name.command)
         =/  body=pointer-body
           [namespace.command key publisher revision.command expires.command target.command]
         =/  rec=record  [%pointer body (sign-digest bowl (pointer-message:cr body))]
         =^  cards  state  (~(start-publish logic engine) id.command rec)
-        =^  notices  callbacks.state
-          (new-operation-notices our.bowl old completed.state callbacks.state)
-        [(weld notices cards) this]
+        [cards this]
       %publish-provider
         ?>  (~(valid-id logic engine) id.command)
         ?>  (digest-valid:cr content.command)
         ?>  (locators-valid:cr locations.command)
-        =/  old=(map operation-id operation-result)  completed.state
         =/  body=provider-body
           [content.command ~(self-id logic engine) revision.command expires.command locations.command]
         =/  rec=record  [%provider body (sign-digest bowl (provider-message:cr body))]
         =^  cards  state  (~(start-publish logic engine) id.command rec)
-        =^  notices  callbacks.state
-          (new-operation-notices our.bowl old completed.state callbacks.state)
-        [(weld notices cards) this]
+        [cards this]
       %find-pointer
         ?>  (~(valid-id logic engine) id.command)
         ?>  (identity-valid:cr publisher.command)
-        =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state
           %+  ~(start-find-pointer logic engine)
             id.command
           [namespace.command publisher.command name.command]
-        =^  notices  callbacks.state
-          (new-operation-notices our.bowl old completed.state callbacks.state)
-        [(weld notices cards) this]
+        [cards this]
       %find-providers
         ?>  (~(valid-id logic engine) id.command)
         ?>  (digest-valid:cr content.command)
-        =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(start-find-providers logic engine) id.command content.command)
-        =^  notices  callbacks.state
-          (new-operation-notices our.bowl old completed.state callbacks.state)
-        [(weld notices cards) this]
+        [cards this]
       %observe
         ?>  (~(valid-id logic engine) id.command)
         =/  callback=operation-callback
@@ -237,12 +230,11 @@
     =/  id=(unit @uv)  (slaw %uv i.t.reply-path.notice)
     ?~  id  `this
     ?.  (~(valid-id logic engine) u.id)  `this
-    =/  old=(map operation-id operation-result)  completed.state
-    =^  cards  state
+    =/  transition=[cards=(list card) update=operation-update]
       (~(receive-lookup logic engine) u.id contacts.result.notice)
-    =^  notices  callbacks.state
-      (new-operation-notices our.bowl old completed.state callbacks.state)
-    [(weld notices cards) this]
+    =^  cards  state
+      (apply-operation-transition our.bowl transition)
+    [cards this]
   ::
       %content-routing-message
     =/  message=content-message  !<(content-message vase)
@@ -269,26 +261,27 @@
       %stored
         ?.  (~(response-expected logic engine) id.message %.n)  `this
         ~&  [%content-routing our.bowl %stored src.bowl id.message status.message]
-        =/  old=(map operation-id operation-result)  completed.state
-        =^  cards  state  (~(receive-stored logic engine) id.message status.message)
-        =^  notices  callbacks.state
-          (new-operation-notices our.bowl old completed.state callbacks.state)
-        [(weld notices cards) this]
+        =/  transition=[cards=(list card) update=operation-update]
+          (~(receive-stored logic engine) id.message status.message)
+        =^  cards  state
+          (apply-operation-transition our.bowl transition)
+        [cards this]
       %records
         ?.  (~(response-expected logic engine) id.message %.y)  `this
         =/  decoded=(unit records)
           (~(unpack-records logic engine) count.message payload.message)
-        =/  old=(map operation-id operation-result)  completed.state
         ?~  decoded
-          =^  cards  state  (~(fail-request logic engine) id.message &)
-          =^  notices  callbacks.state
-            (new-operation-notices our.bowl old completed.state callbacks.state)
-          [(weld notices cards) this]
+          =/  transition=[cards=(list card) update=operation-update]
+            (~(fail-request logic engine) id.message &)
+          =^  cards  state
+            (apply-operation-transition our.bowl transition)
+          [cards this]
         ~&  [%content-routing our.bowl %records src.bowl id.message count.message]
-        =^  cards  state  (~(receive-records logic engine) id.message u.decoded)
-        =^  notices  callbacks.state
-          (new-operation-notices our.bowl old completed.state callbacks.state)
-        [(weld notices cards) this]
+        =/  transition=[cards=(list card) update=operation-update]
+          (~(receive-records logic engine) id.message u.decoded)
+        =^  cards  state
+          (apply-operation-transition our.bowl transition)
+        [cards this]
     ==
   ==
 ::
@@ -334,11 +327,11 @@
   ?~  p.sign  `this
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
-  =/  old=(map operation-id operation-result)  completed.state
-  =^  cards  state  (~(fail-request logic engine) u.request &)
-  =^  notices  callbacks.state
-    (new-operation-notices our.bowl old completed.state callbacks.state)
-  [(weld notices cards) this]
+  =/  transition=[cards=(list card) update=operation-update]
+    (~(fail-request logic engine) u.request &)
+  =^  cards  state
+    (apply-operation-transition our.bowl transition)
+  [cards this]
 ::
 ++  on-arvo
   |=  [=wire =sign-arvo]
@@ -352,11 +345,11 @@
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
   ?.  (~(has by pending.state) u.request)  `this
-  =/  old=(map operation-id operation-result)  completed.state
-  =^  cards  state  (~(fail-request logic engine) u.request |)
-  =^  notices  callbacks.state
-    (new-operation-notices our.bowl old completed.state callbacks.state)
-  [(weld notices cards) this]
+  =/  transition=[cards=(list card) update=operation-update]
+    (~(fail-request logic engine) u.request |)
+  =^  cards  state
+    (apply-operation-transition our.bowl transition)
+  [cards this]
 ::
 ++  on-watch  on-watch:def
 ++  on-leave  on-leave:def

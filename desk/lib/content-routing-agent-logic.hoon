@@ -462,7 +462,7 @@
 ::
 ++  finish
   |=  [id=operation-id op=operation]
-  ^-  content-state
+  ^-  [operation-completion content-state]
   =/  result=operation-result
     ?-  -.kind.op
       %publish
@@ -478,8 +478,8 @@
     ==
   =.  active.state  (~(del by active.state) id)
   ?:  (~(has in background.state) id)
-    state(background (~(del in background.state) id))
-  state(completed (~(put by completed.state) id result))
+    [[id result] state(background (~(del in background.state) id))]
+  [[id result] state(completed (~(put by completed.state) id result))]
 ::
 ++  local-response
   |=  [peer=node-id op=operation]
@@ -509,15 +509,16 @@
 ::
 ++  advance
   |=  [id=operation-id op=operation]
-  ^-  [(list card:agent:gall) content-state]
+  ^-  [(list card:agent:gall) operation-update]
   ?~  remaining.op
     ?:  =(0 in-flight.op)
-      [~ (finish id op)]
+      =/  finished=[operation-completion content-state]  (finish id op)
+      [~ `-.finished +.finished]
     =.  active.state  (~(put by active.state) id op)
-    [~ state]
+    [~ ~ state]
   ?:  (gte in-flight.op concurrency.config.state)
     =.  active.state  (~(put by active.state) id op)
-    [~ state]
+    [~ ~ state]
   =/  queue=(list node-id)  remaining.op
   =/  pair=[node-id (list node-id)]  ?>(?=(^ queue) queue)
   =/  [peer=node-id rest=(list node-id)]  pair
@@ -540,17 +541,17 @@
   =/  timer=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %wait deadline]
   =.  active.state  (~(put by active.state) id next)
-  =/  more=[(list card:agent:gall) content-state]  $(op next)
+  =/  more=[(list card:agent:gall) operation-update]  $(op next)
   [(weld [poke timer ~] -.more) +.more]
 ::
 ++  receive-lookup
   |=  [id=operation-id contacts=(list node-id)]
-  ^-  [(list card:agent:gall) content-state]
-  ?.  (valid-id id)  [~ state]
+  ^-  [(list card:agent:gall) operation-update]
+  ?.  (valid-id id)  [~ ~ state]
   =/  found=(unit operation)  (~(get by active.state) id)
-  ?~  found  [~ state]
+  ?~  found  [~ ~ state]
   =/  op=operation  u.found
-  ?.  =(%.n phase.op)  [~ state]
+  ?.  =(%.n phase.op)  [~ ~ state]
   =/  candidates=(list node-id)  [self-id contacts]
   =/  ordered=(list node-id)
     %+  sort  candidates
@@ -562,13 +563,13 @@
 ::
 ++  receive-stored
   |=  [request=content-request-id status=store-status]
-  ^-  [(list card:agent:gall) content-state]
-  ?.  (response-expected request %.n)  [~ state]
+  ^-  [(list card:agent:gall) operation-update]
+  ?.  (response-expected request %.n)  [~ ~ state]
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
   =/  pen=pending-content-request  (need found)
   =.  pending.state  (~(del by pending.state) request)
   =/  active=(unit operation)  (~(get by active.state) operation.pen)
-  ?~  active  [~ state]
+  ?~  active  [~ ~ state]
   =/  op=operation  u.active
   =.  in-flight.op  (dec in-flight.op)
   =.  op
@@ -578,43 +579,43 @@
     ==
   =/  rest=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen]
-  =/  more=[(list card:agent:gall) content-state]  (advance operation.pen op)
+  =/  more=[(list card:agent:gall) operation-update]  (advance operation.pen op)
   [[rest -.more] +.more]
 ::
 ++  receive-records
   |=  [request=content-request-id values=records]
-  ^-  [(list card:agent:gall) content-state]
-  ?.  (response-expected request %.y)  [~ state]
+  ^-  [(list card:agent:gall) operation-update]
+  ?.  (response-expected request %.y)  [~ ~ state]
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
   =/  pen=pending-content-request  (need found)
   =.  pending.state  (~(del by pending.state) request)
   =/  active=(unit operation)  (~(get by active.state) operation.pen)
-  ?~  active  [~ state]
+  ?~  active  [~ ~ state]
   =/  op=operation  u.active
   =.  in-flight.op  (dec in-flight.op)
   =.  responders.op  (~(put in responders.op) peer.pen)
   =.  op  (merge-records op (scag max-providers.config.state values))
   =/  rest=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen]
-  =/  more=[(list card:agent:gall) content-state]  (advance operation.pen op)
+  =/  more=[(list card:agent:gall) operation-update]  (advance operation.pen op)
   [[rest -.more] +.more]
 ::
 ++  fail-request
   |=  [request=content-request-id cancel=?]
-  ^-  [(list card:agent:gall) content-state]
-  ?.  (valid-id request)  [~ state]
+  ^-  [(list card:agent:gall) operation-update]
+  ?.  (valid-id request)  [~ ~ state]
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
-  ?~  found  [~ state]
+  ?~  found  [~ ~ state]
   =/  pen=pending-content-request  u.found
   =.  pending.state  (~(del by pending.state) request)
   =/  active=(unit operation)  (~(get by active.state) operation.pen)
-  ?~  active  [~ state]
+  ?~  active  [~ ~ state]
   =/  op=operation  u.active
   =.  in-flight.op  (dec in-flight.op)
   =.  timed-out.op  (~(put in timed-out.op) peer.pen)
   =/  cancellation=(list card:agent:gall)
     ?:(cancel [[%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen] ~] ~)
-  =/  more=[(list card:agent:gall) content-state]  (advance operation.pen op)
+  =/  more=[(list card:agent:gall) operation-update]  (advance operation.pen op)
   [(weld cancellation -.more) +.more]
 ::
 ++  get-operation

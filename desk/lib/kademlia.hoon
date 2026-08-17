@@ -451,10 +451,15 @@
 ++  contacts
   |=  tab=table
   ^-  (list contact)
-  ?-  -.tab
-    %leaf  items.live.buc.tab
-    %fork  (weld (contacts zero.tab) (contacts one.tab))
-  ==
+  =/  collect
+    |=  [node=table out=(list contact)]
+    ^-  (list contact)
+    ?-  -.node
+      %leaf  (weld items.live.buc.node out)
+      %fork
+        $(node zero.node, out $(node one.node, out out))
+    ==
+  (collect tab ~)
 ::
 ::  candidate-nearer: compare lookup candidate IDs by XOR distance.
 ::
@@ -514,17 +519,32 @@
 ::
 ::  start-lookup: create a lookup seeded from verified live contacts.
 ::
-::    Routing contacts are converted to IDs, ordered relative to .tar, and
-::    added through the same +learn logic as subsequently discovered IDs.
+::    Routing contacts are validated and deduplicated in one pass, then sorted
+::    once by distance.  Subsequently discovered IDs use incremental +learn.
 ::
 ++  start-lookup
   |=  [self=node-id tar=node-id tab=table]
   ^-  lookup
   ?>  (valid-node tar)
   ?>  !=(0 alpha.cfg)
-  =/  ids=(list node-id)
-    (turn (contacts tab) |=([con=contact] id.con))
-  (learn self ids [tar ~])
+  =/  remaining=contacts  (contacts tab)
+  =/  seen=(set node-id)  ~
+  =/  candidates=lookup-candidates  ~
+  |-
+  ?~  remaining
+    =/  ordered=lookup-candidates
+      %+  sort  candidates
+      |=  [a=lookup-candidate b=lookup-candidate]
+      (candidate-nearer tar a b)
+    [tar ordered]
+  =/  id=node-id  id.i.remaining
+  ?:  |(!(valid-node id) =(self id) (~(has in seen) id))
+    $(remaining t.remaining)
+  %=  $
+    remaining   t.remaining
+    seen        (~(put in seen) id)
+    candidates  [[id %unasked] candidates]
+  ==
 ::
 ::  candidate-status: retrieve the state of a known candidate.
 ::

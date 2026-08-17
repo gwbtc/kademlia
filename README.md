@@ -87,6 +87,9 @@ IDs. Indirectly mentioned candidates remain local to the lookup and do not enter
 the routing table until they answer successfully. The lookup retains all valid
 discovered candidates so failed close peers can be replaced by farther ones,
 while its active frontier is always the closest `k` nonfailed candidates.
+Initial routing contacts are collected in linear time, deduplicated in one
+pass, and distance-sorted once rather than inserted into the candidate list one
+at a time.
 
 ## Peer-discovery agent
 
@@ -155,6 +158,9 @@ from Jael, and verify the domain-separated record digest. Replica leases last
 24 hours; locally originated records are republished every 12 hours. Defaults
 also limit records to 64 KiB, provider identities to 64 per content key, and
 the replica store to 10,000 keys with deterministic earliest-expiry eviction.
+Reads and ordinary stores prune leases only under the accessed key. A complete
+store sweep occurs only when a new key reaches the configured capacity, before
+the eviction policy is applied.
 
 Operation results are exposed at `/operation/<id>`. Stored records can be read
 at `/records/<key>`, pointer records at `/pointer/<key>`, and provider records at

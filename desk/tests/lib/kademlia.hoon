@@ -314,6 +314,39 @@
     (expect !>((~(has-candidate kademlia small-cfg) eighth can)))
   ==
 ::
+++  test-contacts-preserve-tree-and-roster-order
+  =/  small-cfg=config  [2 2 3 12 %kademlia-urbit-v1]
+  =/  a=contact  [0x1 ~2026.7.14..12.00.00 0]
+  =/  b=contact  [0x2 ~2026.7.14..11.00.00 0]
+  =/  c=contact  [0x3 ~2026.7.14..10.00.00 0]
+  =/  tab=table
+    [ %fork
+      [%leaf now [2 [a b ~]] [0 ~]]
+      [%leaf now [1 [c ~]] [0 ~]]
+    ]
+  %+  expect-eq  !>(`contacts`[a b c ~])
+  !>((~(contacts kademlia small-cfg) tab))
+::
+++  test-start-lookup-filters-deduplicates-and-sorts
+  =/  small-cfg=config  [4 4 3 12 %kademlia-urbit-v1]
+  =/  self=node-id  0x8
+  =/  too-wide=node-id  (@ux (pow 2 128))
+  =/  a=contact  [0x1 ~2026.7.14..12.00.00 0]
+  =/  b=contact  [0x2 ~2026.7.14..11.00.00 0]
+  =/  local=contact  [self ~2026.7.14..10.00.00 0]
+  =/  invalid=contact  [too-wide ~2026.7.14..09.00.00 0]
+  =/  tab=table
+    [ %fork
+      [%leaf now [3 [b local a ~]] [0 ~]]
+      [%leaf now [2 [a invalid ~]] [0 ~]]
+    ]
+  =/  lup=lookup  (~(start-lookup kademlia small-cfg) self 0x0 tab)
+  ;:  weld
+    %+  expect-eq  !>(`lookup-candidates`[[0x1 %unasked] [0x2 %unasked] ~])
+    !>(candidates.lup)
+    (expect !>((~(lookup-valid kademlia small-cfg) self lup)))
+  ==
+::
 ++  test-roster-validation
   =/  small-cfg=config  [2 2 3 12 %kademlia-urbit-v1]
   =/  too-wide=contact  [(@ux (pow 2 128)) ~2026.7.14..09.00.00 0]

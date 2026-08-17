@@ -209,7 +209,12 @@
   ?:  (lth now lease-until.i.values)  [i.values rest]
   rest
 ::
-++  prune
+::  prune-all: remove expired leases across the complete replica store.
+::
+::    This is intentionally reserved for reclaiming capacity.  Ordinary reads
+::    and writes use +prune-key so their cost depends only on one key.
+::
+++  prune-all
   ^-  content-state
   =/  entries=(list [key leased-records])  ~(tap by replicas.state)
   =/  fresh=(map key leased-records)  ~
@@ -218,6 +223,15 @@
   =/  values=leased-records  (prune-list +.i.entries)
   =?  fresh  ?=(^ values)  (~(put by fresh) -.i.entries values)
   $(entries t.entries)
+::
+++  prune-key
+  |=  target=key
+  ^-  content-state
+  =/  values=leased-records
+    (prune-list (~(gut by replicas.state) [target ~]))
+  ?~  values
+    state(replicas (~(del by replicas.state) target))
+  state(replicas (~(put by replicas.state) target values))
 ::
 ++  lease-horizon
   |=  values=leased-records
@@ -248,8 +262,8 @@
 ++  values-for
   |=  target=key
   ^-  records
-  =/  fresh=content-state  prune
-  =/  values=leased-records  (~(gut by replicas.fresh) [target ~])
+  =/  values=leased-records
+    (prune-list (~(gut by replicas.state) [target ~]))
   =/  out=records  (turn values |=(item=leased-record value.item))
   =/  origin=(unit record)  (~(get by origins.state) target)
   ?~  origin  out
@@ -273,8 +287,8 @@
   ?.  (record-auth-valid rec)  [[%rejected %invalid] state]
   =/  expiry=(unit @da)  (record-expiry rec)
   ?.  ?~(expiry & (lth now u.expiry))  [[%rejected %expired] state]
-  =.  state  prune
   =/  target=key  (record-key rec)
+  =.  state  (prune-key target)
   =/  existing=leased-records  (~(gut by replicas.state) [target ~])
   =/  signer=node-id  (record-signer rec)
   =/  revision=@ud  (record-revision rec)
@@ -315,8 +329,13 @@
     ?:  ?=(^ duplicate)
       [[value.u.duplicate until] (skim kept |=(item=leased-record !=(rec value.item)))]
     [[rec until] kept]
-  =?  state  ?&  ?=(~ (~(get by replicas.state) target))
-                  (gte (lent ~(tap by replicas.state)) max-replica-keys.config.state)
+  =/  adding-key=?  ?=(~ (~(get by replicas.state) target))
+  =?  state  ?&  adding-key
+                  (gte ~(wyt by replicas.state) max-replica-keys.config.state)
+              ==
+    prune-all
+  =?  state  ?&  adding-key
+                  (gte ~(wyt by replicas.state) max-replica-keys.config.state)
               ==
     evict-one
   =.  replicas.state  (~(put by replicas.state) target kept)

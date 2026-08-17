@@ -16,12 +16,17 @@
   ^-  digest
   (digest-cask:cr `(cask)`[%noun 42])
 ::
+++  provider-for
+  |=  [content=digest who=node-id revision=@ud address=*]
+  ^-  record
+  =/  body=provider-body
+    [content who revision ~2026.8.12 [[%custom %test address] ~]]
+  [%provider body [1 `@ux`revision]]
+::
 ++  provider
   |=  [who=node-id revision=@ud address=*]
   ^-  record
-  =/  body=provider-body
-    [content-id who revision ~2026.8.12 [[%custom %test address] ~]]
-  [%provider body [1 `@ux`revision]]
+  (provider-for content-id who revision address)
 ::
 ++  test-default-config
   =/  state=content-state  initial
@@ -210,6 +215,74 @@
     (~(put-replica logic [~zod now ~nec +.first allow]) (provider 0x13 1 'https://two.test'))
   %+  expect-eq  !>(`store-status`[%rejected %provider-cap])
   !>(-.second)
+::
+++  test-values-for-filters-only-requested-key
+  =/  state=content-state  initial
+  =/  requested=digest  (digest-cask:cr `(cask)`[%noun 1])
+  =/  unrelated=digest  (digest-cask:cr `(cask)`[%noun 2])
+  =/  requested-record=record  (provider-for requested 0x12 1 %requested)
+  =/  unrelated-record=record  (provider-for unrelated 0x13 1 %unrelated)
+  =/  requested-key=key  (provider-key:cr requested)
+  =/  unrelated-key=key  (provider-key:cr unrelated)
+  =.  replicas.state
+    (~(put by replicas.state) requested-key [[requested-record (dec now)] ~])
+  =.  replicas.state
+    (~(put by replicas.state) unrelated-key [[unrelated-record (dec now)] ~])
+  =/  values=records
+    (~(values-for logic [~zod now ~zod state allow]) requested-key)
+  ;:  weld
+    %+  expect-eq  !>(`records`~)
+    !>(values)
+    (expect !>((~(has by replicas.state) unrelated-key)))
+  ==
+::
+++  test-store-prunes-only-target-below-capacity
+  =/  state=content-state  initial
+  =/  expired=digest  (digest-cask:cr `(cask)`[%noun 1])
+  =/  incoming=digest  (digest-cask:cr `(cask)`[%noun 2])
+  =/  expired-record=record  (provider-for expired 0x12 1 %expired)
+  =/  incoming-record=record  (provider-for incoming 0x13 1 %incoming)
+  =/  expired-key=key  (provider-key:cr expired)
+  =/  incoming-key=key  (provider-key:cr incoming)
+  =.  replicas.state
+    (~(put by replicas.state) expired-key [[expired-record (dec now)] ~])
+  =/  out=[store-status content-state]
+    (~(put-replica logic [~zod now ~nec state allow]) incoming-record)
+  ;:  weld
+    %+  expect-eq  !>(`store-status`[%accepted ~])
+    !>(-.out)
+    (expect !>((~(has by replicas.+.out) expired-key)))
+    (expect !>((~(has by replicas.+.out) incoming-key)))
+  ==
+::
+++  test-capacity-sweep-reclaims-expired-key
+  =/  state=content-state  initial
+  =.  state
+    (~(set-config logic [~zod now ~zod state allow]) config.state(max-replica-keys 2))
+  =/  expired=digest  (digest-cask:cr `(cask)`[%noun 1])
+  =/  live=digest  (digest-cask:cr `(cask)`[%noun 2])
+  =/  incoming=digest  (digest-cask:cr `(cask)`[%noun 3])
+  =/  expired-record=record  (provider-for expired 0x12 1 %expired)
+  =/  live-record=record  (provider-for live 0x13 1 %live)
+  =/  incoming-record=record  (provider-for incoming 0x14 1 %incoming)
+  =/  expired-key=key  (provider-key:cr expired)
+  =/  live-key=key  (provider-key:cr live)
+  =/  incoming-key=key  (provider-key:cr incoming)
+  =.  replicas.state
+    (~(put by replicas.state) expired-key [[expired-record (dec now)] ~])
+  =.  replicas.state
+    (~(put by replicas.state) live-key [[live-record +(now)] ~])
+  =/  out=[store-status content-state]
+    (~(put-replica logic [~zod now ~nec state allow]) incoming-record)
+  ;:  weld
+    %+  expect-eq  !>(`store-status`[%accepted ~])
+    !>(-.out)
+    (expect !>(!(~(has by replicas.+.out) expired-key)))
+    (expect !>((~(has by replicas.+.out) live-key)))
+    (expect !>((~(has by replicas.+.out) incoming-key)))
+    %+  expect-eq  !>(2)
+    !>(~(wyt by replicas.+.out))
+  ==
 ::
 ++  test-local-publication-completes
   =/  state=content-state  initial

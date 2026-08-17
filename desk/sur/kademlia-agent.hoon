@@ -15,7 +15,12 @@
   ==
 +$  peer-message
   $%  [%find-node version=protocol-version id=request-id target=node-id]
-      [%nodes version=protocol-version id=request-id contacts=(list node-id)]
+      $:  %nodes
+          version=protocol-version
+          id=request-id
+          count=@ud
+          packed=@
+      ==
   ==
 +$  pending-request
   $:  lookup=lookup-id

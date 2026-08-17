@@ -8,6 +8,7 @@
 =/  default-refresh-interval=@dr  ~h1
 =/  refresh-yield=@dr  ~s1
 =/  max-fails=@ud  3
+=/  max-response-nodes=@ud  20
 |_  $:  our=@p
         now=@da
         src=@p
@@ -95,14 +96,46 @@
     (advance lookup.pen state.failed)
   [(weld cancellation -.advanced) +.advanced]
 ::
+::  pack-nodes: encode at most twenty IDs as fixed 128-bit chunks.  The first
+::    list item occupies the least-significant chunk.
+::
+++  pack-nodes
+  |=  ids=(list node-id)
+  ^-  [count=@ud packed=@]
+  =/  bounded=(list node-id)  (scag max-response-nodes ids)
+  [(lent bounded) (rep [7 1] bounded)]
+::
+::  valid-node-payload: enforce the protocol count and packed-atom bounds.
+::
+++  valid-node-payload
+  |=  [count=@ud packed=@]
+  ^-  ?
+  ?:  (gth count max-response-nodes)  |
+  (lte (met 0 packed) (mul count 128))
+::
+::  unpack-nodes: decode exactly .count fixed-width chunks, retaining zero IDs.
+::
+++  unpack-nodes
+  |=  [count=@ud packed=@]
+  ^-  (list node-id)
+  ?>  (valid-node-payload count packed)
+  =/  index=@ud  0
+  =/  ids=(list node-id)  ~
+  |-
+  ?:  =(index count)  (flop ids)
+  $(index +(index), ids [`node-id`(cut 7 [index 1] packed) ids])
+::
 ++  receive-nodes
-  |=  [request=request-id ids=(list node-id)]
+  |=  [request=request-id count=@ud packed=@]
   ^-  [(list card:agent:gall) agent-state]
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
   ?~  pending  [~ state]
   =/  pen=pending-request  u.pending
   =/  sender=node-id  (~(ship-to-node kad cfg) src)
   ?.  =(sender peer.pen)  [~ state]
+  ?.  (valid-node-payload count packed)
+    (fail-request request &)
+  =/  ids=(list node-id)  (unpack-nodes count packed)
   =.  pending.state  (~(del by pending.state) request)
   =/  cancellation=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen]
@@ -127,7 +160,8 @@
     =(sender id.con)
   =/  nearest=(list contact)  (~(closest kad cfg) target k.cfg known)
   =/  ids=(list node-id)  (turn nearest |=(con=contact id.con))
-  =/  message=peer-message  [%nodes protocol request ids]
+  =/  payload=[count=@ud packed=@]  (pack-nodes ids)
+  =/  message=peer-message  [%nodes protocol request count.payload packed.payload]
   :-  :~  :*  %pass  /response/(scot %uv request)
              %agent  [src %kademlia]
              %poke  %kademlia-message  !>(message)

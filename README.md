@@ -98,6 +98,12 @@ an expected sender identity. Successful responses and poke nacks cancel their
 timers; timeout wakes consume the timer normally. Late, duplicate, unsolicited,
 and wrong-sender responses are ignored.
 
+`%nodes` responses carry a count and an atom containing fixed 128-bit chunks,
+rather than an unbounded Hoon list.  The protocol accepts at most 20 chunks and
+checks the packed atom's bit width before allocating the decoded contact list.
+Malformed responses immediately fail a matching request; malformed unsolicited
+responses are ignored.
+
 Local `%kademlia-command` pokes can replace bootstrap ships, set the request
 timeout with `%set-request-timeout`, set the positive per-bucket refresh
 interval with `%set-refresh-interval`, start a caller-ID'd lookup, and forget a

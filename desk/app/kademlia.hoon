@@ -85,9 +85,11 @@
       [cards this]
     ::
         %nodes
-      ~&  [%kademlia our.bowl now.bowl %nodes src.bowl id.message contacts.message]
+      ~&  [%kademlia our.bowl now.bowl %nodes src.bowl id.message count.message]
       =^  cards  state
-        (~(receive-nodes logic [our.bowl now.bowl src.bowl state]) id.message contacts.message)
+        %+  ~(receive-nodes logic [our.bowl now.bowl src.bowl state])
+          id.message
+        [count.message packed.message]
       =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
       =^  maintenance-cards  state
         (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)

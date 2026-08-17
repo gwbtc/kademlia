@@ -28,6 +28,26 @@
   ^-  record
   (provider-for content-id who revision address)
 ::
+++  linear-pack-records
+  |=  values=records
+  ^-  [count=@ud payload=@]
+  =/  remaining=records  (scag 64 values)
+  =/  kept=records  ~
+  =/  count=@ud  0
+  =/  payload=@  (jam `records`~)
+  |-
+  ?~  remaining  [count payload]
+  =/  candidate=records  (flop [i.remaining kept])
+  =/  candidate-payload=@  (jam candidate)
+  ?:  (gth (met 3 candidate-payload) 262.144)
+    [count payload]
+  %=  $
+    remaining  t.remaining
+    kept       [i.remaining kept]
+    count      +(count)
+    payload    candidate-payload
+  ==
+::
 ++  test-default-config
   =/  state=content-state  initial
   ;:  weld
@@ -71,6 +91,27 @@
     (expect !>(?=(^ decoded)))
     %+  expect-eq  !>(values)
     !>(got)
+  ==
+::
+++  test-records-payload-longest-fitting-prefix
+  =/  state=content-state  initial
+  =/  engine  [~zod now ~zod state allow]
+  =/  blob=@  (pow 2 (mul 8 40.000))
+  =/  make
+    |=  [remaining=@ud values=records]
+    ^-  records
+    ?:  =(0 remaining)  values
+    =/  rec=record
+      (provider-for content-id (@ux remaining) 1 (add blob remaining))
+    $(remaining (dec remaining), values [rec values])
+  =/  values=records  (make 8 ~)
+  =/  expected=[count=@ud payload=@]  (linear-pack-records values)
+  =/  actual=[count=@ud payload=@]  (~(pack-records logic engine) values)
+  ;:  weld
+    %+  expect-eq  !>(expected)
+    !>(actual)
+    (expect !>((gth count.actual 0)))
+    (expect !>((lth count.actual (lent values))))
   ==
 ::
 ++  test-malformed-record-payloads-rejected

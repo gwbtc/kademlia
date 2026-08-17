@@ -92,17 +92,24 @@
 ++  pack-records
   |=  values=records
   ^-  [count=@ud payload=@]
-  =/  remaining=records  (scag max-wire-records values)
-  =/  kept=records  ~
-  =/  count=@ud  0
-  =/  payload=@  (jam `records`~)
+  =/  limited=records  (scag max-wire-records values)
+  =/  total=@ud  (lent limited)
+  =/  empty-payload=@  (jam `records`~)
+  ?~  limited  [0 empty-payload]
+  =/  full-payload=@  (jam limited)
+  ?:  (lte (met 3 full-payload) max-wire-response-bytes)
+    [total full-payload]
+  =/  low=@ud  0
+  =/  high=@ud  total
+  =/  low-payload=@  empty-payload
   |-
-  ?~  remaining  [count payload]
-  =/  candidate=records  (flop [i.remaining kept])
+  ?:  =(+(low) high)  [low low-payload]
+  =/  middle=@ud  (div (add low high) 2)
+  =/  candidate=records  (scag middle values)
   =/  candidate-payload=@  (jam candidate)
-  ?:  (gth (met 3 candidate-payload) max-wire-response-bytes)
-    [count payload]
-  $(remaining t.remaining, kept [i.remaining kept], count +(count), payload candidate-payload)
+  ?:  (lte (met 3 candidate-payload) max-wire-response-bytes)
+    $(low middle, low-payload candidate-payload)
+  $(high middle)
 ::
 ::  unpack-records: bound the atom before cueing and require the declared count.
 ::

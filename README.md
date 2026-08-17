@@ -148,6 +148,8 @@ record nouns. Receivers check atom size before `cue`; the wire protocol permits
 at most 64 KiB per record, 64 records, and 256 KiB for an entire response.
 Malformed stores are dropped, while a malformed response immediately fails its
 matching pending request.
+Response packing finds the longest byte-bounded record prefix by binary search,
+requiring at most logarithmically many whole-prefix encodings.
 Response IDs, kinds, and senders are matched against pending state before any
 response payload is decoded. Unsolicited, late, duplicate, and wrong-sender
 responses are therefore dropped without decode work.

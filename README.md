@@ -66,7 +66,8 @@ supplied to the pure library as a gate; access to Urbit identity keys remains an
 agent responsibility.  Different signed bodies from one identity at the same
 greatest revision are treated as equivocation.  A pointer conflict fails the
 selection, while a conflicting provider is excluded without hiding other valid
-providers.
+providers. Provider selection authenticates and groups announcements in one
+pass, then sorts only the unique provider identities for deterministic output.
 
 The library implements the pure part of an iterative node lookup. `+start-lookup`
 seeds a lookup from the routing table. Each call to `+dispatch` marks up to the

@@ -239,101 +239,57 @@
   ?.  (pointer-bodies-agree body.first latest)  [%conflict greatest]
   [%found first]
 ::
-::  provider-ids: collect the unique provider identities in a record list.
+::  provider-choice: the greatest revision observed for one provider.
 ::
-++  provider-ids
-  |=  records=providers
-  ^-  (set node-id)
-  ?~  records  ~
-  (~(put in $(records t.records)) provider.body.i.records)
+::    .conflict records whether distinct bodies exist at that revision.
+::    .best is the canonical duplicate selected by signature noun order.
 ::
-::  greatest-provider-revision: find the greatest revision in a list.
-::
-++  greatest-provider-revision
-  |=  records=providers
-  ^-  @ud
-  ?~  records  0
-  (max revision.body.i.records $(records t.records))
-::
-::  provider-bodies-agree: test whether every record has one provider body.
-::
-++  provider-bodies-agree
-  |=  [expected=provider-body records=providers]
-  ^-  ?
-  ?~  records  &
-  ?.  =(expected body.i.records)  |
-  $(records t.records)
-::
-::  canonical-provider: choose one duplicate by deterministic noun order.
-::
-++  canonical-provider
-  |=  records=providers
-  ^-  provider
-  ?>  ?=(^ records)
-  =/  best=provider  i.records
-  =/  remaining=providers  t.records
-  |-
-  ?~  remaining  best
-  =/  candidate=provider  i.remaining
-  =?  best  (dor signature.candidate signature.best)  candidate
-  $(remaining t.remaining)
-::
-::  valid-providers: retain authenticated announcements for one digest.
-::
-++  valid-providers
-  |=  [now=@da expected=digest verify=verifier records=providers]
-  ^-  providers
-  ?~  records  ~
-  =/  rest=providers  $(records t.records)
-  ?:  (provider-valid now expected verify i.records)
-    [i.records rest]
-  rest
-::
-::  providers-for: retain announcements made by one provider.
-::
-++  providers-for
-  |=  [id=node-id records=providers]
-  ^-  providers
-  ?~  records  ~
-  =/  rest=providers  $(records t.records)
-  ?:  =(id provider.body.i.records)
-    [i.records rest]
-  rest
-::
-::  providers-at-revision: retain announcements at one exact revision.
-::
-++  providers-at-revision
-  |=  [revision=@ud records=providers]
-  ^-  providers
-  ?~  records  ~
-  =/  rest=providers  $(records t.records)
-  ?:  =(revision revision.body.i.records)
-    [i.records rest]
-  rest
++$  provider-choice
+  [best=provider conflict=?]
 ::
 ::  select-providers: select one latest announcement per provider.
 ::
 ::    An equivocating provider is excluded and reported without affecting
-::    valid announcements from other providers.
+::    valid announcements from other providers.  Records are authenticated
+::    and grouped in one pass; no provider causes a rescan of the input list.
 ::
 ++  select-providers
   |=  [now=@da expected=digest verify=verifier records=providers]
   ^-  provider-selection
-  =/  valid=providers  (valid-providers now expected verify records)
-  =/  ids=(set node-id)  (provider-ids valid)
-  =/  ordered-ids=(list node-id)
-    (sort ~(tap in ids) |=([a=node-id b=node-id] (lth a b)))
-  =/  remaining=(list node-id)  ordered-ids
-  =/  selected=providers  ~
-  =/  conflicts=(set node-id)  ~
+  =/  remaining=providers  records
+  =/  choices=(map node-id provider-choice)  ~
   |-
-  ?~  remaining  [(flop selected) conflicts]
-  =/  id=node-id  i.remaining
-  =/  matching=providers  (providers-for id valid)
-  =/  greatest=@ud  (greatest-provider-revision matching)
-  =/  latest=providers  (providers-at-revision greatest matching)
-  =/  first=provider  (canonical-provider latest)
-  ?.  (provider-bodies-agree body.first latest)
-    $(remaining t.remaining, conflicts (~(put in conflicts) id))
-  $(remaining t.remaining, selected [first selected])
+  ?~  remaining
+    =/  entries=(list (pair node-id provider-choice))
+      %+  sort  ~(tap by choices)
+      |=  [a=(pair node-id provider-choice) b=(pair node-id provider-choice)]
+      (lth -.a -.b)
+    =/  pending=(list (pair node-id provider-choice))  entries
+    =/  selected=providers  ~
+    =/  conflicts=(set node-id)  ~
+    |-
+    ?~  pending  [(flop selected) conflicts]
+    =/  id=node-id  -.i.pending
+    =/  choice=provider-choice  +.i.pending
+    ?:  conflict.choice
+      $(pending t.pending, conflicts (~(put in conflicts) id))
+    $(pending t.pending, selected [best.choice selected])
+  =/  candidate=provider  i.remaining
+  ?.  (provider-valid now expected verify candidate)
+    $(remaining t.remaining)
+  =/  id=node-id  provider.body.candidate
+  =/  old=(unit provider-choice)  (~(get by choices) id)
+  ?~  old
+    $(remaining t.remaining, choices (~(put by choices) id [candidate |]))
+  =/  choice=provider-choice  u.old
+  =/  candidate-revision=@ud  revision.body.candidate
+  =/  chosen-revision=@ud  revision.body.best.choice
+  ?:  (gth candidate-revision chosen-revision)
+    $(remaining t.remaining, choices (~(put by choices) id [candidate |]))
+  ?:  (lth candidate-revision chosen-revision)
+    $(remaining t.remaining)
+  =/  canonical=provider  best.choice
+  =?  canonical  (dor signature.candidate signature.canonical)  candidate
+  =/  conflict=?  |(conflict.choice !=(body.candidate body.best.choice))
+  $(remaining t.remaining, choices (~(put by choices) id [canonical conflict]))
 --

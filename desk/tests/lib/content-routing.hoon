@@ -157,4 +157,26 @@
     (expect !>((~(has in conflicts.out) 0x20)))
     (expect !>(!(~(has in conflicts.out) 0x10)))
   ==
+::
+++  test-provider-newer-revision-supersedes-conflict
+  =/  now=@da  ~2026.8.4
+  =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
+  =/  old-a=provider
+    [[dig 0x20 4 ~2026.8.6 ~[(custom %old-a)]] [1 0x3]]
+  =/  old-b=provider
+    [[dig 0x20 4 ~2026.8.6 ~[(custom %old-b)]] [1 0x2]]
+  =/  newest=provider
+    [[dig 0x20 5 ~2026.8.7 ~[(custom %new)]] [1 0x1]]
+  =/  out=provider-selection
+    (select-providers:content-routing now dig allow [old-a newest old-b ~])
+  =/  reordered=provider-selection
+    (select-providers:content-routing now dig allow [newest old-b old-a ~])
+  ;:  weld
+    %+  expect-eq  !>(`providers`[newest ~])
+    !>(records.out)
+    %+  expect-eq  !>(out)
+    !>(reordered)
+    %+  expect-eq  !>(`(set node-id)`~)
+    !>(conflicts.out)
+  ==
 --

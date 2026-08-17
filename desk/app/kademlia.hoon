@@ -53,12 +53,15 @@
           (~(set-refresh-interval logic [our.bowl now.bowl src.bowl state]) duration.command)
         [cards this]
       %find
+        ?>  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.command)
+        ?>  (~(valid-node-id logic [our.bowl now.bowl src.bowl state]) target.command)
         ~&  [%kademlia our.bowl %find id.command target.command]
         =^  cards  state
           (~(start logic [our.bowl now.bowl src.bowl state]) id.command target.command)
         ~&  [%kademlia our.bowl %dispatch id.command ~(tap by pending.state)]
         [cards this]
       %find-for
+        ?>  (~(valid-node-id logic [our.bowl now.bowl src.bowl state]) target.command)
         ~&  [%kademlia our.bowl %find-for target.command recipient.command]
         =^  cards  state
           %+  ~(start-for logic [our.bowl now.bowl src.bowl state])
@@ -67,6 +70,7 @@
         =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
         [(weld cards notices) this]
       %forget
+        ?>  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.command)
         ~&  [%kademlia our.bowl %forget id.command]
         =.  state  (~(forget logic [our.bowl now.bowl src.bowl state]) id.command)
         `this
@@ -79,12 +83,15 @@
       `this
     ?-    -.message
         %find-node
+      ?.  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.message)  `this
+      ?.  (~(valid-node-id logic [our.bowl now.bowl src.bowl state]) target.message)  `this
       ~&  [%kademlia our.bowl now.bowl %find-node src.bowl id.message target.message]
       =^  cards  state
         (~(receive-find-node logic [our.bowl now.bowl src.bowl state]) id.message target.message)
       [cards this]
     ::
         %nodes
+      ?.  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.message)  `this
       ~&  [%kademlia our.bowl now.bowl %nodes src.bowl id.message count.message]
       =^  cards  state
         %+  ~(receive-nodes logic [our.bowl now.bowl src.bowl state])
@@ -112,6 +119,7 @@
       [%x %lookup @ ~]
     =/  parsed=(unit @uv)  (slaw %uv i.t.t.path)
     ?~  parsed  ~
+    ?.  (~(valid-id logic engine) u.parsed)  ~
     =/  view=(unit lookup-view)  (~(get-lookup logic engine) u.parsed)
     ?~  view  ~
     ``noun+!>(u.view)

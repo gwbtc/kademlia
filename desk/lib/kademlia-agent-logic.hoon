@@ -18,6 +18,53 @@
   ^-  node-id
   (~(ship-to-node kad cfg) our)
 ::
+::  valid-id: require lookup and peer request IDs to fit in 64 bits.
+::
+++  valid-id
+  |=  id=@
+  ^-  ?
+  (lte (met 0 id) 64)
+::
+::  valid-node-id: expose the configured 128-bit node-ID validation.
+::
+++  valid-node-id
+  |=  id=node-id
+  ^-  ?
+  (~(valid-node kad cfg) id)
+::
+::  bump-id: advance a counter modulo the 64-bit ID space.
+::
+++  bump-id
+  |=  id=@
+  ^-  @uv
+  (end 6 +(id))
+::
+::  take-request-id: allocate an unused peer request ID.
+::
+++  take-request-id
+  ^-  [request-id agent-state]
+  =/  id=request-id  (end 6 next-request.state)
+  |-
+  ?:  (~(has by pending.state) id)
+    $(id (bump-id id))
+  =.  next-request.state  (bump-id id)
+  [id state]
+::
+::  take-lookup-id: allocate an unused internally-owned lookup ID.
+::
+++  take-lookup-id
+  ^-  [lookup-id agent-state]
+  =/  id=lookup-id  (end 6 next-lookup.state)
+  |-
+  ?:  ?|  (~(has by active.state) id)
+          (~(has by completed.state) id)
+          (~(has by callbacks.state) id)
+          =(maintenance.state `id)
+      ==
+    $(id (bump-id id))
+  =.  next-lookup.state  (bump-id id)
+  [id state]
+::
 ++  init
   ^-  agent-state
   :*  (~(empty-table kad cfg) now)
@@ -59,11 +106,10 @@
   |-
   ?~  peers  [(flop cards) state]
   =/  peer=node-id  i.peers
-  =/  request=request-id  next-request.state
+  =^  request  state  take-request-id
   =/  deadline=@da  (add request-timeout.settings.state now)
   =/  pending=pending-request  [id peer now deadline]
   =.  pending.state  (~(put by pending.state) request pending)
-  =.  next-request.state  +(request)
   =/  ship=@p  (~(node-to-ship kad cfg) peer)
   =/  message=peer-message  [%find-node protocol request target.lup]
   =/  poke=card:agent:gall
@@ -78,6 +124,7 @@
 ++  fail-request
   |=  [request=request-id cancel=?]
   ^-  [(list card:agent:gall) agent-state]
+  ?.  (valid-id request)  [~ state]
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
   ?~  pending  [~ state]
   =/  pen=pending-request  u.pending
@@ -128,6 +175,7 @@
 ++  receive-nodes
   |=  [request=request-id count=@ud packed=@]
   ^-  [(list card:agent:gall) agent-state]
+  ?.  (valid-id request)  [~ state]
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
   ?~  pending  [~ state]
   =/  pen=pending-request  u.pending
@@ -151,6 +199,7 @@
 ++  receive-find-node
   |=  [request=request-id target=node-id]
   ^-  [(list card:agent:gall) agent-state]
+  ?.  (valid-id request)  [~ state]
   ?.  (~(valid-node kad cfg) target)  [~ state]
   =/  sender=node-id  (~(ship-to-node kad cfg) src)
   =.  routing.state  (~(record-success kad cfg) self-id sender now routing.state)
@@ -227,6 +276,7 @@
 ++  start
   |=  [id=lookup-id target=node-id]
   ^-  [(list card:agent:gall) agent-state]
+  ?>  (valid-id id)
   ?>  (~(valid-node kad cfg) target)
   ?>  !(~(has by active.state) id)
   ?>  !(~(has by completed.state) id)
@@ -297,14 +347,7 @@
   =/  due=(unit bucket-ref)  due-refresh
   ?~  due  schedule-next-refresh
   =/  target=node-id  (~(refresh-target kad cfg) u.due entropy)
-  =/  id=lookup-id  next-lookup.state
-  |-
-  ?:  ?|  (~(has by active.state) id)
-          (~(has by completed.state) id)
-          (~(has by callbacks.state) id)
-      ==
-    $(id +(id))
-  =.  next-lookup.state  +(id)
+  =^  id  state  take-lookup-id
   =.  maintenance.state  `id
   =/  started=[(list card:agent:gall) agent-state]  (start id target)
   =.  state  +.started
@@ -348,14 +391,7 @@
 ++  start-for
   |=  [target=node-id callback=lookup-callback]
   ^-  [(list card:agent:gall) agent-state]
-  =/  id=lookup-id  next-lookup.state
-  |-
-  ?:  ?|  (~(has by active.state) id)
-          (~(has by completed.state) id)
-          (~(has by callbacks.state) id)
-      ==
-    $(id +(id))
-  =.  next-lookup.state  +(id)
+  =^  id  state  take-lookup-id
   =.  callbacks.state  (~(put by callbacks.state) id callback)
   (start id target)
 ::
@@ -384,6 +420,7 @@
 ++  forget
   |=  id=lookup-id
   ^-  agent-state
+  ?>  (valid-id id)
   ?>  !(~(has by active.state) id)
   state(completed (~(del by completed.state) id))
 ::
@@ -405,6 +442,7 @@
 ++  get-lookup
   |=  id=lookup-id
   ^-  (unit lookup-view)
+  ?.  (valid-id id)  ~
   =/  active=(unit lookup)  (~(get by active.state) id)
   ?^  active  `[%running u.active]
   =/  completed=(unit lookup-result)  (~(get by completed.state) id)

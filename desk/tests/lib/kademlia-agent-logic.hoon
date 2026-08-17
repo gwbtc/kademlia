@@ -43,6 +43,49 @@
     (expect !>(!(~(has in seeds.state) (node ~zod))))
   ==
 ::
+++  test-id-boundaries
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  engine  [~zod now ~zod state]
+  ;:  weld
+    (expect !>((~(valid-id logic engine) (dec (pow 2 64)))))
+    (expect !>(!(~(valid-id logic engine) (pow 2 64))))
+    %-  expect-fail
+    |.  (~(start logic engine) ;;(@uv (pow 2 64)) 0x0)
+  ==
+::
+++  test-request-id-wrap-skips-pending
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  max=request-id  ;;(@uv (dec (pow 2 64)))
+  =/  pen=pending-request  [0v9 (node ~nec) now +(now)]
+  =.  pending.state  (~(put by pending.state) max pen)
+  =.  pending.state  (~(put by pending.state) ;;(@uv 0) pen)
+  =.  next-request.state  max
+  =/  out=[request-id agent-state]
+    ~(take-request-id logic [~zod now ~zod state])
+  ;:  weld
+    %+  expect-eq  !>(;;(@uv 1))
+    !>(-.out)
+    %+  expect-eq  !>(;;(@uv 2))
+    !>(next-request.+.out)
+  ==
+::
+++  test-lookup-id-wrap-skips-owned-ids
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  max=lookup-id  ;;(@uv (dec (pow 2 64)))
+  =/  result=lookup-result  [0x1 ~]
+  =.  completed.state  (~(put by completed.state) max result)
+  =.  completed.state  (~(put by completed.state) ;;(@uv 0) result)
+  =.  callbacks.state  (~(put by callbacks.state) ;;(@uv 1) [%sink /result])
+  =.  next-lookup.state  max
+  =/  out=[lookup-id agent-state]
+    ~(take-lookup-id logic [~zod now ~zod state])
+  ;:  weld
+    %+  expect-eq  !>(;;(@uv 2))
+    !>(-.out)
+    %+  expect-eq  !>(;;(@uv 3))
+    !>(next-lookup.+.out)
+  ==
+::
 ++  test-request-timeout-setting
   =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-request-timeout logic [~zod now ~zod state]) ~s45)

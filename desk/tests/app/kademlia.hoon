@@ -143,6 +143,28 @@
     !>((lent (~(contacts kad [20 20 3 12 %kademlia-urbit-v1]) routing.saved)))
   ==
 ::
+++  test-oversized-local-lookup-id-nacks
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
+  =/  initialized  on-init:~(. agent bol)
+  =/  command=command  [%find ;;(@uv (pow 2 64)) 0x1234]
+  %-  expect-fail
+  |.  (on-poke:+.initialized %kademlia-command !>(command))
+::
+++  test-oversized-peer-request-id-is-ignored
+  =/  bol=bowl:gall  (bowl ~zod ~nec ~2026.8.4)
+  =/  initialized  on-init:~(. agent bol)
+  =/  before=agent-state  !<(agent-state on-save:+.initialized)
+  =/  message=peer-message
+    [%find-node %kademlia-v1 ;;(@uv (pow 2 64)) 0x1234]
+  =/  out  (on-poke:+.initialized %kademlia-message !>(message))
+  =/  after=agent-state  !<(agent-state on-save:+.out)
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>((lent -.out))
+    %+  expect-eq  !>(before)
+    !>(after)
+  ==
+::
 ++  test-wrong-protocol-ignored
   =/  bol=bowl:gall  (bowl ~zod ~nec ~2026.8.4)
   =/  initialized  on-init:~(. agent bol)

@@ -15,6 +15,31 @@
   ^-  node-id
   (~(ship-to-node kad kad-cfg) our)
 ::
+::  valid-id: require operation and peer request IDs to fit in 64 bits.
+::
+++  valid-id
+  |=  id=@
+  ^-  ?
+  (lte (met 0 id) 64)
+::
+::  bump-id: advance a counter modulo the 64-bit ID space.
+::
+++  bump-id
+  |=  id=@
+  ^-  @uv
+  (end 6 +(id))
+::
+::  take-content-request-id: allocate an unused peer request ID.
+::
+++  take-content-request-id
+  ^-  [content-request-id content-state]
+  =/  id=content-request-id  (end 6 next-request.state)
+  |-
+  ?:  (~(has by pending.state) id)
+    $(id (bump-id id))
+  =.  next-request.state  (bump-id id)
+  [id state]
+::
 ++  init
   ^-  content-state
   [defaults ~ ~ ~ ~ ~ 0v1 (add refresh.defaults now) 0v1 ~ ~]
@@ -243,6 +268,7 @@
 ++  start-operation
   |=  [id=operation-id kind=operation-kind]
   ^-  [(list card:agent:gall) content-state]
+  ?>  (valid-id id)
   ?>  !(~(has by active.state) id)
   ?>  !(~(has by completed.state) id)
   =/  op=operation  [kind %.n ~ 0 ~ ~ ~ ~ ~ ~]
@@ -251,13 +277,15 @@
 ::
 ++  next-operation-id
   ^-  [operation-id content-state]
-  =/  id=operation-id  next-operation.state
+  =/  id=operation-id  (end 6 next-operation.state)
   |-
   ?:  ?|  (~(has by active.state) id)
           (~(has by completed.state) id)
+          (~(has by callbacks.state) id)
+          (~(has in background.state) id)
       ==
-    $(id +(id))
-  =.  next-operation.state  +(id)
+    $(id (bump-id id))
+  =.  next-operation.state  (bump-id id)
   [id state]
 ::
 ++  publishing
@@ -389,8 +417,7 @@
   =/  next=operation  op(remaining rest)
   ?:  =(peer self-id)
     $(op (local-response peer next))
-  =/  request=content-request-id  next-request.state
-  =.  next-request.state  +(request)
+  =^  request  state  take-content-request-id
   =/  deadline=@da  (add request-timeout.config.state now)
   =/  query=?  !=(%publish -.kind.next)
   =/  pen=pending-content-request  [id peer query deadline]
@@ -412,6 +439,7 @@
 ++  receive-lookup
   |=  [id=operation-id contacts=(list node-id)]
   ^-  [(list card:agent:gall) content-state]
+  ?.  (valid-id id)  [~ state]
   =/  found=(unit operation)  (~(get by active.state) id)
   ?~  found  [~ state]
   =/  op=operation  u.found
@@ -428,6 +456,7 @@
 ++  receive-stored
   |=  [request=content-request-id status=store-status]
   ^-  [(list card:agent:gall) content-state]
+  ?.  (valid-id request)  [~ state]
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
   ?~  found  [~ state]
   =/  pen=pending-content-request  u.found
@@ -451,6 +480,7 @@
 ++  receive-records
   |=  [request=content-request-id values=records]
   ^-  [(list card:agent:gall) content-state]
+  ?.  (valid-id request)  [~ state]
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
   ?~  found  [~ state]
   =/  pen=pending-content-request  u.found
@@ -471,6 +501,7 @@
 ++  fail-request
   |=  [request=content-request-id cancel=?]
   ^-  [(list card:agent:gall) content-state]
+  ?.  (valid-id request)  [~ state]
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
   ?~  found  [~ state]
   =/  pen=pending-content-request  u.found
@@ -488,6 +519,7 @@
 ++  get-operation
   |=  id=operation-id
   ^-  (unit operation-view)
+  ?.  (valid-id id)  ~
   =/  active=(unit operation)  (~(get by active.state) id)
   ?^  active  `[%running u.active]
   =/  done=(unit operation-result)  (~(get by completed.state) id)
@@ -497,6 +529,7 @@
 ++  forget
   |=  id=operation-id
   ^-  content-state
+  ?>  (valid-id id)
   ?>  !(~(has by active.state) id)
   state(completed (~(del by completed.state) id))
 --

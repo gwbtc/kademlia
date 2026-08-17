@@ -165,6 +165,7 @@
     =/  command=content-command  !<(content-command vase)
     ?-  -.command
       %publish-pointer
+        ?>  (~(valid-id logic engine) id.command)
         =/  old=(map operation-id operation-result)  completed.state
         =/  publisher=node-id  ~(self-id logic engine)
         =/  key=key  (pointer-key:cr namespace.command publisher name.command)
@@ -176,6 +177,7 @@
           (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %publish-provider
+        ?>  (~(valid-id logic engine) id.command)
         =/  old=(map operation-id operation-result)  completed.state
         =/  body=provider-body
           [content.command ~(self-id logic engine) revision.command expires.command locations.command]
@@ -185,6 +187,7 @@
           (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %find-pointer
+        ?>  (~(valid-id logic engine) id.command)
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state
           %+  ~(start-find-pointer logic engine)
@@ -194,12 +197,14 @@
           (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %find-providers
+        ?>  (~(valid-id logic engine) id.command)
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(start-find-providers logic engine) id.command content.command)
         =^  notices  callbacks.state
           (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %observe
+        ?>  (~(valid-id logic engine) id.command)
         =/  callback=operation-callback
           [recipient.command reply-path.command]
         =/  result=(unit operation-result)
@@ -211,6 +216,7 @@
           (~(put by callbacks.state) id.command callback)
         `this
       %forget
+        ?>  (~(valid-id logic engine) id.command)
         =.  state  (~(forget logic engine) id.command)
         =.  callbacks.state  (~(del by callbacks.state) id.command)
         `this
@@ -225,6 +231,7 @@
     ?.  ?=([%operation @ ~] reply-path.notice)  `this
     =/  id=(unit @uv)  (slaw %uv i.t.reply-path.notice)
     ?~  id  `this
+    ?.  (~(valid-id logic engine) u.id)  `this
     =/  old=(map operation-id operation-result)  completed.state
     =^  cards  state
       (~(receive-lookup logic engine) u.id contacts.result.notice)
@@ -237,18 +244,21 @@
     ?.  =(version.message %content-routing-v1)  `this
     ?-  -.message
       %store
+        ?.  (~(valid-id logic engine) id.message)  `this
         =/  stored=[store-status content-state]  (~(put-replica logic engine) value.message)
         =.  state  +.stored
         ~&  [%content-routing our.bowl %store src.bowl id.message -.stored]
         =/  response=content-message  [%stored %content-routing-v1 id.message -.stored]
         [[(send-message src.bowl response) ~] this]
       %find-records
+        ?.  (~(valid-id logic engine) id.message)  `this
         =/  values=records  (records-for bowl state request.message)
         ~&  [%content-routing our.bowl %find-records src.bowl id.message request.message (lent values)]
         =/  response=content-message
           [%records %content-routing-v1 id.message values]
         [[(send-message src.bowl response) ~] this]
       %stored
+        ?.  (~(valid-id logic engine) id.message)  `this
         ~&  [%content-routing our.bowl %stored src.bowl id.message status.message]
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(receive-stored logic engine) id.message status.message)
@@ -256,6 +266,7 @@
           (new-operation-notices our.bowl old completed.state callbacks.state)
         [(weld notices cards) this]
       %records
+        ?.  (~(valid-id logic engine) id.message)  `this
         ~&  [%content-routing our.bowl %records src.bowl id.message (lent values.message)]
         =/  old=(map operation-id operation-result)  completed.state
         =^  cards  state  (~(receive-records logic engine) id.message values.message)
@@ -275,6 +286,7 @@
       [%x %operation @ ~]
     =/  id=(unit @uv)  (slaw %uv i.t.t.path)
     ?~  id  ~
+    ?.  (~(valid-id logic engine) u.id)  ~
     =/  view=(unit operation-view)  (~(get-operation logic engine) u.id)
     ?~  view  ~
     ``noun+!>(u.view)

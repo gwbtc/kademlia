@@ -38,6 +38,49 @@
     !>(refresh.config.state)
   ==
 ::
+++  test-id-boundaries
+  =/  state=content-state  initial
+  =/  engine  [~zod now ~zod state allow]
+  ;:  weld
+    (expect !>((~(valid-id logic engine) (dec (pow 2 64)))))
+    (expect !>(!(~(valid-id logic engine) (pow 2 64))))
+    %-  expect-fail
+    |.  (~(start-find-providers logic engine) ;;(@uv (pow 2 64)) content-id)
+  ==
+::
+++  test-content-request-id-wrap-skips-pending
+  =/  state=content-state  initial
+  =/  max=content-request-id  ;;(@uv (dec (pow 2 64)))
+  =/  pen=pending-content-request  [0v9 0x1 %.n +(now)]
+  =.  pending.state  (~(put by pending.state) max pen)
+  =.  pending.state  (~(put by pending.state) ;;(@uv 0) pen)
+  =.  next-request.state  max
+  =/  out=[content-request-id content-state]
+    ~(take-content-request-id logic [~zod now ~zod state allow])
+  ;:  weld
+    %+  expect-eq  !>(;;(@uv 1))
+    !>(-.out)
+    %+  expect-eq  !>(;;(@uv 2))
+    !>(next-request.+.out)
+  ==
+::
+++  test-operation-id-wrap-skips-owned-ids
+  =/  state=content-state  initial
+  =/  max=operation-id  ;;(@uv (dec (pow 2 64)))
+  =/  callback=operation-callback  [%sink /result]
+  =.  callbacks.state  (~(put by callbacks.state) max callback)
+  =.  callbacks.state  (~(put by callbacks.state) ;;(@uv 0) callback)
+  =.  background.state  (~(put in background.state) ;;(@uv 1))
+  =.  next-operation.state  max
+  =/  out=[operation-id content-state]
+    ~(next-operation-id logic [~zod now ~zod state allow])
+  ;:  weld
+    %+  expect-eq  !>(;;(@uv 2))
+    !>(-.out)
+    %+  expect-eq  !>(;;(@uv 3))
+    !>(next-operation.+.out)
+  ==
+::
 ++  test-replica-revision-and-conflict-cap
   =/  state=content-state  initial
   =/  one=record  (provider 0x12 1 'https://one.test')

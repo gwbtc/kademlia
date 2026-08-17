@@ -96,4 +96,27 @@
     %+  expect-eq  !>(0)
     !>((lent ~(tap by callbacks.final)))
   ==
+::
+++  test-oversized-local-operation-id-nacks
+  =/  bol=bowl:gall  (bowl ~zod ~zod)
+  =/  initialized  on-init:~(. agent bol)
+  =/  command=content-command
+    [%find-providers ;;(@uv (pow 2 64)) ;;(@uvI 1)]
+  %-  expect-fail
+  |.  (on-poke:+.initialized %content-routing-command !>(command))
+::
+++  test-oversized-peer-request-id-is-ignored
+  =/  bol=bowl:gall  (bowl ~zod ~nec)
+  =/  initialized  on-init:~(. agent bol)
+  =/  before=content-state  !<(content-state on-save:+.initialized)
+  =/  message=content-message
+    [%find-records %content-routing-v1 ;;(@uv (pow 2 64)) [%providers ;;(@uvI 1)]]
+  =/  out  (on-poke:+.initialized %content-routing-message !>(message))
+  =/  after=content-state  !<(content-state on-save:+.out)
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>((lent -.out))
+    %+  expect-eq  !>(before)
+    !>(after)
+  ==
 --

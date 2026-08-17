@@ -98,6 +98,11 @@ an expected sender identity. Successful responses and poke nacks cancel their
 timers; timeout wakes consume the timer normally. Late, duplicate, unsolicited,
 and wrong-sender responses are ignored.
 
+Caller lookup IDs and peer request IDs are limited to 64 bits. Caller-supplied
+conflicts or oversized IDs nack the local command. Internally allocated IDs
+wrap within 64 bits and skip entries still owned by active state; oversized
+remote IDs are dropped without a protocol response.
+
 `%nodes` responses carry a count and an atom containing fixed 128-bit chunks,
 rather than an unbounded Hoon list.  The protocol accepts at most 20 chunks and
 checks the packed atom's bit width before allocating the decoded contact list.
@@ -128,6 +133,9 @@ nodes through its callback API, then sends versioned `%content-routing-message`
 store/query RPCs to at most three peers concurrently. Each RPC has a five-minute
 Behn timeout. Publication completes only after every selected replica has been
 accounted for as accepted, rejected, or timed out.
+
+Content operation IDs and transport request IDs follow the same 64-bit local
+conflict, internal allocation, and remote rejection rules as Kademlia IDs.
 
 Unsigned local publication bodies are completed with the local 128-bit node ID
 and signed using the ship's current Jael Ames key. Receiving replicas resolve

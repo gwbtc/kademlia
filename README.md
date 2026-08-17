@@ -37,7 +37,7 @@ second provider lookup.
 
 An exact `$spar:ames` is one supported locator. Its path includes the actual
 Gall revision in `/g/x/<revision>/...`; callers must not assume or synthesize
-that revision. HTTP and application-defined custom locators are also supported.
+that revision. Application-defined custom locators are also supported.
 The `%content-routing` agent transports those records over ordinary Ames pokes;
 remote scry remains one possible final retrieval mechanism, not a requirement.
 
@@ -56,8 +56,8 @@ stable name -> signed pointer -> digest -> provider lookup -> locator -> fetch
 
 A content digest is SHA-256 of `jam` over the complete `(cask)`, so both its mark
 and noun are committed.  After retrieval, `+verify-cask` checks the result
-without interpreting application data.  Locators may be exact remote-scry
-`$spar:ames` values, HTTP URLs, or application-defined `%custom` addresses.
+without interpreting application data. Locators may be exact remote-scry
+`$spar:ames` values or application-defined `%custom` addresses.
 Routing records never embed content themselves.
 
 Pointers have monotonically increasing revisions and optional expiry.  Provider
@@ -190,8 +190,8 @@ Remote scry is read-only. Gall `+on-peek` is a pure namespace lookup and cannot
 mutate the publisher's state or learn the requester's identity. It therefore
 serves only as a possible final read after ordinary Ames discovery has supplied
 an exact locator. Kademlia record `STORE` and `FIND_RECORDS` are ordinary Ames
-messages handled by `%content-routing`; HTTP and custom retrieval locators work
-the same way at the routing layer.
+messages handled by `%content-routing`; custom retrieval protocols remain
+independent of the routing layer.
 
 ## Identity domain
 

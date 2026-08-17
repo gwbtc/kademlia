@@ -17,10 +17,10 @@
   (digest-cask:cr `(cask)`[%noun 42])
 ::
 ++  provider
-  |=  [who=node-id revision=@ud url=@t]
+  |=  [who=node-id revision=@ud address=*]
   ^-  record
   =/  body=provider-body
-    [content-id who revision ~2026.8.12 [[%http url] ~]]
+    [content-id who revision ~2026.8.12 [[%custom %test address] ~]]
   [%provider body [1 `@ux`revision]]
 ::
 ++  test-default-config

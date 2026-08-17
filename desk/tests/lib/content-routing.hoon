@@ -12,10 +12,10 @@
   ^-  ?
   |
 ::
-++  http
-  |=  url=@t
+++  custom
+  |=  address=*
   ^-  locator
-  [%http url]
+  [%custom %test address]
 ::
 ++  test-cask-digest
   =/  a=(cask)  [%noun 42]
@@ -46,31 +46,29 @@
 ::
 ++  test-locators
   =/  scry=locator  [%scry [~zod /g/x/1/example]]
-  =/  web=locator  (http 'https://example.test/data')
+  =/  application=locator  (custom [%cid 0x1234])
   =/  custom=locator  [%custom %ipfs [%cid 0x1234]]
   =/  wide=locator  [%scry [(@p (pow 2 128)) /foo]]
   ;:  weld
     (expect !>((locator-valid:content-routing scry)))
-    (expect !>((locator-valid:content-routing web)))
+    (expect !>((locator-valid:content-routing application)))
     (expect !>((locator-valid:content-routing custom)))
-    %+  expect-eq  !>(%.n)
-    !>((locator-valid:content-routing `locator`[%http '']))
     %+  expect-eq  !>(%.n)
     !>((locator-valid:content-routing `locator`[%custom %$ 0]))
     %+  expect-eq  !>(%.n)
     !>((locator-valid:content-routing wide))
-    (expect !>((locators-valid:content-routing [scry web custom ~])))
+    (expect !>((locators-valid:content-routing [scry application custom ~])))
     %+  expect-eq  !>(%.n)
     !>((locators-valid:content-routing ~))
   ==
 ::
 ++  test-targets
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
-  =/  web=locator  (http 'https://example.test/data')
+  =/  application=locator  (custom [%cid 0x1234])
   ;:  weld
     (expect !>((target-valid:content-routing `target`[%content dig])))
-    (expect !>((target-valid:content-routing `target`[%direct ~ [web ~]])))
-    (expect !>((target-valid:content-routing `target`[%direct `dig [web ~]])))
+    (expect !>((target-valid:content-routing `target`[%direct ~ [application ~]])))
+    (expect !>((target-valid:content-routing `target`[%direct `dig [application ~]])))
     %+  expect-eq  !>(%.n)
     !>((target-valid:content-routing `target`[%direct ~ ~]))
   ==
@@ -79,7 +77,7 @@
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
   =/  pointer-body=pointer-body  [%app 0x12 0x34 1 ~ [%content dig]]
   =/  provider-body=provider-body
-    [dig 0x34 1 ~2026.8.5 ~[(http 'https://example.test/data')]]
+    [dig 0x34 1 ~2026.8.5 ~[(custom [%cid 0x1234])]]
   ;:  weld
     (expect !>(!=((pointer-message:content-routing pointer-body) dig)))
     (expect !>(!=((provider-message:content-routing provider-body) dig)))
@@ -122,13 +120,13 @@
   =/  now=@da  ~2026.8.4
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
   =/  low=provider
-    [[dig 0x20 1 ~2026.8.5 ~[(http 'https://old.test/data')]] [1 0x1]]
+    [[dig 0x20 1 ~2026.8.5 ~[(custom %old)]] [1 0x1]]
   =/  high=provider
-    [[dig 0x20 2 ~2026.8.6 ~[(http 'https://new.test/data')]] [1 0x2]]
+    [[dig 0x20 2 ~2026.8.6 ~[(custom %new)]] [1 0x2]]
   =/  other=provider
     [[dig 0x10 1 ~2026.8.5 ~[[%custom %ipfs [%cid 42]]]] [1 0x3]]
   =/  expired=provider
-    [[dig 0x30 1 now ~[(http 'https://expired.test/data')]] [1 0x4]]
+    [[dig 0x30 1 now ~[(custom %expired)]] [1 0x4]]
   =/  out=provider-selection
     (select-providers:content-routing now dig allow [low other expired high ~])
   =/  reordered=provider-selection
@@ -146,11 +144,11 @@
   =/  now=@da  ~2026.8.4
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
   =/  a=provider
-    [[dig 0x20 4 ~2026.8.6 ~[(http 'https://a.test/data')]] [1 0x1]]
+    [[dig 0x20 4 ~2026.8.6 ~[(custom %a)]] [1 0x1]]
   =/  b=provider
-    [[dig 0x20 4 ~2026.8.6 ~[(http 'https://b.test/data')]] [1 0x2]]
+    [[dig 0x20 4 ~2026.8.6 ~[(custom %b)]] [1 0x2]]
   =/  good=provider
-    [[dig 0x10 1 ~2026.8.5 ~[(http 'https://good.test/data')]] [1 0x3]]
+    [[dig 0x10 1 ~2026.8.5 ~[(custom %good)]] [1 0x3]]
   =/  out=provider-selection
     (select-providers:content-routing now dig allow [a good b ~])
   ;:  weld

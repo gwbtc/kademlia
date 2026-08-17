@@ -5,7 +5,6 @@
 +$  digest  @uvI                       ::  sha-256 of jammed (cask)
 +$  locator
   $%  [%scry spar=spar:ames]           ::  exact remote-scry address
-      [%http url=@t]                   ::  absolute HTTP(S) URL
       [%custom protocol=@tas address=*]
   ==
 +$  locators  (list locator)

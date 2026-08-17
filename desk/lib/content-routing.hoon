@@ -68,8 +68,6 @@
   ?-  -.loc
     %scry
       (identity-valid ship.spar.loc)
-    %http
-      !=(0 url.loc)
     %custom
       !=(%$ protocol.loc)
   ==

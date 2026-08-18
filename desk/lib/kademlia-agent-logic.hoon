@@ -84,12 +84,10 @@
   ==
 ::
 ++  complete
-  |=  [id=lookup-id lup=lookup]
+  |=  [id=lookup-id lup=lookup result=(list node-id)]
   ^-  agent-state
-  =/  result=(unit (list node-id))  (~(lookup-result kad cfg) lup)
-  ?~  result  state
   =.  active.state  (~(del by active.state) id)
-  =.  completed.state  (~(put by completed.state) id [target.lup u.result])
+  =.  completed.state  (~(put by completed.state) id [target.lup result])
   state
 ::
 ++  advance
@@ -99,8 +97,9 @@
     (~(dispatch kad cfg) lup)
   =.  lup  state.dispatched
   =.  active.state  (~(put by active.state) id lup)
-  ?:  (~(lookup-complete kad cfg) lup)
-    [~ (complete id lup)]
+  =/  result=(unit (list node-id))  (~(lookup-result kad cfg) lup)
+  ?^  result
+    [~ (complete id lup u.result)]
   =/  peers=(list node-id)  peers.dispatched
   =/  cards=(list card:agent:gall)  ~
   |-

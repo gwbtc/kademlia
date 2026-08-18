@@ -413,6 +413,51 @@
     (expect !>((~(lookup-valid kademlia small-cfg) self +.again)))
   ==
 ::
+++  test-lookup-batch-learn-preserves-status-and-deduplicates
+  =/  small-cfg=config  [4 4 3 12 %kademlia-urbit-v1]
+  =/  self=node-id  0x8
+  =/  too-wide=node-id  (@ux (pow 2 128))
+  =/  lup=lookup  [0x0 [[0x1 %succeeded] [0x4 %failed] ~]]
+  =/  out=lookup
+    (~(learn kademlia small-cfg) self [0x3 0x1 0x2 0x3 self too-wide ~] lup)
+  ;:  weld
+    %+  expect-eq
+      !>(`lookup-candidates`[[0x1 %succeeded] [0x2 %unasked] [0x3 %unasked] [0x4 %failed] ~])
+    !>(candidates.out)
+    (expect !>((~(lookup-valid kademlia small-cfg) self out)))
+  ==
+::
+++  test-dispatch-stays-within-nonfailed-frontier
+  =/  small-cfg=config  [2 2 3 12 %kademlia-urbit-v1]
+  =/  self=node-id  0x8
+  =/  lup=lookup
+    [0x0 [[0x1 %failed] [0x2 %succeeded] [0x3 %unasked] [0x4 %unasked] ~]]
+  =/  out=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) lup)
+  ;:  weld
+    %+  expect-eq  !>(`(list node-id)`[0x3 ~])
+    !>(-.out)
+    %+  expect-eq
+      !>(`lookup-candidates`[[0x1 %failed] [0x2 %succeeded] [0x3 %in-flight] [0x4 %unasked] ~])
+    !>(candidates.+.out)
+    (expect !>((~(lookup-valid kademlia small-cfg) self +.out)))
+  ==
+::
+++  test-result-detects-in-flight-outside-frontier
+  =/  small-cfg=config  [2 2 2 12 %kademlia-urbit-v1]
+  =/  lup=lookup
+    [0x0 [[0x1 %succeeded] [0x2 %succeeded] [0x3 %in-flight] ~]]
+  =/  settled=(unit lookup-candidates)
+    (~(settle-candidate kademlia small-cfg) 0x3 %failed candidates.lup)
+  =/  done=lookup  lup(candidates (need settled))
+  ;:  weld
+    (expect !>(!(~(lookup-complete kademlia small-cfg) lup)))
+    %+  expect-eq  !>(`(unit (list node-id))`~)
+    !>((~(lookup-result kademlia small-cfg) lup))
+    (expect !>((~(lookup-complete kademlia small-cfg) done)))
+    %+  expect-eq  !>(`(unit (list node-id))`[~ [0x1 0x2 ~]])
+    !>((~(lookup-result kademlia small-cfg) done))
+  ==
+::
 ++  test-lookup-receive-closer
   =/  small-cfg=config  [3 3 2 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0

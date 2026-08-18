@@ -479,17 +479,29 @@
   ?:  =(id id.i.remaining)  &
   $(remaining t.remaining)
 ::
-::  insert-candidate: insert a candidate in XOR-distance order.
-::
-::    This arm does not deduplicate; +learn-one enforces that invariant.
+::  insert-candidate: insert a candidate uniquely in XOR-distance order.
 ::
 ++  insert-candidate
   |=  [target=node-id new=lookup-candidate can=lookup-candidates]
   ^-  lookup-candidates
   ?~  can  [new ~]
+  ?:  =(id.new id.i.can)  can
   ?:  (candidate-nearer target new i.can)
     [new can]
   [i.can (insert-candidate target new t.can)]
+::
+::  merge-candidates: merge two unique distance-ordered candidate lists.
+::
+++  merge-candidates
+  |=  [target=node-id left=lookup-candidates right=lookup-candidates]
+  ^-  lookup-candidates
+  ?~  left  right
+  ?~  right  left
+  ?:  =(id.i.left id.i.right)
+    [i.left $(left t.left, right t.right)]
+  ?:  (candidate-nearer target i.left i.right)
+    [i.left $(left t.left)]
+  [i.right $(right t.right)]
 ::
 ::  learn-one: add one indirectly discovered ID to a lookup shortlist.
 ::
@@ -500,27 +512,43 @@
   |=  [self=node-id id=node-id lup=lookup]
   ^-  lookup
   ?:  |(!(valid-node id) =(self id))  lup
-  ?:  (has-candidate id candidates.lup)  lup
   =/  can=lookup-candidates
     (insert-candidate target.lup [id %unasked] candidates.lup)
   lup(candidates can)
 ::
-::  learn: add a list of indirectly discovered IDs to one lookup.
+::  learn: batch-add indirectly discovered IDs to one lookup.
 ::
-::    Learning affects only temporary lookup state; it does not authenticate
-::    the peers or insert them into the routing table.
+::    Incoming IDs are deduplicated with a small set, sorted once, and merged
+::    with the existing ordered shortlist in one pass.  The merge discards IDs
+::    already present while preserving their existing status.  Learning remains
+::    temporary and does not authenticate routing contacts.
 ::
 ++  learn
   |=  [self=node-id ids=(list node-id) lup=lookup]
   ^-  lookup
-  %+  roll  ids
-  |=  [id=node-id out=_lup]
-  (learn-one self id out)
+  =/  seen=(set node-id)  ~
+  =/  remaining=(list node-id)  ids
+  =/  fresh=lookup-candidates  ~
+  |-
+  ?~  remaining
+    =/  ordered=lookup-candidates
+      %+  sort  fresh
+      |=  [a=lookup-candidate b=lookup-candidate]
+      (candidate-nearer target.lup a b)
+    lup(candidates (merge-candidates target.lup candidates.lup ordered))
+  =/  id=node-id  i.remaining
+  ?:  |(!(valid-node id) =(self id) (~(has in seen) id))
+    $(remaining t.remaining)
+  %=  $
+    remaining  t.remaining
+    seen       (~(put in seen) id)
+    fresh      [[id %unasked] fresh]
+  ==
 ::
 ::  start-lookup: create a lookup seeded from verified live contacts.
 ::
 ::    Routing contacts are validated and deduplicated in one pass, then sorted
-::    once by distance.  Subsequently discovered IDs use incremental +learn.
+::    once by distance.  Subsequently discovered IDs use batch +learn merging.
 ::
 ++  start-lookup
   |=  [self=node-id tar=node-id tab=table]
@@ -565,26 +593,47 @@
     [i.can(status status) t.can]
   [i.can $(can t.can)]
 ::
+::  settle-candidate: update a candidate only when it is currently in flight.
+::
+::    Absence and stale status transitions both return null.  A successful
+::    result contains the complete updated list, constructed in one search.
+::
+++  settle-candidate
+  |=  [id=node-id replacement=lookup-status can=lookup-candidates]
+  ^-  (unit lookup-candidates)
+  ?~  can  ~
+  ?:  =(id id.i.can)
+    ?.  =(%in-flight status.i.can)  ~
+    `[[id.i.can replacement] t.can]
+  =/  rest=(unit lookup-candidates)
+    $(can t.can)
+  ?~  rest  ~
+  `[i.can u.rest]
+::
 ::  in-flight-count: count requests currently owned by a lookup.
 ::
 ++  in-flight-count
   |=  lup=lookup
   ^-  @ud
-  =/  is-flying=$-(lookup-candidate ?)
-    |=  one=lookup-candidate
-    =(%in-flight status.one)
-  (lent (skim candidates.lup is-flying))
+  =/  remaining=lookup-candidates  candidates.lup
+  =/  count=@ud  0
+  |-
+  ?~  remaining  count
+  =?  count  =(%in-flight status.i.remaining)  +(count)
+  $(remaining t.remaining)
 ::
 ::  active-frontier: return the closest .k candidates not known to have failed.
 ::
 ++  active-frontier
   |=  lup=lookup
   ^-  lookup-candidates
-  =/  is-usable=$-(lookup-candidate ?)
-    |=  one=lookup-candidate
-    !=(%failed status.one)
-  =/  usable=lookup-candidates  (skim candidates.lup is-usable)
-  (scag k.cfg usable)
+  =/  remaining=lookup-candidates  candidates.lup
+  =/  left=@ud  k.cfg
+  |-
+  ?:  |(?=(~ remaining) =(0 left))  ~
+  ?:  =(%failed status.i.remaining)
+    $(remaining t.remaining)
+  [i.remaining $(remaining t.remaining, left (dec left))]
 ::
 ::  dispatch: atomically fill available alpha slots from the active frontier.
 ::
@@ -596,18 +645,27 @@
   ^-  [(list node-id) lookup]
   =/  flying=@ud  (in-flight-count lup)
   ?:  (gte flying alpha.cfg)  [~ lup]
-  =/  available=@ud  (sub alpha.cfg flying)
-  =/  is-unasked=$-(lookup-candidate ?)
-    |=  one=lookup-candidate
-    =(%unasked status.one)
-  =/  unasked=lookup-candidates  (skim (active-frontier lup) is-unasked)
-  =/  ids=(list node-id)
-    (turn (scag available unasked) |=([one=lookup-candidate] id.one))
-  =/  out=lookup
-    %+  roll  ids
-    |=  [id=node-id acc=_lup]
-    acc(candidates (set-candidate-status id %in-flight candidates.acc))
-  [ids out]
+  =/  walk
+    |=  [can=lookup-candidates frontier=@ud slots=@ud]
+    ^-  [(list node-id) lookup-candidates]
+    ?:  |(?=(~ can) =(0 slots))  [~ can]
+    =/  one=lookup-candidate  i.can
+    ?:  =(%failed status.one)
+      =/  rest=[(list node-id) lookup-candidates]
+        $(can t.can)
+      [-.rest [one +.rest]]
+    ?:  =(0 frontier)  [~ can]
+    =/  next-frontier=@ud  (dec frontier)
+    ?:  =(%unasked status.one)
+      =/  rest=[(list node-id) lookup-candidates]
+        $(can t.can, frontier next-frontier, slots (dec slots))
+      [[id.one -.rest] [one(status %in-flight) +.rest]]
+    =/  rest=[(list node-id) lookup-candidates]
+      $(can t.can, frontier next-frontier)
+    [-.rest [one +.rest]]
+  =/  out=[(list node-id) lookup-candidates]
+    (walk candidates.lup k.cfg (sub alpha.cfg flying))
+  [-.out lup(candidates +.out)]
 ::
 ::  receive: apply a successful response from an in-flight candidate.
 ::
@@ -624,11 +682,10 @@
           lup=lookup
       ==
   ^-  [table lookup]
-  =/  status=(unit lookup-status)  (candidate-status id candidates.lup)
-  ?~  status  [tab lup]
-  ?.  =(%in-flight u.status)  [tab lup]
-  =/  out=lookup
-    lup(candidates (set-candidate-status id %succeeded candidates.lup))
+  =/  updated=(unit lookup-candidates)
+    (settle-candidate id %succeeded candidates.lup)
+  ?~  updated  [tab lup]
+  =/  out=lookup  lup(candidates u.updated)
   =.  out  (learn self (scag k.cfg returned) out)
   [(record-success self id now tab) out]
 ::
@@ -640,11 +697,10 @@
 ++  timeout
   |=  [self=node-id id=node-id max-fails=@ud tab=table lup=lookup]
   ^-  [table lookup]
-  =/  status=(unit lookup-status)  (candidate-status id candidates.lup)
-  ?~  status  [tab lup]
-  ?.  =(%in-flight u.status)  [tab lup]
-  =/  out=lookup
-    lup(candidates (set-candidate-status id %failed candidates.lup))
+  =/  updated=(unit lookup-candidates)
+    (settle-candidate id %failed candidates.lup)
+  ?~  updated  [tab lup]
+  =/  out=lookup  lup(candidates u.updated)
   [(record-failure self id max-fails tab) out]
 ::
 ::  lookup-complete: test whether the active frontier has settled.
@@ -655,25 +711,41 @@
 ++  lookup-complete
   |=  lup=lookup
   ^-  ?
-  ?:  !=(0 (in-flight-count lup))  |
-  =/  is-unasked=$-(lookup-candidate ?)
-    |=  one=lookup-candidate
-    =(%unasked status.one)
-  =/  unasked=lookup-candidates  (skim (active-frontier lup) is-unasked)
-  =(0 (lent unasked))
+  =/  remaining=lookup-candidates  candidates.lup
+  =/  frontier=@ud  k.cfg
+  |-
+  ?~  remaining  &
+  =/  one=lookup-candidate  i.remaining
+  ?:  =(%in-flight status.one)  |
+  ?:  =(%failed status.one)
+    $(remaining t.remaining)
+  ?:  =(0 frontier)
+    $(remaining t.remaining)
+  ?:  =(%unasked status.one)  |
+  $(remaining t.remaining, frontier (dec frontier))
 ::
 ::  lookup-result: return the closest responsive IDs after completion.
 ::
 ++  lookup-result
   |=  lup=lookup
   ^-  (unit (list node-id))
-  ?.  (lookup-complete lup)  ~
-  =/  is-successful=$-(lookup-candidate ?)
-    |=  one=lookup-candidate
-    =(%succeeded status.one)
-  =/  successful=lookup-candidates
-    (skim (active-frontier lup) is-successful)
-  `(turn successful |=([one=lookup-candidate] id.one))
+  =/  remaining=lookup-candidates  candidates.lup
+  =/  frontier=@ud  k.cfg
+  =/  successful=(list node-id)  ~
+  |-
+  ?~  remaining  `(flop successful)
+  =/  one=lookup-candidate  i.remaining
+  ?:  =(%in-flight status.one)  ~
+  ?:  =(%failed status.one)
+    $(remaining t.remaining)
+  ?:  =(0 frontier)
+    $(remaining t.remaining)
+  ?:  =(%unasked status.one)  ~
+  %=  $
+    remaining   t.remaining
+    frontier    (dec frontier)
+    successful  [id.one successful]
+  ==
 ::
 ::  lookup-valid: verify ordering and state-machine invariants.
 ::
@@ -687,12 +759,12 @@
   ?.  ?&  (valid-node self)
           (valid-node target.lup)
           !=(0 alpha.cfg)
-          (lte (in-flight-count lup) alpha.cfg)
       ==
     |
   =/  remaining=lookup-candidates  candidates.lup
   =/  seen=(set node-id)  ~
   =/  previous=(unit lookup-candidate)  ~
+  =/  flying=@ud  0
   |-
   ?~  remaining  &
   =/  one=lookup-candidate  i.remaining
@@ -703,10 +775,14 @@
     ?~  previous  &
     (candidate-nearer target.lup u.previous one)
   ?.  ordered  |
+  =/  next-flying=@ud
+    ?:(=(%in-flight status.one) +(flying) flying)
+  ?:  (gth next-flying alpha.cfg)  |
   %=  $
     remaining  t.remaining
     seen       (~(put in seen) id.one)
     previous   `one
+    flying     next-flying
   ==
 ::
 ::  default-config: conventional bucket, replacement, and Feistel settings.

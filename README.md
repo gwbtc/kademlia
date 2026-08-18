@@ -91,6 +91,10 @@ while its active frontier is always the closest `k` nonfailed candidates.
 Initial routing contacts are collected in linear time, deduplicated in one
 pass, and distance-sorted once rather than inserted into the candidate list one
 at a time.
+Lookup responses likewise deduplicate and sort fresh candidates once before a
+linear merge. Dispatch, status settlement, completion, result construction,
+and invariant validation traverse the ordered shortlist without intermediate
+filter lists or repeated per-candidate status searches.
 
 ## Peer-discovery agent
 

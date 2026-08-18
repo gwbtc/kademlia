@@ -64,6 +64,59 @@
   ^-  (list contact)
   (scag n (sort contacts |=([a=contact b=contact] (nearer target a b))))
 ::
+::  nearest-contacts: collect live routing contacts in exact XOR order.
+::
+::    Prefix branches matching the target bit are wholly nearer than their
+::    siblings, so the traversal stops as soon as .limit contacts are found.
+::    Only the bounded live roster of each visited leaf is locally sorted.
+::
+++  nearest-contacts
+  |=  $:  target=node-id
+          limit=@ud
+          excluded=(unit node-id)
+          tab=table
+      ==
+  ^-  (list contact)
+  ?>  (valid-node target)
+  =/  walk
+    |=  [node=table depth=@ud left=@ud out=(list contact)]
+    ^-  [left=@ud out=(list contact)]
+    ?:  =(0 left)  [left out]
+    ?-  -.node
+      %leaf
+        =/  available=(list contact)
+          ?~  excluded  items.live.buc.node
+          %+  skip  items.live.buc.node
+          |=  con=contact
+          =(u.excluded id.con)
+        =/  selected=(list contact)
+          (closest target left available)
+        =/  remaining=(list contact)  selected
+        |-
+        ?~  remaining  [left out]
+        %=  $
+          remaining  t.remaining
+          left       (dec left)
+          out        [i.remaining out]
+        ==
+      %fork
+        =/  matching=table
+          ?:  =(0b0 (node-bit depth target))
+            zero.node
+          one.node
+        =/  other=table
+          ?:  =(0b0 (node-bit depth target))
+            one.node
+          zero.node
+        =/  first=[left=@ud out=(list contact)]
+          $(node matching, depth +(depth))
+        ?:  =(0 left.first)  first
+        $(node other, depth +(depth), left left.first, out out.first)
+    ==
+  =/  found=[left=@ud out=(list contact)]
+    (walk tab 0 limit ~)
+  (flop out.found)
+::
 ::  empty-table: construct the initial bucket covering the whole ID space.
 ::
 ++  empty-table

@@ -95,6 +95,8 @@ Lookup responses likewise deduplicate and sort fresh candidates once before a
 linear merge. Dispatch, status settlement, completion, result construction,
 and invariant validation traverse the ordered shortlist without intermediate
 filter lists or repeated per-candidate status searches.
+Incoming node queries walk matching XOR-prefix branches first and stop after
+`k` live contacts, instead of collecting and globally sorting the routing table.
 
 ## Peer-discovery agent
 

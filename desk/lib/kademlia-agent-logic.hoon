@@ -202,11 +202,8 @@
   ?.  (~(valid-node kad cfg) target)  [~ state]
   =/  sender=node-id  (~(ship-to-node kad cfg) src)
   =.  routing.state  (~(record-success kad cfg) self-id sender now routing.state)
-  =/  known=(list contact)
-    %+  skip  (~(contacts kad cfg) routing.state)
-    |=  con=contact
-    =(sender id.con)
-  =/  nearest=(list contact)  (~(closest kad cfg) target k.cfg known)
+  =/  nearest=(list contact)
+    (~(nearest-contacts kad cfg) target k.cfg `sender routing.state)
   =/  ids=(list node-id)  (turn nearest |=(con=contact id.con))
   =/  payload=[count=@ud packed=@]  (pack-nodes ids)
   =/  message=peer-message  [%nodes protocol request count.payload packed.payload]

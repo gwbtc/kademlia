@@ -66,6 +66,34 @@
     !>((~(closest kademlia cfg) 0x0 2 [far near middle ~]))
   ==
 ::
+++  test-nearest-contacts-matches-exhaustive-order
+  =/  small-cfg=config  [2 2 3 12 %kademlia-urbit-v1]
+  =/  self=node-id  0x0
+  =/  a=node-id  (@ux (pow 2 127))
+  =/  b=node-id  (@ux (pow 2 126))
+  =/  c=node-id  (@ux (pow 2 125))
+  =/  d=node-id  (@ux (pow 2 124))
+  =/  e=node-id  (@ux (pow 2 123))
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
+  =.  tab  (~(record-success kademlia small-cfg) self a now tab)
+  =.  tab  (~(record-success kademlia small-cfg) self b +(now) tab)
+  =.  tab  (~(record-success kademlia small-cfg) self c (add 2 now) tab)
+  =.  tab  (~(record-success kademlia small-cfg) self d (add 3 now) tab)
+  =.  tab  (~(record-success kademlia small-cfg) self e (add 4 now) tab)
+  =/  all=contacts  (~(contacts kademlia small-cfg) tab)
+  =/  without-b=contacts  (skip all |=(con=contact =(b id.con)))
+  =/  expected-a=contacts  (~(closest kademlia small-cfg) a 3 without-b)
+  =/  expected-self=contacts  (~(closest kademlia small-cfg) self 4 all)
+  ;:  weld
+    %+  expect-eq  !>(expected-a)
+    !>((~(nearest-contacts kademlia small-cfg) a 3 `b tab))
+    %+  expect-eq  !>(expected-self)
+    !>((~(nearest-contacts kademlia small-cfg) self 4 ~ tab))
+    %+  expect-eq  !>(`contacts`~)
+    !>((~(nearest-contacts kademlia small-cfg) c 0 ~ tab))
+    (expect !>((~(table-valid kademlia small-cfg) self tab)))
+  ==
+::
 ++  empty-bucket  ^-  bucket  [now [0 ~] [0 ~]]
 ::
 ++  spine

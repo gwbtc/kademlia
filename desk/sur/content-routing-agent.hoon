@@ -1,6 +1,6 @@
 ::  Content-record transport protocol and persistent-state molds.
 ::
-/-  *kademlia, *content-routing
+/-  *kademlia, *kademlia-agent, *content-routing
 |%
 +$  content-version  @tas
 +$  operation-id     @uv
@@ -59,6 +59,7 @@
       [%observe id=operation-id recipient=@tas reply-path=path]
       [%forget id=operation-id]
       [%set-config value=content-config]
+      [%set-verbosity level=verbosity]
   ==
 +$  leased-record
   [value=record lease-until=@da]
@@ -128,4 +129,6 @@
   ==
 +$  operation-update
   [completion=(unit operation-completion) state=content-state]
++$  content-saved-state
+  [state=content-state verbosity=verbosity]
 --

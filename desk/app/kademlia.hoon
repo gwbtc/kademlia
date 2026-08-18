@@ -9,6 +9,34 @@
 %+  verb  |
 %-  agent:dbug
 =|  state=agent-state
+=/  verbosity=verbosity  %off
+=>  |%
+++  log-enabled
+  |=  level=log-level
+  ^-  ?
+  ?-  verbosity
+    %off    |
+    %info   =(%info level)
+    %debug  &
+  ==
+::
+++  log
+  |=  [=bowl:gall level=log-level event=*]
+  ^-  ~
+  ?.  (log-enabled level)  ~
+  ~&  [dap.bowl level event]
+  ~
+::
+++  log-completion
+  |=  [=bowl:gall id=(unit lookup-id) maintenance=?]
+  ^-  ~
+  ?~  id  ~
+  =/  result=(unit lookup-result)  (~(get by completed.state) u.id)
+  ?~  result  ~
+  ?:  maintenance
+    (log bowl %debug [%refresh-complete u.id (lent contacts.u.result)])
+  (log bowl %info [%lookup-complete u.id (lent contacts.u.result)])
+--
 ^-  agent:gall
 |_  =bowl:gall
 +*  this  .
@@ -16,17 +44,17 @@
 ::
 ++  on-init
   ^-  (quip card _this)
-  ~&  [%kademlia our.bowl %init]
   =.  state  ~(init logic [our.bowl now.bowl src.bowl state])
   [~(refresh-card logic [our.bowl now.bowl src.bowl state]) this]
 ::
-++  on-save  !>(state)
+++  on-save  !>(`kademlia-saved-state`[state verbosity])
 ::
 ++  on-load
   |=  old=vase
   ^-  (quip card _this)
-  ~&  [%kademlia our.bowl %load]
-  =.  state  !<(agent-state old)
+  =/  saved=kademlia-saved-state  !<(kademlia-saved-state old)
+  =.  state  state.saved
+  =.  verbosity  verbosity.saved
   [~(refresh-card logic [our.bowl now.bowl src.bowl state]) this]
 ::
 ++  on-poke
@@ -38,31 +66,35 @@
     =/  command=command  !<(command vase)
     ?-  -.command
       %set-seeds
-        ~&  [%kademlia our.bowl %set-seeds ships.command]
+        =/  ignored  (log bowl %info [%seeds-set (lent ships.command)])
         =.  state  (~(set-seeds logic [our.bowl now.bowl src.bowl state]) ships.command)
         =^  cards  state  ~(bootstrap logic [our.bowl now.bowl src.bowl state])
         [cards this]
       %set-request-timeout
-        ~&  [%kademlia our.bowl %set-request-timeout duration.command]
+        =/  ignored  (log bowl %info [%request-timeout-set duration.command])
         =.  state
           (~(set-request-timeout logic [our.bowl now.bowl src.bowl state]) duration.command)
         `this
       %set-refresh-interval
-        ~&  [%kademlia our.bowl %set-refresh-interval duration.command]
+        =/  ignored  (log bowl %info [%refresh-interval-set duration.command])
         =^  cards  state
           (~(set-refresh-interval logic [our.bowl now.bowl src.bowl state]) duration.command)
         [cards this]
+      %set-verbosity
+        =.  verbosity  level.command
+        =/  ignored  (log bowl %info [%verbosity-set level.command])
+        `this
       %find
         ?>  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.command)
         ?>  (~(valid-node-id logic [our.bowl now.bowl src.bowl state]) target.command)
-        ~&  [%kademlia our.bowl %find id.command target.command]
+        =/  ignored  (log bowl %info [%lookup-start id.command target.command])
         =^  cards  state
           (~(start logic [our.bowl now.bowl src.bowl state]) id.command target.command)
-        ~&  [%kademlia our.bowl %dispatch id.command ~(tap by pending.state)]
         [cards this]
       %find-for
         ?>  (~(valid-node-id logic [our.bowl now.bowl src.bowl state]) target.command)
-        ~&  [%kademlia our.bowl %find-for target.command recipient.command]
+        =/  ignored
+          (log bowl %info [%lookup-start-for target.command recipient.command reply-path.command])
         =^  cards  state
           %+  ~(start-for logic [our.bowl now.bowl src.bowl state])
             target.command
@@ -71,7 +103,7 @@
         [(weld cards notices) this]
       %forget
         ?>  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.command)
-        ~&  [%kademlia our.bowl %forget id.command]
+        =/  ignored  (log bowl %debug [%lookup-forget id.command])
         =.  state  (~(forget logic [our.bowl now.bowl src.bowl state]) id.command)
         `this
     ==
@@ -79,20 +111,25 @@
       %kademlia-message
     =/  message=peer-message  !<(peer-message vase)
     ?.  =(%kademlia-v1 version.message)
-      ~&  [%kademlia our.bowl %ignore-version src.bowl version.message]
+      =/  ignored  (log bowl %debug [%peer-version-ignored src.bowl version.message])
       `this
     ?-    -.message
         %find-node
       ?.  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.message)  `this
       ?.  (~(valid-node-id logic [our.bowl now.bowl src.bowl state]) target.message)  `this
-      ~&  [%kademlia our.bowl now.bowl %find-node src.bowl id.message target.message]
+      =/  ignored
+        (log bowl %debug [%peer-find-node src.bowl id.message target.message])
       =^  cards  state
         (~(receive-find-node logic [our.bowl now.bowl src.bowl state]) id.message target.message)
       [cards this]
     ::
         %nodes
       ?.  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.message)  `this
-      ~&  [%kademlia our.bowl now.bowl %nodes src.bowl id.message count.message]
+      =/  pending=(unit pending-request)  (~(get by pending.state) id.message)
+      =/  maintenance=?
+        ?^  pending  =(maintenance.state `lookup.u.pending)
+        |
+      =/  ignored  (log bowl %debug [%peer-nodes src.bowl id.message count.message])
       =^  cards  state
         %+  ~(receive-nodes logic [our.bowl now.bowl src.bowl state])
           id.message
@@ -100,7 +137,8 @@
       =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
       =^  maintenance-cards  state
         (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)
-      ~&  [%kademlia our.bowl %advance id.message ~(tap by pending.state)]
+      =/  ignored
+        (log-completion bowl ?~(pending ~ `lookup.u.pending) maintenance)
       [(weld cards (weld notices maintenance-cards)) this]
     ==
   ==
@@ -115,6 +153,7 @@
       [%x %table ~]     ``noun+!>(routing.state)
       [%x %seeds ~]     ``noun+!>(~(seed-list logic engine))
       [%x %settings ~]  ``noun+!>(settings.state)
+      [%x %verbosity ~]  ``noun+!>(verbosity)
       [%x %lookup ~]    [~ ~]
       [%x %lookup @ ~]
     =/  parsed=(unit @uv)  (slaw %uv i.t.t.path)
@@ -133,13 +172,18 @@
   ?~  p.sign  `this
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
-  ~&  [%kademlia our.bowl %poke-failed u.request]
+  =/  pending=(unit pending-request)  (~(get by pending.state) u.request)
+  =/  maintenance=?
+    ?^  pending  =(maintenance.state `lookup.u.pending)
+    |
+  =/  ignored  (log bowl %debug [%request-poke-failed u.request])
   =^  cards  state
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request &)
   =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
   =^  maintenance-cards  state
     (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)
-  ~&  [%kademlia our.bowl %advance-after-failure u.request ~(tap by pending.state)]
+  =/  ignored
+    (log-completion bowl ?~(pending ~ `lookup.u.pending) maintenance)
   [(weld cards (weld notices maintenance-cards)) this]
 ::
 ++  on-arvo
@@ -149,7 +193,7 @@
     ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
     =/  deadline=(unit @da)  (slaw %da i.t.wire)
     ?~  deadline  `this
-    ~&  [%kademlia our.bowl %refresh u.deadline]
+    =/  ignored  (log bowl %debug [%refresh-wake u.deadline])
     =^  cards  state
       (~(run-refresh logic [our.bowl now.bowl src.bowl state]) u.deadline eny.bowl)
     [cards this]
@@ -158,13 +202,18 @@
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
   ?.  (~(has by pending.state) u.request)  `this
-  ~&  [%kademlia our.bowl now.bowl %timeout u.request]
+  =/  pending=(unit pending-request)  (~(get by pending.state) u.request)
+  =/  maintenance=?
+    ?^  pending  =(maintenance.state `lookup.u.pending)
+    |
+  =/  ignored  (log bowl %debug [%request-timeout u.request])
   =^  cards  state
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request |)
   =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
   =^  maintenance-cards  state
     (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)
-  ~&  [%kademlia our.bowl %advance-after-timeout u.request ~(tap by pending.state)]
+  =/  ignored
+    (log-completion bowl ?~(pending ~ `lookup.u.pending) maintenance)
   [(weld cards (weld notices maintenance-cards)) this]
 ::
 ++  on-watch  on-watch:def

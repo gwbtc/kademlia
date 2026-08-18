@@ -5,10 +5,13 @@
 +$  protocol-version  @tas
 +$  lookup-id         @uv
 +$  request-id        @uv
++$  verbosity         ?(%off %info %debug)
++$  log-level         ?(%info %debug)
 +$  command
   $%  [%set-seeds ships=(list @p)]
       [%set-request-timeout duration=@dr]
       [%set-refresh-interval duration=@dr]
+      [%set-verbosity level=verbosity]
       [%find id=lookup-id target=node-id]
       [%find-for target=node-id recipient=@tas reply-path=path]
       [%forget id=lookup-id]
@@ -62,4 +65,6 @@
       refresh-at=(unit @da)
       maintenance=(unit lookup-id)
   ==
++$  kademlia-saved-state
+  [state=agent-state verbosity=verbosity]
 --

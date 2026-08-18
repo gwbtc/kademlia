@@ -10,7 +10,24 @@
 %+  verb  |
 %-  agent:dbug
 =|  state=content-state
+=/  verbosity=verbosity  %off
 =>  |%
+::
+++  log-enabled
+  |=  level=log-level
+  ^-  ?
+  ?-  verbosity
+    %off    |
+    %info   =(%info level)
+    %debug  &
+  ==
+::
+++  log
+  |=  [=bowl:gall level=log-level event=*]
+  ^-  ~
+  ?.  (log-enabled level)  ~
+  ~&  [dap.bowl level event]
+  ~
 ::
 ++  sign-digest
   |=  [=bowl:gall message=digest]
@@ -62,15 +79,16 @@
       ~
     `[1 (fake-public ship)]
   ?~  public
-    ~&  [%content-routing our.bowl %verify-no-public ship life.sig]
+    =/  ignored  (log bowl %debug [%record-verification-failed ship life.sig %no-public-key])
     |
   ?.  =(1 crypto-suite.u.public)
-    ~&  [%content-routing our.bowl %verify-unsupported-suite ship crypto-suite.u.public]
+    =/  ignored
+      (log bowl %debug [%record-verification-failed ship life.sig %unsupported-suite])
     |
   =/  them  (com:nu:crub:crypto pass.u.public)
   =/  valid  (safe:as:them value.sig message)
   ?.  valid
-    ~&  [%content-routing our.bowl %verify-failed ship life.sig]
+    =/  ignored  (log bowl %debug [%record-verification-failed ship life.sig %bad-signature])
     |
   &
 ::
@@ -127,14 +145,18 @@
   [[card ~] (~(del by callbacks) id)]
 ::
 ++  apply-operation-transition
-  |=  $:  our=@p
+  |=  $:  =bowl:gall
           transition=[cards=(list card) update=operation-update]
       ==
   ^-  [(list card) content-state]
   =/  noticed=[(list card) (map operation-id operation-callback)]
-    %+  operation-completion-notice  our
+    %+  operation-completion-notice  our.bowl
     [completion.update.transition callbacks.state.update.transition]
   =/  out=content-state  state.update.transition
+  =/  completion=(unit operation-completion)  completion.update.transition
+  =/  ignored
+    ?~  completion  ~
+    (log bowl %info [%operation-complete id.u.completion -.result.u.completion])
   =.  callbacks.out  +.noticed
   [(weld -.noticed cards.transition) out]
 --
@@ -149,16 +171,17 @@
 ::
 ++  on-init
   ^-  (quip card _this)
-  ~&  [%content-routing our.bowl %init]
   =.  state  ~(init logic engine)
   [[~(refresh-card logic engine) ~] this]
 ::
-++  on-save  !>(state)
+++  on-save  !>(`content-saved-state`[state verbosity])
 ::
 ++  on-load
   |=  old=vase
   ^-  (quip card _this)
-  =.  state  !<(content-state old)
+  =/  saved=content-saved-state  !<(content-saved-state old)
+  =.  state  state.saved
+  =.  verbosity  verbosity.saved
   [[~(refresh-card logic engine) ~] this]
 ::
 ++  on-poke
@@ -177,6 +200,7 @@
         =/  body=pointer-body
           [namespace.command key publisher revision.command expires.command target.command]
         =/  rec=record  [%pointer body (sign-digest bowl (pointer-message:cr body))]
+        =/  ignored  (log bowl %info [%operation-start id.command %publish-pointer key])
         =^  cards  state  (~(start-publish logic engine) id.command rec)
         [cards this]
       %publish-provider
@@ -186,11 +210,14 @@
         =/  body=provider-body
           [content.command ~(self-id logic engine) revision.command expires.command locations.command]
         =/  rec=record  [%provider body (sign-digest bowl (provider-message:cr body))]
+        =/  ignored  (log bowl %info [%operation-start id.command %publish-provider content.command])
         =^  cards  state  (~(start-publish logic engine) id.command rec)
         [cards this]
       %find-pointer
         ?>  (~(valid-id logic engine) id.command)
         ?>  (identity-valid:cr publisher.command)
+        =/  key=key  (pointer-key:cr namespace.command publisher.command name.command)
+        =/  ignored  (log bowl %info [%operation-start id.command %find-pointer key])
         =^  cards  state
           %+  ~(start-find-pointer logic engine)
             id.command
@@ -199,6 +226,7 @@
       %find-providers
         ?>  (~(valid-id logic engine) id.command)
         ?>  (digest-valid:cr content.command)
+        =/  ignored  (log bowl %info [%operation-start id.command %find-providers content.command])
         =^  cards  state  (~(start-find-providers logic engine) id.command content.command)
         [cards this]
       %observe
@@ -219,7 +247,12 @@
         =.  callbacks.state  (~(del by callbacks.state) id.command)
         `this
       %set-config
+        =/  ignored  (log bowl %info [%config-set])
         =.  state  (~(set-config logic engine) value.command)
+        `this
+      %set-verbosity
+        =.  verbosity  level.command
+        =/  ignored  (log bowl %info [%verbosity-set level.command])
         `this
     ==
   ::
@@ -233,7 +266,7 @@
     =/  transition=[cards=(list card) update=operation-update]
       (~(receive-lookup logic engine) u.id contacts.result.notice)
     =^  cards  state
-      (apply-operation-transition our.bowl transition)
+      (apply-operation-transition bowl transition)
     [cards this]
   ::
       %content-routing-message
@@ -246,7 +279,7 @@
         ?~  decoded  `this
         =/  stored=[store-status content-state]  (~(put-replica logic engine) u.decoded)
         =.  state  +.stored
-        ~&  [%content-routing our.bowl %store src.bowl id.message -.stored]
+        =/  ignored  (log bowl %debug [%peer-store src.bowl id.message -.stored])
         =/  response=content-message  [%stored %content-routing-v1 id.message -.stored]
         [[(send-message src.bowl response) ~] this]
       %find-records
@@ -254,17 +287,18 @@
         ?.  (~(valid-query logic engine) request.message)  `this
         =/  values=records  (records-for bowl state request.message)
         =/  packed=[count=@ud payload=@]  (~(pack-records logic engine) values)
-        ~&  [%content-routing our.bowl %find-records src.bowl id.message request.message count.packed]
+        =/  ignored
+          (log bowl %debug [%peer-find-records src.bowl id.message -.request.message count.packed])
         =/  response=content-message
           [%records %content-routing-v1 id.message count.packed payload.packed]
         [[(send-message src.bowl response) ~] this]
       %stored
         ?.  (~(response-expected logic engine) id.message %.n)  `this
-        ~&  [%content-routing our.bowl %stored src.bowl id.message status.message]
+        =/  ignored  (log bowl %debug [%peer-stored src.bowl id.message status.message])
         =/  transition=[cards=(list card) update=operation-update]
           (~(receive-stored logic engine) id.message status.message)
         =^  cards  state
-          (apply-operation-transition our.bowl transition)
+          (apply-operation-transition bowl transition)
         [cards this]
       %records
         ?.  (~(response-expected logic engine) id.message %.y)  `this
@@ -274,13 +308,13 @@
           =/  transition=[cards=(list card) update=operation-update]
             (~(fail-request logic engine) id.message &)
           =^  cards  state
-            (apply-operation-transition our.bowl transition)
+            (apply-operation-transition bowl transition)
           [cards this]
-        ~&  [%content-routing our.bowl %records src.bowl id.message count.message]
+        =/  ignored  (log bowl %debug [%peer-records src.bowl id.message count.message])
         =/  transition=[cards=(list card) update=operation-update]
           (~(receive-records logic engine) id.message u.decoded)
         =^  cards  state
-          (apply-operation-transition our.bowl transition)
+          (apply-operation-transition bowl transition)
         [cards this]
     ==
   ==
@@ -291,6 +325,7 @@
   ?+    path  (on-peek:def path)
       [%x ~]             [~ ~]
       [%x %settings ~]   ``noun+!>(config.state)
+      [%x %verbosity ~]  ``noun+!>(verbosity)
       [%x %operation ~]  [~ ~]
       [%x %operation @ ~]
     =/  id=(unit @uv)  (slaw %uv i.t.t.path)
@@ -329,8 +364,9 @@
   ?~  request  `this
   =/  transition=[cards=(list card) update=operation-update]
     (~(fail-request logic engine) u.request &)
+  =/  ignored  (log bowl %debug [%request-poke-failed u.request])
   =^  cards  state
-    (apply-operation-transition our.bowl transition)
+    (apply-operation-transition bowl transition)
   [cards this]
 ::
 ++  on-arvo
@@ -345,10 +381,11 @@
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
   ?.  (~(has by pending.state) u.request)  `this
+  =/  ignored  (log bowl %debug [%request-timeout u.request])
   =/  transition=[cards=(list card) update=operation-update]
     (~(fail-request logic engine) u.request |)
   =^  cards  state
-    (apply-operation-transition our.bowl transition)
+    (apply-operation-transition bowl transition)
   [cards this]
 ::
 ++  on-watch  on-watch:def

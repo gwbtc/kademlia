@@ -122,11 +122,13 @@ responses are ignored.
 Local `%kademlia-command` pokes can replace bootstrap ships, set the request
 timeout with `%set-request-timeout`, set the positive per-bucket refresh
 interval with `%set-refresh-interval`, start a caller-ID'd lookup, and forget a
-completed result. `%find-for` is the internal callback form: it allocates a
+completed result. `%set-verbosity` selects `%off`, `%info`, or `%debug`
+application logging and persists independently from the generic `verb` wrapper.
+`%find-for` is the internal callback form: it allocates a
 lookup ID and pokes a typed `%kademlia-result` notice to the requesting local
 agent when lookup completes. Commands are accepted only from the local ship. Read-only
 diagnostics are available through `/summary`, `/settings`, `/table`, `/seeds`,
-and `/lookup/<id>` Gall scries using the `%noun` output mark. For example:
+`/verbosity`, and `/lookup/<id>` Gall scries using the `%noun` output mark. For example:
 
 ```hoon
 .^(* %gx /=kademlia=/summary/noun)
@@ -138,7 +140,9 @@ and `/lookup/<id>` Gall scries using the `%noun` output mark. For example:
 The separate `%content-routing` agent keeps Kademlia itself agnostic about
 application data. Local `%content-routing-command` pokes publish signed pointer
 or provider records, start pointer/provider queries, forget completed operation
-results, or update transport limits. The agent asks `%kademlia` for the closest
+results, update transport limits, or set its independent persistent verbosity
+with `[%set-verbosity ?(%off %info %debug)]`. The current level is available at
+`/verbosity` through a `%noun` Gall scry. The agent asks `%kademlia` for the closest
 nodes through its callback API, then sends versioned `%content-routing-message`
 store/query RPCs to at most three peers concurrently. Each RPC has a five-minute
 Behn timeout. Publication completes only after every selected replica has been

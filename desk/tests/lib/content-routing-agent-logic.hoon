@@ -398,6 +398,31 @@
     !>(refresh-at.+.refreshed)
   ==
 ::
+++  test-origin-refresh-skips-active-publication-key
+  =/  state=content-state  initial
+  =/  other-content=digest  (digest-cask:cr `(cask)`[%noun 43])
+  =/  one=record  (provider-for content-id 0x12 1 'https://one.test')
+  =/  two=record  (provider-for other-content 0x13 1 'https://two.test')
+  =/  active-publish=[(list card:agent:gall) content-state]
+    (~(start-publish logic [~zod now ~zod state allow]) 0v9 one)
+  =.  state  +.active-publish
+  =.  state  (~(put-origin logic [~zod now ~zod state allow]) two)
+  =/  later=@da  (add ~h12 now)
+  =/  refreshed=[(list card:agent:gall) content-state]
+    ~(refresh-origins logic [~zod later ~zod state allow])
+  =/  publishing=(set key)
+    ~(publishing-keys logic [~zod later ~zod +.refreshed allow])
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>((lent ~(tap by active.+.refreshed)))
+    %+  expect-eq  !>(1)
+    !>((lent ~(tap in background.+.refreshed)))
+    %+  expect-eq  !>(2)
+    !>((lent ~(tap in publishing)))
+    %+  expect-eq  !>(2)
+    !>((lent -.refreshed))
+  ==
+::
 ++  test-background-completion-is-emitted-but-not-retained
   =/  state=content-state  initial
   =/  rec=record  (provider 0x12 1 'https://one.test')

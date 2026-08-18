@@ -400,18 +400,16 @@
   =.  next-operation.state  (bump-id id)
   [id state]
 ::
-++  publishing
-  |=  target=key
-  ^-  ?
+++  publishing-keys
+  ^-  (set key)
   =/  entries=(list [operation-id operation])  ~(tap by active.state)
+  =/  targets=(set key)  ~
   |-
-  ?~  entries  |
+  ?~  entries  targets
   =/  op=operation  +.i.entries
-  ?:  ?&  ?=(%publish -.kind.op)
-          =(target key.kind.op)
-      ==
-    &
-  $(entries t.entries)
+  ?.  ?=(%publish -.kind.op)
+    $(entries t.entries)
+  $(entries t.entries, targets (~(put in targets) key.kind.op))
 ::
 ++  refresh-card
   ^-  card:agent:gall
@@ -420,6 +418,7 @@
 ++  refresh-origins
   ^-  [(list card:agent:gall) content-state]
   =/  entries=(list [key record])  ~(tap by origins.state)
+  =/  publishing=(set key)  publishing-keys
   =/  cards=(list card:agent:gall)  ~
   |-
   ?~  entries
@@ -427,7 +426,7 @@
     [(flop [refresh-card cards]) state]
   =/  target=key  -.i.entries
   =/  rec=record  +.i.entries
-  ?:  (publishing target)
+  ?:  (~(has in publishing) target)
     $(entries t.entries)
   =^  id  state  next-operation-id
   =^  started  state  (start-operation id [%publish rec target (pack-record rec)])

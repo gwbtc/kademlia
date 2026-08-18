@@ -173,6 +173,8 @@ the replica store to 10,000 keys with deterministic earliest-expiry eviction.
 Reads and ordinary stores prune leases only under the accessed key. A complete
 store sweep occurs only when a new key reaches the configured capacity, before
 the eviction policy is applied.
+Origin refreshes collect active publication keys once per sweep, avoiding a
+full active-operation scan for every locally published record.
 
 Operation results are exposed at `/operation/<id>`. Stored records can be read
 at `/records/<key>`, pointer records at `/pointer/<key>`, and provider records at

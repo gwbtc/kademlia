@@ -114,6 +114,13 @@
     (expect !>((~(table-valid kademlia cfg) 0x0 tab)))
   ==
 ::
+++  test-bucket-refs-preserve-skewed-prefix-order
+  =/  tab=table  (spine 3)
+  =/  expected=(list bucket-ref)
+    [[3 0x0 now] [3 0x1 now] [2 0x1 now] [1 0x1 now] ~]
+  %+  expect-eq  !>(expected)
+  !>((~(bucket-refs kademlia cfg) tab))
+::
 ++  test-refresh-metadata
   =/  small-cfg=config  [1 2 3 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0

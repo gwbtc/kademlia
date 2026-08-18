@@ -195,6 +195,9 @@ schedules its sole wake for the earliest future deadline. Ordinary lookups also
 refresh their target leaf, and split children inherit the parent's timestamp.
 Installing seeds into an empty table advances the wake so initial bootstrap
 does not wait for the default one-hour interval.
+Leaf metadata and live contacts are enumerated with accumulator-based prefix
+tree traversals, remaining linear even when splitting produces a deeply skewed
+tree.
 
 A full leaf outside the local node's range does not split. New verified contacts
 enter its bounded replacement roster and may be promoted after live contacts

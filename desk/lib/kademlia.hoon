@@ -167,18 +167,28 @@
 ++  bucket-refs
   |=  tab=table
   ^-  (list bucket-ref)
-  =/  depth=@ud  0
-  =/  prefix=@ux  0x0
-  |-
-  ?-  -.tab
-    %leaf  [[depth prefix refreshed.buc.tab] ~]
-    %fork
-      =/  zero-refs=(list bucket-ref)
-        $(tab zero.tab, depth +(depth), prefix (mul 2 prefix))
-      =/  one-refs=(list bucket-ref)
-        $(tab one.tab, depth +(depth), prefix (add 1 (mul 2 prefix)))
-      (weld zero-refs one-refs)
-  ==
+  =/  collect
+    |=  $:  node=table
+            depth=@ud
+            prefix=@ux
+            out=(list bucket-ref)
+        ==
+    ^-  (list bucket-ref)
+    ?-  -.node
+      %leaf
+        [[depth prefix refreshed.buc.node] out]
+      %fork
+        =/  next-depth=@ud  +(depth)
+        =/  zero-prefix=@ux  (mul 2 prefix)
+        =/  one-prefix=@ux  +(zero-prefix)
+        %=  $
+          node    zero.node
+          depth   next-depth
+          prefix  zero-prefix
+          out     $(node one.node, depth next-depth, prefix one-prefix)
+        ==
+    ==
+  (collect tab 0 0x0 ~)
 ::
 ::  touch-bucket: record that a lookup has begun in the target's leaf.
 ::

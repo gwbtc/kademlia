@@ -4,7 +4,8 @@
 /+  kad=kademlia, cr=content-routing
 =/  kad-cfg=config  [20 20 3 12 %kademlia-urbit-v1]
 =/  protocol=content-version  %content-routing-v1
-=/  defaults=content-config  [20 3 ~m5 ~d1 ~h12 65.536 64 10.000]
+=/  defaults=content-config  [20 3 12 ~m5 ~d1 ~h12 8 65.536 64 10.000]
+=/  refresh-yield=@dr  ~s1
 =/  max-wire-record-bytes=@ud  65.536
 =/  max-wire-records=@ud  64
 =/  max-wire-response-bytes=@ud  262.144
@@ -133,7 +134,7 @@
 ::
 ++  init
   ^-  content-state
-  [defaults ~ ~ ~ ~ ~ 0v1 (add refresh.defaults now) 0v1 ~ ~]
+  [defaults ~ ~ ~ ~ ~ 0v1 (add refresh.defaults now) 0v1 ~ ~ ~ ~ ~]
 ::
 ++  config-valid
   |=  cfg=content-config
@@ -141,10 +142,12 @@
   ?&  (gth replication.cfg 0)
       (gth concurrency.cfg 0)
       (lte concurrency.cfg replication.cfg)
+      (gth global-concurrency.cfg 0)
       (gth request-timeout.cfg 0)
       (gth lease.cfg 0)
       (gth refresh.cfg 0)
       (lth refresh.cfg lease.cfg)
+      (gth refresh-batch.cfg 0)
       (gth max-record-bytes.cfg 0)
       (lte max-record-bytes.cfg max-wire-record-bytes)
       (gth max-providers.cfg 0)
@@ -417,21 +420,36 @@
 ::
 ++  refresh-origins
   ^-  [(list card:agent:gall) content-state]
-  =/  entries=(list [key record])  ~(tap by origins.state)
   =/  publishing=(set key)  publishing-keys
+  =/  queue=(list key)  refresh-queue.state
+  =?  queue  ?=(~ queue)
+    %+  turn  ~(tap by origins.state)
+    |=  entry=[key record]
+    -.entry
   =/  cards=(list card:agent:gall)  ~
+  =/  left=@ud  refresh-batch.config.state
   |-
-  ?~  entries
-    =.  refresh-at.state  (add refresh.config.state now)
+  ?:  |(?=(~ queue) =(0 left))
+    =.  refresh-queue.state  queue
+    =/  delay=@dr  ?:(?=(~ queue) refresh.config.state refresh-yield)
+    =.  refresh-at.state  (add delay now)
     [(flop [refresh-card cards]) state]
-  =/  target=key  -.i.entries
-  =/  rec=record  +.i.entries
+  =/  target=key  i.queue
+  =/  remaining=(list key)  t.queue
   ?:  (~(has in publishing) target)
-    $(entries t.entries)
+    $(queue remaining, left (dec left))
+  =/  found=(unit record)  (~(get by origins.state) target)
+  ?~  found
+    $(queue remaining, left (dec left))
+  =/  rec=record  u.found
   =^  id  state  next-operation-id
   =^  started  state  (start-operation id [%publish rec target (pack-record rec)])
   =.  background.state  (~(put in background.state) id)
-  $(entries t.entries, cards (weld (flop started) cards))
+  %=  $
+    queue  remaining
+    left   (dec left)
+    cards  (weld (flop started) cards)
+  ==
 ::
 ++  start-publish
   |=  [id=operation-id rec=record]
@@ -513,9 +531,45 @@
       [%find-records protocol request [%providers content.kind.op]]
   ==
 ::
-++  advance
+++  operation-ready
+  |=  op=operation
+  ^-  ?
+  ?&  phase.op
+      ?=(^ remaining.op)
+      (lth in-flight.op concurrency.config.state)
+  ==
+::
+::  enqueue: schedule one request-phase operation exactly once.
+::
+++  enqueue
+  |=  id=operation-id
+  ^-  content-state
+  ?:  (~(has in queued.state) id)  state
+  =/  found=(unit operation)  (~(get by active.state) id)
+  ?~  found  state
+  ?.  (operation-ready u.found)  state
+  =.  ready.state  (~(put to ready.state) id)
+  =.  queued.state  (~(put in queued.state) id)
+  state
+::
+::  pop-ready: take the oldest scheduled operation and clear membership.
+::
+++  pop-ready
+  ^-  [id=(unit operation-id) out=content-state]
+  ?~  ready.state  [~ state]
+  =/  item=[operation-id (qeu operation-id)]  ~(get to ready.state)
+  =/  out=content-state
+    state(ready +.item, queued (~(del in queued.state) -.item))
+  [`-.item out]
+::
+::  advance-one: perform local work and dispatch at most one remote request.
+::
+++  advance-one
   |=  [id=operation-id op=operation]
-  ^-  [(list card:agent:gall) operation-update]
+  ^-  $:  cards=(list card:agent:gall)
+          completion=(unit operation-completion)
+          out=content-state
+      ==
   ?~  remaining.op
     ?:  =(0 in-flight.op)
       =/  finished=[operation-completion content-state]  (finish id op)
@@ -547,8 +601,40 @@
   =/  timer=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %wait deadline]
   =.  active.state  (~(put by active.state) id next)
-  =/  more=[(list card:agent:gall) operation-update]  $(op next)
-  [(weld [poke timer ~] -.more) +.more]
+  [[poke timer ~] ~ state]
+::
+::  pump: fairly fill the process-wide request budget from the ready queue.
+::
+::    Each queue turn dispatches at most one remote request for one operation,
+::    then requeues that operation behind its peers if it can send more.
+::
+++  pump
+  ^-  [(list card:agent:gall) operation-update]
+  =/  cards=(list card:agent:gall)  ~
+  =/  completions=(list operation-completion)  ~
+  |-
+  =/  stopped=?
+    ?|  ?=(~ ready.state)
+        (gte ~(wyt by pending.state) global-concurrency.config.state)
+    ==
+  ?:  stopped
+    [(flop cards) (flop completions) state]
+  =/  popped=[id=(unit operation-id) out=content-state]  pop-ready
+  =.  state  out.popped
+  ?~  id.popped  [(flop cards) (flop completions) state]
+  =/  id=operation-id  u.id.popped
+  =/  found=(unit operation)  (~(get by active.state) id)
+  ?~  found  $(cards cards, completions completions)
+  =/  advanced=[cards=(list card:agent:gall) completion=(unit operation-completion) out=content-state]
+    (advance-one id u.found)
+  =.  state  out.advanced
+  =?  completions  ?=(^ completion.advanced)
+    [u.completion.advanced completions]
+  =.  state  (enqueue id)
+  %=  $
+    cards        (weld (flop cards.advanced) cards)
+    completions  completions
+  ==
 ::
 ++  receive-lookup
   |=  [id=operation-id contacts=(list node-id)]
@@ -565,7 +651,9 @@
     (lth (~(distance kad kad-cfg) (operation-key op) a) (~(distance kad kad-cfg) (operation-key op) b))
   =.  phase.op  %.y
   =.  remaining.op  (scag replication.config.state ordered)
-  (advance id op)
+  =.  active.state  (~(put by active.state) id op)
+  =.  state  (enqueue id)
+  pump
 ::
 ++  receive-stored
   |=  [request=content-request-id status=store-status]
@@ -583,9 +671,11 @@
       %accepted  op(accepted (~(put in accepted.op) peer.pen))
       %rejected  op(rejected (~(put by rejected.op) peer.pen reason.status))
     ==
+  =.  active.state  (~(put by active.state) operation.pen op)
+  =.  state  (enqueue operation.pen)
   =/  rest=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen]
-  =/  more=[(list card:agent:gall) operation-update]  (advance operation.pen op)
+  =/  more=[(list card:agent:gall) operation-update]  pump
   [[rest -.more] +.more]
 ::
 ++  receive-records
@@ -601,9 +691,11 @@
   =.  in-flight.op  (dec in-flight.op)
   =.  responders.op  (~(put in responders.op) peer.pen)
   =.  op  (merge-records op (scag max-providers.config.state values))
+  =.  active.state  (~(put by active.state) operation.pen op)
+  =.  state  (enqueue operation.pen)
   =/  rest=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen]
-  =/  more=[(list card:agent:gall) operation-update]  (advance operation.pen op)
+  =/  more=[(list card:agent:gall) operation-update]  pump
   [[rest -.more] +.more]
 ::
 ++  fail-request
@@ -619,9 +711,11 @@
   =/  op=operation  u.active
   =.  in-flight.op  (dec in-flight.op)
   =.  timed-out.op  (~(put in timed-out.op) peer.pen)
+  =.  active.state  (~(put by active.state) operation.pen op)
+  =.  state  (enqueue operation.pen)
   =/  cancellation=(list card:agent:gall)
     ?:(cancel [[%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen] ~] ~)
-  =/  more=[(list card:agent:gall) operation-update]  (advance operation.pen op)
+  =/  more=[(list card:agent:gall) operation-update]  pump
   [(weld cancellation -.more) +.more]
 ::
 ++  get-operation

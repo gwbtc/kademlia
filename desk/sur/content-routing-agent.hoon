@@ -10,9 +10,11 @@
 +$  content-config
   $:  replication=@ud
       concurrency=@ud
+      global-concurrency=@ud
       request-timeout=@dr
       lease=@dr
       refresh=@dr
+      refresh-batch=@ud
       max-record-bytes=@ud
       max-providers=@ud
       max-replica-keys=@ud
@@ -126,9 +128,12 @@
       next-operation=operation-id
       background=(set operation-id)
       callbacks=(map operation-id operation-callback)
+      ready=(qeu operation-id)
+      queued=(set operation-id)
+      refresh-queue=(list key)
   ==
 +$  operation-update
-  [completion=(unit operation-completion) state=content-state]
+  [completions=(list operation-completion) state=content-state]
 +$  content-saved-state
   [state=content-state verbosity=verbosity]
 --

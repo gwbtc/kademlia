@@ -5,7 +5,7 @@
 /+  *ph-io, kad=kademlia, cr=content-routing
 =,  strand=strand:spider
 =/  cfg=config  [20 20 3 12 %kademlia-urbit-v1]
-=/  content-cfg=content-config  [2 1 ~h1 ~d1 ~h12 65.536 64 10.000]
+=/  content-cfg=content-config  [2 1 4 ~h1 ~d1 ~h12 2 65.536 64 10.000]
 ^-  thread:spider
 |=  argument=vase
 |^

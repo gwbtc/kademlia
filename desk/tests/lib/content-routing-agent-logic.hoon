@@ -28,6 +28,13 @@
   ^-  record
   (provider-for content-id who revision address)
 ::
+++  pending-for
+  |=  [id=operation-id state=content-state]
+  ^-  @ud
+  %+  roll  ~(tap by pending.state)
+  |=  [entry=[content-request-id pending-content-request] count=@ud]
+  ?:(=(id operation.+.entry) +(count) count)
+::
 ++  linear-pack-records
   |=  values=records
   ^-  [count=@ud payload=@]
@@ -55,12 +62,16 @@
     !>(replication.config.state)
     %+  expect-eq  !>(3)
     !>(concurrency.config.state)
+    %+  expect-eq  !>(12)
+    !>(global-concurrency.config.state)
     %+  expect-eq  !>(~m5)
     !>(request-timeout.config.state)
     %+  expect-eq  !>(~d1)
     !>(lease.config.state)
     %+  expect-eq  !>(~h12)
     !>(refresh.config.state)
+    %+  expect-eq  !>(8)
+    !>(refresh-batch.config.state)
   ==
 ::
 ++  test-record-payload-round-trip
@@ -136,6 +147,8 @@
   ;:  weld
     (expect !>(!(~(config-valid logic engine) config.state(max-record-bytes 65.537))))
     (expect !>(!(~(config-valid logic engine) config.state(max-providers 65))))
+    (expect !>(!(~(config-valid logic engine) config.state(global-concurrency 0))))
+    (expect !>(!(~(config-valid logic engine) config.state(refresh-batch 0))))
   ==
 ::
 ++  test-id-boundaries
@@ -334,7 +347,8 @@
     (~(receive-lookup logic [~zod now ~zod +.started allow]) 0v1 ~)
   =/  view=(unit operation-view)
     (~(get-operation logic [~zod now ~zod state.+.found allow]) 0v1)
-  =/  completion=operation-completion  (need completion.+.found)
+  ?>  ?=(^ completions.+.found)
+  =/  completion=operation-completion  i.completions.+.found
   =/  got=operation-view  (need view)
   ?>  ?=(%complete -.got)
   ?>  ?=(%published -.value.got)
@@ -377,7 +391,41 @@
     !>((lent ~(tap by pending.state.+.found)))
     %+  expect-eq  !>(6)
     !>((lent -.found))
-    (expect !>(?=(~ completion.+.found)))
+    (expect !>(?=(~ completions.+.found)))
+  ==
+::
+++  test-global-concurrency-is-fair-across-operations
+  =/  state=content-state  initial
+  =.  state
+    (~(set-config logic [~zod now ~zod state allow]) config.state(global-concurrency 2))
+  =/  one=record  (provider-for content-id 0x12 1 %one)
+  =/  other=digest  (digest-cask:cr `(cask)`[%noun 43])
+  =/  two=record  (provider-for other 0x13 1 %two)
+  =/  first=[(list card:agent:gall) content-state]
+    (~(start-publish logic [~zod now ~zod state allow]) 0v1 one)
+  =/  second=[(list card:agent:gall) content-state]
+    (~(start-publish logic [~zod now ~zod +.first allow]) 0v2 two)
+  =/  first-ready=[(list card:agent:gall) operation-update]
+    %+  ~(receive-lookup logic [~zod now ~zod +.second allow])  0v1
+    [0x10 0x20 0x30 0x40 ~]
+  =/  both-ready=[(list card:agent:gall) operation-update]
+    %+  ~(receive-lookup logic [~zod now ~zod state.+.first-ready allow])  0v2
+    [0x50 0x60 0x70 0x80 ~]
+  =/  freed-one=[(list card:agent:gall) operation-update]
+    (~(fail-request logic [~zod now ~zod state.+.both-ready allow]) 0v1 |)
+  =/  freed-two=[(list card:agent:gall) operation-update]
+    (~(fail-request logic [~zod now ~zod state.+.freed-one allow]) 0v2 |)
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>(~(wyt by pending.state.+.both-ready))
+    %+  expect-eq  !>(0)
+    !>((pending-for 0v2 state.+.both-ready))
+    %+  expect-eq  !>(2)
+    !>(~(wyt by pending.state.+.freed-one))
+    %+  expect-eq  !>(2)
+    !>(~(wyt by pending.state.+.freed-two))
+    %+  expect-eq  !>(1)
+    !>((pending-for 0v2 state.+.freed-two))
   ==
 ::
 ++  test-origin-refresh-is-background
@@ -396,6 +444,47 @@
     !>((lent ~(tap by active.+.refreshed)))
     %+  expect-eq  !>((add ~h12 later))
     !>(refresh-at.+.refreshed)
+  ==
+::
+++  test-origin-refresh-is-batched
+  =/  state=content-state  initial
+  =.  state
+    (~(set-config logic [~zod now ~zod state allow]) config.state(refresh-batch 1))
+  =/  one=digest  (digest-cask:cr `(cask)`[%noun 1])
+  =/  two=digest  (digest-cask:cr `(cask)`[%noun 2])
+  =/  three=digest  (digest-cask:cr `(cask)`[%noun 3])
+  =.  state
+    (~(put-origin logic [~zod now ~zod state allow]) (provider-for one 0x11 1 %one))
+  =.  state
+    (~(put-origin logic [~zod now ~zod state allow]) (provider-for two 0x12 1 %two))
+  =.  state
+    (~(put-origin logic [~zod now ~zod state allow]) (provider-for three 0x13 1 %three))
+  =/  first-now=@da  (add ~h12 now)
+  =/  first=[(list card:agent:gall) content-state]
+    ~(refresh-origins logic [~zod first-now ~zod state allow])
+  =/  second-now=@da  (add ~s1 first-now)
+  =/  second=[(list card:agent:gall) content-state]
+    ~(refresh-origins logic [~zod second-now ~zod +.first allow])
+  =/  third-now=@da  (add ~s1 second-now)
+  =/  third=[(list card:agent:gall) content-state]
+    ~(refresh-origins logic [~zod third-now ~zod +.second allow])
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>(~(wyt by active.+.first))
+    %+  expect-eq  !>(2)
+    !>((lent refresh-queue.+.first))
+    %+  expect-eq  !>((add ~s1 first-now))
+    !>(refresh-at.+.first)
+    %+  expect-eq  !>(2)
+    !>(~(wyt by active.+.second))
+    %+  expect-eq  !>(1)
+    !>((lent refresh-queue.+.second))
+    %+  expect-eq  !>(3)
+    !>(~(wyt by active.+.third))
+    %+  expect-eq  !>(0)
+    !>((lent refresh-queue.+.third))
+    %+  expect-eq  !>((add ~h12 third-now))
+    !>(refresh-at.+.third)
   ==
 ::
 ++  test-origin-refresh-skips-active-publication-key
@@ -435,7 +524,8 @@
   =/  id=operation-id  -.i.entries
   =/  finished=[(list card:agent:gall) operation-update]
     (~(receive-lookup logic [~zod later ~zod +.refreshed allow]) id ~)
-  =/  completion=operation-completion  (need completion.+.finished)
+  ?>  ?=(^ completions.+.finished)
+  =/  completion=operation-completion  i.completions.+.finished
   ;:  weld
     %+  expect-eq  !>(id)
     !>(id.completion)

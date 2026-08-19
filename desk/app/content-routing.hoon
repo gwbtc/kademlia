@@ -130,19 +130,28 @@
       %poke  %content-routing-result  !>(notice)
   ==
 ::
-++  operation-completion-notice
-  |=  $:  our=@p
-          completion=(unit operation-completion)
+++  operation-completion-notices
+  |=  $:  =bowl:gall
+          completions=(list operation-completion)
           callbacks=(map operation-id operation-callback)
       ==
   ^-  [(list card) (map operation-id operation-callback)]
-  ?~  completion  [~ callbacks]
-  =/  id=operation-id  id.u.completion
+  =/  cards=(list card)  ~
+  |-
+  ?~  completions  [(flop cards) callbacks]
+  =/  completion=operation-completion  i.completions
+  =/  ignored
+    (log bowl %info [%operation-complete id.completion -.result.completion])
+  =/  id=operation-id  id.completion
   =/  callback=(unit operation-callback)  (~(get by callbacks) id)
-  ?~  callback  [~ callbacks]
+  ?~  callback  $(completions t.completions)
   =/  card=card
-    (operation-notice-card our id u.callback result.u.completion)
-  [[card ~] (~(del by callbacks) id)]
+    (operation-notice-card our.bowl id u.callback result.completion)
+  %=  $
+    completions  t.completions
+    callbacks    (~(del by callbacks) id)
+    cards        [card cards]
+  ==
 ::
 ++  apply-operation-transition
   |=  $:  =bowl:gall
@@ -150,13 +159,9 @@
       ==
   ^-  [(list card) content-state]
   =/  noticed=[(list card) (map operation-id operation-callback)]
-    %+  operation-completion-notice  our.bowl
-    [completion.update.transition callbacks.state.update.transition]
+    %+  operation-completion-notices  bowl
+    [completions.update.transition callbacks.state.update.transition]
   =/  out=content-state  state.update.transition
-  =/  completion=(unit operation-completion)  completion.update.transition
-  =/  ignored
-    ?~  completion  ~
-    (log bowl %info [%operation-complete id.u.completion -.result.u.completion])
   =.  callbacks.out  +.noticed
   [(weld -.noticed cards.transition) out]
 --
@@ -249,7 +254,11 @@
       %set-config
         =/  ignored  (log bowl %info [%config-set])
         =.  state  (~(set-config logic engine) value.command)
-        `this
+        =/  transition=[cards=(list card) update=operation-update]
+          ~(pump logic engine)
+        =^  cards  state
+          (apply-operation-transition bowl transition)
+        [cards this]
       %set-verbosity
         =.  verbosity  level.command
         =/  ignored  (log bowl %info [%verbosity-set level.command])

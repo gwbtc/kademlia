@@ -144,9 +144,11 @@ results, update transport limits, or set its independent persistent verbosity
 with `[%set-verbosity ?(%off %info %debug)]`. The current level is available at
 `/verbosity` through a `%noun` Gall scry. The agent asks `%kademlia` for the closest
 nodes through its callback API, then sends versioned `%content-routing-message`
-store/query RPCs to at most three peers concurrently. Each RPC has a five-minute
-Behn timeout. Publication completes only after every selected replica has been
-accounted for as accepted, rejected, or timed out.
+store/query RPCs to at most three peers per operation and twelve peers across
+the agent. A persistent round-robin ready queue shares that global budget among
+active operations. Each RPC has a five-minute Behn timeout. Publication
+completes only after every selected replica has been accounted for as accepted,
+rejected, or timed out.
 
 Content operation IDs and transport request IDs follow the same 64-bit local
 conflict, internal allocation, and remote rejection rules as Kademlia IDs.
@@ -163,9 +165,10 @@ requiring at most logarithmically many whole-prefix encodings.
 Response IDs, kinds, and senders are matched against pending state before any
 response payload is decoded. Unsolicited, late, duplicate, and wrong-sender
 responses are therefore dropped without decode work.
-Logic transitions explicitly return an optional operation-completion event.
-The agent uses that event for a single callback-map lookup instead of comparing
-and scanning the complete retained-result map after every response or timeout.
+Logic transitions explicitly return the operation-completion events produced by
+each scheduler pass. The agent uses those events for direct callback-map lookups
+instead of comparing and scanning the complete retained-result map after every
+response or timeout.
 
 Unsigned local publication bodies are completed with the local 128-bit node ID
 and signed using the ship's current Jael Ames key. Receiving replicas resolve
@@ -177,8 +180,10 @@ the replica store to 10,000 keys with deterministic earliest-expiry eviction.
 Reads and ordinary stores prune leases only under the accessed key. A complete
 store sweep occurs only when a new key reaches the configured capacity, before
 the eviction policy is applied.
-Origin refreshes collect active publication keys once per sweep, avoiding a
-full active-operation scan for every locally published record.
+Origin refreshes collect active publication keys once per batch and persist a
+queue of keys. At most eight origins are started per wake; an unfinished sweep
+continues on a short follow-up wake. This bounds both event size and per-event
+work without installing one timer per origin.
 
 Operation results are exposed at `/operation/<id>`. Stored records can be read
 at `/records/<key>`, pointer records at `/pointer/<key>`, and provider records at

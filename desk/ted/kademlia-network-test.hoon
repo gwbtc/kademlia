@@ -34,6 +34,9 @@
 ::
 ++  configure-network
   =/  m  (strand ,~)
+  ;<  ~  bind:m  (poke-kademlia ~bud [%set-verbosity %debug])
+  ;<  ~  bind:m  (poke-kademlia ~dev [%set-verbosity %debug])
+  ;<  ~  bind:m  (poke-kademlia ~wes [%set-verbosity %debug])
   ;<  ~  bind:m  (poke-kademlia ~bud [%set-seeds ~[~dev]])
   ;<  ~  bind:m  (poke-kademlia ~bud [%set-request-timeout ~h1])
   ;<  ~  bind:m  (poke-kademlia ~dev [%set-seeds ~[~wes]])

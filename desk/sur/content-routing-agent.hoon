@@ -119,6 +119,7 @@
 +$  content-state
   $:  config=content-config
       replicas=(map key leased-records)
+      replica-count=@ud
       origins=(map key record)
       active=(map operation-id operation)
       completed=(map operation-id operation-result)

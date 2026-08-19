@@ -179,7 +179,9 @@ also limit records to 64 KiB, provider identities to 64 per content key, and
 the replica store to 10,000 keys with deterministic earliest-expiry eviction.
 Reads and ordinary stores prune leases only under the accessed key. A complete
 store sweep occurs only when a new key reaches the configured capacity, before
-the eviction policy is applied.
+the eviction policy is applied. The state maintains the number of replica keys
+alongside the map, so ordinary capacity checks do not traverse the whole store;
+targeted pruning, full pruning, and eviction update that count transactionally.
 Origin refreshes collect active publication keys once per batch and persist a
 queue of keys. At most eight origins are started per wake; an unfinished sweep
 continues on a short follow-up wake. This bounds both event size and per-event

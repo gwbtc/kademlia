@@ -134,7 +134,7 @@
 ::
 ++  init
   ^-  content-state
-  [defaults ~ ~ ~ ~ ~ 0v1 (add refresh.defaults now) 0v1 ~ ~ ~ ~ ~]
+  [defaults ~ 0 ~ ~ ~ ~ 0v1 (add refresh.defaults now) 0v1 ~ ~ ~ ~ ~]
 ::
 ++  config-valid
   |=  cfg=content-config
@@ -228,19 +228,29 @@
   ^-  content-state
   =/  entries=(list [key leased-records])  ~(tap by replicas.state)
   =/  fresh=(map key leased-records)  ~
+  =/  count=@ud  0
   |-
-  ?~  entries  state(replicas fresh)
+  ?~  entries  state(replicas fresh, replica-count count)
   =/  values=leased-records  (prune-list +.i.entries)
-  =?  fresh  ?=(^ values)  (~(put by fresh) -.i.entries values)
-  $(entries t.entries)
+  ?~  values  $(entries t.entries)
+  %=  $
+    entries  t.entries
+    fresh    (~(put by fresh) -.i.entries values)
+    count    +(count)
+  ==
 ::
 ++  prune-key
   |=  target=key
   ^-  content-state
+  =/  present=?  (~(has by replicas.state) target)
   =/  values=leased-records
     (prune-list (~(gut by replicas.state) [target ~]))
   ?~  values
-    state(replicas (~(del by replicas.state) target))
+    ?.  present  state
+    %=  state
+      replicas       (~(del by replicas.state) target)
+      replica-count  (dec replica-count.state)
+    ==
   state(replicas (~(put by replicas.state) target values))
 ::
 ++  lease-horizon
@@ -258,7 +268,11 @@
   =/  horizon=@da  (lease-horizon +.i.entries)
   =/  remaining=(list [key leased-records])  t.entries
   |-
-  ?~  remaining  state(replicas (~(del by replicas.state) victim))
+  ?~  remaining
+    %=  state
+      replicas       (~(del by replicas.state) victim)
+      replica-count  (dec replica-count.state)
+    ==
   =/  candidate=key  -.i.remaining
   =/  candidate-horizon=@da  (lease-horizon +.i.remaining)
   =/  replace=?
@@ -341,14 +355,15 @@
     [[rec until] kept]
   =/  adding-key=?  ?=(~ (~(get by replicas.state) target))
   =?  state  ?&  adding-key
-                  (gte ~(wyt by replicas.state) max-replica-keys.config.state)
+                  (gte replica-count.state max-replica-keys.config.state)
               ==
     prune-all
   =?  state  ?&  adding-key
-                  (gte ~(wyt by replicas.state) max-replica-keys.config.state)
+                  (gte replica-count.state max-replica-keys.config.state)
               ==
     evict-one
   =.  replicas.state  (~(put by replicas.state) target kept)
+  =?  replica-count.state  adding-key  +(replica-count.state)
   [[%accepted ~] state]
 ::
 ++  put-origin
@@ -534,10 +549,10 @@
 ++  operation-ready
   |=  op=operation
   ^-  ?
-  ?&  phase.op
-      ?=(^ remaining.op)
-      (lth in-flight.op concurrency.config.state)
-  ==
+  ?.  phase.op  |
+  ?~  remaining.op
+    =(0 in-flight.op)
+  (lth in-flight.op concurrency.config.state)
 ::
 ::  enqueue: schedule one request-phase operation exactly once.
 ::

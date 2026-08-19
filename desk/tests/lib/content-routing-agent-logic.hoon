@@ -72,6 +72,8 @@
     !>(refresh.config.state)
     %+  expect-eq  !>(8)
     !>(refresh-batch.config.state)
+    %+  expect-eq  !>(0)
+    !>(replica-count.state)
   ==
 ::
 ++  test-record-payload-round-trip
@@ -282,6 +284,7 @@
     (~(put by replicas.state) requested-key [[requested-record (dec now)] ~])
   =.  replicas.state
     (~(put by replicas.state) unrelated-key [[unrelated-record (dec now)] ~])
+  =.  replica-count.state  2
   =/  values=records
     (~(values-for logic [~zod now ~zod state allow]) requested-key)
   ;:  weld
@@ -300,6 +303,7 @@
   =/  incoming-key=key  (provider-key:cr incoming)
   =.  replicas.state
     (~(put by replicas.state) expired-key [[expired-record (dec now)] ~])
+  =.  replica-count.state  1
   =/  out=[store-status content-state]
     (~(put-replica logic [~zod now ~nec state allow]) incoming-record)
   ;:  weld
@@ -307,6 +311,71 @@
     !>(-.out)
     (expect !>((~(has by replicas.+.out) expired-key)))
     (expect !>((~(has by replicas.+.out) incoming-key)))
+    %+  expect-eq  !>(2)
+    !>(replica-count.+.out)
+  ==
+::
+++  test-prune-key-updates-replica-count
+  =/  state=content-state  initial
+  =/  rec=record  (provider 0x12 1 %expired)
+  =/  target=key  (provider-key:cr content-id)
+  =.  replicas.state
+    (~(put by replicas.state) target [[rec (dec now)] ~])
+  =.  replica-count.state  1
+  =/  out=content-state
+    (~(prune-key logic [~zod now ~zod state allow]) target)
+  ;:  weld
+    (expect !>(!(~(has by replicas.out) target)))
+    %+  expect-eq  !>(0)
+    !>(replica-count.out)
+  ==
+::
+++  test-prune-all-recomputes-replica-count
+  =/  state=content-state  initial
+  =/  expired=digest  (digest-cask:cr `(cask)`[%noun 1])
+  =/  live=digest  (digest-cask:cr `(cask)`[%noun 2])
+  =/  expired-record=record  (provider-for expired 0x12 1 %expired)
+  =/  live-record=record  (provider-for live 0x13 1 %live)
+  =/  expired-key=key  (provider-key:cr expired)
+  =/  live-key=key  (provider-key:cr live)
+  =.  replicas.state
+    (~(put by replicas.state) expired-key [[expired-record (dec now)] ~])
+  =.  replicas.state
+    (~(put by replicas.state) live-key [[live-record +(now)] ~])
+  =.  replica-count.state  2
+  =/  out=content-state
+    ~(prune-all logic [~zod now ~zod state allow])
+  ;:  weld
+    (expect !>(!(~(has by replicas.out) expired-key)))
+    (expect !>((~(has by replicas.out) live-key)))
+    %+  expect-eq  !>(1)
+    !>(replica-count.out)
+  ==
+::
+++  test-eviction-preserves-replica-count
+  =/  state=content-state  initial
+  =.  state
+    (~(set-config logic [~zod now ~zod state allow]) config.state(max-replica-keys 1))
+  =/  old=digest  (digest-cask:cr `(cask)`[%noun 1])
+  =/  incoming=digest  (digest-cask:cr `(cask)`[%noun 2])
+  =/  old-record=record  (provider-for old 0x12 1 %old)
+  =/  incoming-record=record  (provider-for incoming 0x13 1 %incoming)
+  =/  old-key=key  (provider-key:cr old)
+  =/  incoming-key=key  (provider-key:cr incoming)
+  =.  replicas.state
+    (~(put by replicas.state) old-key [[old-record +(now)] ~])
+  =.  replica-count.state  1
+  =/  out=[store-status content-state]
+    (~(put-replica logic [~zod now ~nec state allow]) incoming-record)
+  ;:  weld
+    %+  expect-eq  !>(`store-status`[%accepted ~])
+    !>(-.out)
+    (expect !>(!(~(has by replicas.+.out) old-key)))
+    (expect !>((~(has by replicas.+.out) incoming-key)))
+    %+  expect-eq  !>(1)
+    !>(replica-count.+.out)
+    %+  expect-eq  !>(1)
+    !>(~(wyt by replicas.+.out))
   ==
 ::
 ++  test-capacity-sweep-reclaims-expired-key
@@ -326,6 +395,7 @@
     (~(put by replicas.state) expired-key [[expired-record (dec now)] ~])
   =.  replicas.state
     (~(put by replicas.state) live-key [[live-record +(now)] ~])
+  =.  replica-count.state  2
   =/  out=[store-status content-state]
     (~(put-replica logic [~zod now ~nec state allow]) incoming-record)
   ;:  weld
@@ -336,6 +406,8 @@
     (expect !>((~(has by replicas.+.out) incoming-key)))
     %+  expect-eq  !>(2)
     !>(~(wyt by replicas.+.out))
+    %+  expect-eq  !>(2)
+    !>(replica-count.+.out)
   ==
 ::
 ++  test-local-publication-completes
@@ -360,6 +432,34 @@
     (expect !>((~(has in accepted.value.value.got) ~(self-id logic [~zod now ~zod state.+.found allow]))))
     %+  expect-eq  !>(0v1)
     !>(id.completion)
+  ==
+::
+++  test-remote-publication-completes-after-stored
+  =/  state=content-state  initial
+  =.  state
+    (~(set-config logic [~zod now ~zod state allow]) config.state(replication 2, concurrency 1))
+  =/  rec=record  (provider 0x12 1 %remote)
+  =/  peer=node-id  ~(self-id logic [~nec now ~nec state allow])
+  =/  started=[(list card:agent:gall) content-state]
+    (~(start-publish logic [~zod now ~zod state allow]) 0v1 rec)
+  =/  found=[(list card:agent:gall) operation-update]
+    (~(receive-lookup logic [~zod now ~zod +.started allow]) 0v1 [peer ~])
+  ?>  =(1 ~(wyt by pending.state.+.found))
+  =/  pending-entries=(list [content-request-id pending-content-request])
+    ~(tap by pending.state.+.found)
+  ?>  ?=(^ pending-entries)
+  =/  request=content-request-id  -.i.pending-entries
+  =/  stored=[(list card:agent:gall) operation-update]
+    (~(receive-stored logic [~zod now ~nec state.+.found allow]) request [%accepted ~])
+  ?>  ?=(^ completions.+.stored)
+  =/  completion=operation-completion  i.completions.+.stored
+  ?>  ?=(%published -.result.completion)
+  ;:  weld
+    %+  expect-eq  !>(0v1)
+    !>(id.completion)
+    %+  expect-eq  !>(2)
+    !>((lent ~(tap in accepted.value.result.completion)))
+    (expect !>(!(~(has by active.state.+.stored) 0v1)))
   ==
 ::
 ++  test-local-provider-query

@@ -93,12 +93,14 @@
   =/  engine  [~zod now ~zod state allow]
   =/  rec=record  (provider 0x12 1 'https://one.test')
   =/  payload=@  (~(pack-record logic engine) rec)
-  =/  decoded=(unit record)  (~(unpack-record logic engine) payload)
-  =/  got=record  (need decoded)
+  =/  decoded=(unit sized-record)  (~(unpack-record logic engine) payload)
+  =/  got=sized-record  (need decoded)
   ;:  weld
     (expect !>(?=(^ decoded)))
     %+  expect-eq  !>(rec)
-    !>(got)
+    !>(value.got)
+    %+  expect-eq  !>((met 3 payload))
+    !>(bytes.got)
   ==
 ::
 ++  test-records-payload-round-trip
@@ -107,15 +109,21 @@
   =/  values=records
     [(provider 0x12 1 'https://one.test') (provider 0x13 1 'https://two.test') ~]
   =/  packed=[count=@ud payload=@]  (~(pack-records logic engine) values)
-  =/  decoded=(unit records)
+  =/  decoded=(unit sized-records)
     (~(unpack-records logic engine) count.packed payload.packed)
-  =/  got=records  (need decoded)
+  =/  got=sized-records  (need decoded)
+  =/  got-values=records  (turn got |=(item=sized-record value.item))
+  =/  got-sizes=(list @ud)  (turn got |=(item=sized-record bytes.item))
+  =/  expected-sizes=(list @ud)
+    (turn values |=(item=record (met 3 (jam item))))
   ;:  weld
     %+  expect-eq  !>(2)
     !>(count.packed)
     (expect !>(?=(^ decoded)))
     %+  expect-eq  !>(values)
-    !>(got)
+    !>(got-values)
+    %+  expect-eq  !>(expected-sizes)
+    !>(got-sizes)
   ==
 ::
 ++  test-records-payload-longest-fitting-prefix
@@ -145,13 +153,13 @@
   =/  valid=[count=@ud payload=@]
     (~(pack-records logic engine) [(provider 0x12 1 'https://one.test') ~])
   ;:  weld
-    %+  expect-eq  !>(`(unit record)`~)
+    %+  expect-eq  !>(`(unit sized-record)`~)
     !>((~(unpack-record logic engine) 0))
-    %+  expect-eq  !>(`(unit records)`~)
+    %+  expect-eq  !>(`(unit sized-records)`~)
     !>((~(unpack-records logic engine) 2 payload.valid))
-    %+  expect-eq  !>(`(unit records)`~)
+    %+  expect-eq  !>(`(unit sized-records)`~)
     !>((~(unpack-records logic engine) 65 payload.valid))
-    %+  expect-eq  !>(`(unit records)`~)
+    %+  expect-eq  !>(`(unit sized-records)`~)
     !>((~(unpack-records logic engine) 0 (pow 2 (mul 8 262.144))))
   ==
 ::

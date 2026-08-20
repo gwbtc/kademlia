@@ -24,6 +24,9 @@
       [%provider value=provider]
   ==
 +$  records  (list record)
+::  A decoded record paired with its already-validated encoded byte size.
++$  sized-record  [value=record bytes=@ud]
++$  sized-records  (list sized-record)
 +$  query
   $%  [%pointer key=key]
       [%providers content=digest]

@@ -284,9 +284,10 @@
     ?-  -.message
       %store
         ?.  (~(valid-id logic engine) id.message)  `this
-        =/  decoded=(unit record)  (~(unpack-record logic engine) payload.message)
+        =/  decoded=(unit sized-record)  (~(unpack-record logic engine) payload.message)
         ?~  decoded  `this
-        =/  stored=[store-status content-state]  (~(put-replica logic engine) u.decoded)
+        =/  stored=[store-status content-state]
+          (~(put-replica-sized logic engine) u.decoded)
         =.  state  +.stored
         =/  ignored  (log bowl %debug [%peer-store src.bowl id.message -.stored])
         =/  response=content-message  [%stored %content-routing-v1 id.message -.stored]
@@ -311,7 +312,7 @@
         [cards this]
       %records
         ?.  (~(response-expected logic engine) id.message %.y)  `this
-        =/  decoded=(unit records)
+        =/  decoded=(unit sized-records)
           (~(unpack-records logic engine) count.message payload.message)
         ?~  decoded
           =/  transition=[cards=(list card) update=operation-update]

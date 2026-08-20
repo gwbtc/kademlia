@@ -81,12 +81,13 @@
 ::
 ++  unpack-record
   |=  payload=@
-  ^-  (unit record)
-  ?.  (lte (met 3 payload) max-wire-record-bytes)  ~
-  ?.  (lte (met 3 payload) max-record-bytes.config.state)  ~
+  ^-  (unit sized-record)
+  =/  size=@ud  (met 3 payload)
+  ?.  (lte size max-wire-record-bytes)  ~
+  ?.  (lte size max-record-bytes.config.state)  ~
   =/  decoded  (mule |.(;;(record (cue payload))))
   ?:  ?=(%| -.decoded)  ~
-  `p.decoded
+  `[p.decoded size]
 ::
 ::  pack-records: retain the longest prefix fitting both response ceilings.
 ::
@@ -116,21 +117,22 @@
 ::
 ++  unpack-records
   |=  [count=@ud payload=@]
-  ^-  (unit records)
+  ^-  (unit sized-records)
   ?:  (gth count max-wire-records)  ~
   ?.  (lte (met 3 payload) max-wire-response-bytes)  ~
   =/  decoded  (mule |.(;;(records (cue payload))))
   ?:  ?=(%| -.decoded)  ~
   ?.  =(count (lent p.decoded))  ~
   =/  remaining=records  p.decoded
+  =/  out=sized-records  ~
   |-
-  ?~  remaining  `p.decoded
+  ?~  remaining  `(flop out)
   =/  size=@ud  (met 3 (jam i.remaining))
   ?.  ?&  (lte size max-wire-record-bytes)
           (lte size max-record-bytes.config.state)
       ==
     ~
-  $(remaining t.remaining)
+  $(remaining t.remaining, out [[i.remaining size] out])
 ::
 ++  init
   ^-  content-state
@@ -220,7 +222,16 @@
 ++  record-valid-for
   |=  [op=operation rec=record]
   ^-  ?
-  ?.  (lte (met 3 (jam rec)) max-record-bytes.config.state)  |
+  (record-valid-for-sized op [rec (met 3 (jam rec))])
+::
+::  record-valid-for-sized: authenticate a record whose encoded size was
+::  retained by the transport decoder, without serializing it again.
+::
+++  record-valid-for-sized
+  |=  [op=operation incoming=sized-record]
+  ^-  ?
+  ?.  (lte bytes.incoming max-record-bytes.config.state)  |
+  =/  rec=record  value.incoming
   ?-  -.kind.op
     %publish
       |
@@ -317,8 +328,17 @@
 ++  put-replica
   |=  rec=record
   ^-  [store-status content-state]
-  ?.  (lte (met 3 (jam rec)) max-record-bytes.config.state)
+  (put-replica-sized [rec (met 3 (jam rec))])
+::
+::  put-replica-sized: admit a transport-decoded replica without re-jamming
+::  it solely to recover its already-validated encoded size.
+::
+++  put-replica-sized
+  |=  incoming=sized-record
+  ^-  [store-status content-state]
+  ?.  (lte bytes.incoming max-record-bytes.config.state)
     [[%rejected %too-large] state]
+  =/  rec=record  value.incoming
   ?.  (record-auth-valid rec)  [[%rejected %invalid] state]
   =/  expiry=(unit @da)  (record-expiry rec)
   ?.  ?~(expiry & (lth now u.expiry))  [[%rejected %expired] state]
@@ -530,6 +550,23 @@
     op
   $(op op, incoming t.incoming)
 ::
+::  merge-sized-records: merge transport-decoded records while reusing the
+::  individual encoded sizes established at the unpacking boundary.
+::
+++  merge-sized-records
+  |=  [op=operation incoming=sized-records]
+  ^-  operation
+  ?~  incoming  op
+  =/  rec=record  value.i.incoming
+  =/  op
+    ?:  (record-valid-for-sized op i.incoming)
+      ?-  -.rec
+        %pointer   op(pointers [value.rec pointers.op])
+        %provider  op(providers [value.rec providers.op])
+      ==
+    op
+  $(op op, incoming t.incoming)
+::
 ++  finish
   |=  [id=operation-id op=operation]
   ^-  [operation-completion content-state]
@@ -725,7 +762,7 @@
   [[rest -.more] +.more]
 ::
 ++  receive-records
-  |=  [request=content-request-id values=records]
+  |=  [request=content-request-id values=sized-records]
   ^-  [(list card:agent:gall) operation-update]
   ?.  (response-expected request %.y)  [~ ~ state]
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
@@ -736,7 +773,7 @@
   =/  op=operation  u.active
   =.  in-flight.op  (dec in-flight.op)
   =.  responders.op  (~(put in responders.op) peer.pen)
-  =.  op  (merge-records op (scag max-providers.config.state values))
+  =.  op  (merge-sized-records op (scag max-providers.config.state values))
   =.  active.state  (~(put by active.state) operation.pen op)
   =.  state  (enqueue operation.pen)
   =/  rest=card:agent:gall

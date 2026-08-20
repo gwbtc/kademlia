@@ -403,18 +403,66 @@
   =/  too-wide=node-id  (@ux (pow 2 128))
   =/  a=contact  [0x1 ~2026.7.14..12.00.00 0]
   =/  b=contact  [0x2 ~2026.7.14..11.00.00 0]
+  =/  misplaced=contact  [0x3 ~2026.7.14..10.30.00 0]
   =/  local=contact  [self ~2026.7.14..10.00.00 0]
   =/  invalid=contact  [too-wide ~2026.7.14..09.00.00 0]
   =/  tab=table
     [ %fork
       [%leaf now [3 [b local a ~]] [0 ~]]
-      [%leaf now [2 [a invalid ~]] [0 ~]]
+      [%leaf now [3 [a misplaced invalid ~]] [0 ~]]
     ]
   =/  lup=lookup  (~(start-lookup kademlia small-cfg) self 0x0 tab)
   ;:  weld
     %+  expect-eq  !>(`lookup-candidates`[[0x1 %unasked] [0x2 %unasked] ~])
     !>(candidates.lup)
     (expect !>((~(lookup-valid kademlia small-cfg) self lup)))
+  ==
+::
+++  test-start-lookup-prefix-order
+  =/  small-cfg=config  [2 2 3 12 %kademlia-urbit-v1]
+  =/  self=node-id  0x0
+  =/  a=node-id  (@ux (pow 2 127))
+  =/  aa=node-id  +(a)
+  =/  b=node-id  (@ux (pow 2 126))
+  =/  bb=node-id  +(b)
+  =/  c=node-id  (@ux (pow 2 125))
+  =/  d=node-id  (@ux (pow 2 124))
+  =/  e=node-id  (@ux (pow 2 123))
+  =/  tab=table  (~(empty-table kademlia small-cfg) now)
+  =.  tab  (~(record-success kademlia small-cfg) self a now tab)
+  =.  tab  (~(record-success kademlia small-cfg) self aa +(now) tab)
+  =.  tab  (~(record-success kademlia small-cfg) self b (add 2 now) tab)
+  =.  tab  (~(record-success kademlia small-cfg) self bb (add 3 now) tab)
+  =.  tab  (~(record-success kademlia small-cfg) self c (add 4 now) tab)
+  =.  tab  (~(record-success kademlia small-cfg) self d (add 5 now) tab)
+  =.  tab  (~(record-success kademlia small-cfg) self e (add 6 now) tab)
+  =/  all=contacts  (~(contacts kademlia small-cfg) tab)
+  =/  expected
+    |=  target=node-id
+    ^-  lookup-candidates
+    %+  turn  (~(closest kademlia small-cfg) target (lent all) all)
+    |=  con=contact
+    [id.con %unasked]
+  =/  self-lookup=lookup
+    (~(start-lookup kademlia small-cfg) self self tab)
+  =/  a-lookup=lookup
+    (~(start-lookup kademlia small-cfg) self a tab)
+  =/  bb-lookup=lookup
+    (~(start-lookup kademlia small-cfg) self bb tab)
+  =/  max=node-id  (@ux (dec (pow 2 128)))
+  =/  max-lookup=lookup
+    (~(start-lookup kademlia small-cfg) self max tab)
+  ;:  weld
+    %+  expect-eq  !>((expected self))
+    !>(candidates.self-lookup)
+    %+  expect-eq  !>((expected a))
+    !>(candidates.a-lookup)
+    %+  expect-eq  !>((expected bb))
+    !>(candidates.bb-lookup)
+    %+  expect-eq  !>((expected max))
+    !>(candidates.max-lookup)
+    (expect !>((~(table-valid kademlia small-cfg) self tab)))
+    (expect !>((~(lookup-valid kademlia small-cfg) self max-lookup)))
   ==
 ::
 ++  test-roster-validation

@@ -621,32 +621,69 @@
 ::
 ::  start-lookup: create a lookup seeded from verified live contacts.
 ::
-::    Routing contacts are validated and deduplicated in one pass, then sorted
-::    once by distance.  Subsequently discovered IDs use batch +learn merging.
+::    Target-matching prefix branches are wholly nearer than their siblings,
+::    so visiting them first produces leaves in exact XOR-distance order.  Each
+::    bounded live roster is validated, deduplicated, and sorted locally.  The
+::    reverse accumulator avoids welding the complete candidate list.
 ::
 ++  start-lookup
   |=  [self=node-id tar=node-id tab=table]
   ^-  lookup
   ?>  (valid-node tar)
   ?>  !=(0 alpha.cfg)
-  =/  remaining=contacts  (contacts tab)
-  =/  seen=(set node-id)  ~
-  =/  candidates=lookup-candidates  ~
-  |-
-  ?~  remaining
-    =/  ordered=lookup-candidates
-      %+  sort  candidates
+  =/  leaf-candidates
+    |=  [depth=@ud prefix=@ux items=contacts]
+    ^-  lookup-candidates
+    =/  remaining=contacts  items
+    =/  seen=(set node-id)  ~
+    =/  out=lookup-candidates  ~
+    |-
+    ?~  remaining
+      %+  sort  out
       |=  [a=lookup-candidate b=lookup-candidate]
       (candidate-nearer tar a b)
-    [tar 0 ordered]
-  =/  id=node-id  id.i.remaining
-  ?:  |(!(valid-node id) =(self id) (~(has in seen) id))
-    $(remaining t.remaining)
-  %=  $
-    remaining   t.remaining
-    seen        (~(put in seen) id)
-    candidates  [[id %unasked] candidates]
-  ==
+    =/  id=node-id  id.i.remaining
+    ?:  ?|  !(valid-node id)
+            =(self id)
+            !(prefix-match depth prefix id)
+            (~(has in seen) id)
+        ==
+      $(remaining t.remaining)
+    %=  $
+      remaining  t.remaining
+      seen       (~(put in seen) id)
+      out        [[id %unasked] out]
+    ==
+  =/  prepend
+    |=  [items=lookup-candidates out=lookup-candidates]
+    ^-  lookup-candidates
+    ?~  items  out
+    $(items t.items, out [i.items out])
+  =/  walk
+    |=  $:  node=table
+            depth=@ud
+            prefix=@ux
+            out=lookup-candidates
+        ==
+    ^-  lookup-candidates
+    ?-  -.node
+      %leaf
+        =/  local=lookup-candidates
+          (leaf-candidates depth prefix items.live.buc.node)
+        (prepend local out)
+      %fork
+        =/  next-depth=@ud  +(depth)
+        =/  zero-prefix=@ux  (mul 2 prefix)
+        =/  one-prefix=@ux  +(zero-prefix)
+        ?:  =(0b0 (node-bit depth tar))
+          =/  first=lookup-candidates
+            $(node zero.node, depth next-depth, prefix zero-prefix)
+          $(node one.node, depth next-depth, prefix one-prefix, out first)
+        =/  first=lookup-candidates
+          $(node one.node, depth next-depth, prefix one-prefix)
+        $(node zero.node, depth next-depth, prefix zero-prefix, out first)
+    ==
+  [tar 0 (flop (walk tab 0 0x0 ~))]
 ::
 ::  candidate-status: retrieve the state of a known candidate.
 ::

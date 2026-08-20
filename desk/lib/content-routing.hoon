@@ -159,88 +159,37 @@
       (verify provider.body (provider-message body) signature.record)
   ==
 ::
-::  greatest-pointer-revision: find the greatest revision in a nonempty list.
+::  choose-pointer: select the greatest accepted pointer in one traversal.
 ::
-++  greatest-pointer-revision
-  |=  records=pointers
-  ^-  @ud
-  ?~  records  0
-  (max revision.body.i.records $(records t.records))
-::
-::  pointer-bodies-agree: test whether every record has one pointer body.
-::
-++  pointer-bodies-agree
-  |=  [expected=pointer-body records=pointers]
-  ^-  ?
-  ?~  records  &
-  ?.  =(expected body.i.records)  |
-  $(records t.records)
-::
-::  canonical-pointer: choose one duplicate by deterministic noun order.
-::
-++  canonical-pointer
-  |=  records=pointers
-  ^-  pointer
-  ?>  ?=(^ records)
-  =/  best=pointer  i.records
-  =/  remaining=pointers  t.records
-  |-
-  ?~  remaining  best
-  =/  candidate=pointer  i.remaining
-  =?  best  (dor signature.candidate signature.best)  candidate
-  $(remaining t.remaining)
-::
-::  valid-pointers: retain authenticated pointers for one expected name.
-::
-++  valid-pointers
-  |=  $:  now=@da
-          expected-namespace=@tas
-          expected-key=key
-          expected-publisher=node-id
-          verify=verifier
-          records=pointers
-      ==
-  ^-  pointers
-  ?~  records  ~
-  =/  rest=pointers
-    $(records t.records)
-  ?:  (pointer-valid now expected-namespace expected-key expected-publisher verify i.records)
-    [i.records rest]
-  rest
-::
-::  fresh-pointers: retain admitted pointers that have not since expired.
-::
-++  fresh-pointers
-  |=  [now=@da records=pointers]
-  ^-  pointers
-  ?~  records  ~
-  =/  rest=pointers  $(records t.records)
-  ?:  (pointer-fresh now expires.body.i.records)
-    [i.records rest]
-  rest
-::
-::  pointers-at-revision: retain pointers at one exact revision.
-::
-++  pointers-at-revision
-  |=  [revision=@ud records=pointers]
-  ^-  pointers
-  ?~  records  ~
-  =/  rest=pointers  $(records t.records)
-  ?:  =(revision revision.body.i.records)
-    [i.records rest]
-  rest
-::
-::  choose-pointer: select among authenticated, context-checked fresh records.
+::    The accumulator retains only the greatest revision, its canonical
+::    duplicate, and whether distinct bodies occurred at that revision.
 ::
 ++  choose-pointer
-  |=  records=pointers
+  |=  [records=pointers admit=$-(pointer ?)]
   ^-  pointer-selection
-  ?~  records  [%none ~]
-  =/  greatest=@ud  (greatest-pointer-revision records)
-  =/  latest=pointers  (pointers-at-revision greatest records)
-  =/  first=pointer  (canonical-pointer latest)
-  ?.  (pointer-bodies-agree body.first latest)  [%conflict greatest]
-  [%found first]
+  =/  remaining=pointers  records
+  =/  best=(unit pointer)  ~
+  =/  greatest=@ud  0
+  =/  conflict=?  |
+  |-
+  ?~  remaining
+    ?~  best  [%none ~]
+    ?:  conflict  [%conflict greatest]
+    [%found u.best]
+  =/  candidate=pointer  i.remaining
+  ?.  (admit candidate)
+    $(remaining t.remaining)
+  =/  revision=@ud  revision.body.candidate
+  ?~  best
+    $(remaining t.remaining, best `candidate, greatest revision, conflict |)
+  ?:  (gth revision greatest)
+    $(remaining t.remaining, best `candidate, greatest revision, conflict |)
+  ?:  (lth revision greatest)
+    $(remaining t.remaining)
+  =/  chosen=pointer  u.best
+  =/  conflict=?  |(conflict !=(body.candidate body.chosen))
+  =?  chosen  (dor signature.candidate signature.chosen)  candidate
+  $(remaining t.remaining, best `chosen, conflict conflict)
 ::
 ::  select-pointer: authenticate, context-check, and select pointers.
 ::
@@ -253,7 +202,10 @@
           records=pointers
       ==
   ^-  pointer-selection
-  (choose-pointer (valid-pointers now expected-namespace expected-key expected-publisher verify records))
+  =/  admit=$-(pointer ?)
+    |=  candidate=pointer
+    (pointer-valid now expected-namespace expected-key expected-publisher verify candidate)
+  (choose-pointer records admit)
 ::
 ::  select-admitted-pointer: recheck expiry and select admitted pointers.
 ::
@@ -264,7 +216,10 @@
 ++  select-admitted-pointer
   |=  [now=@da records=pointers]
   ^-  pointer-selection
-  (choose-pointer (fresh-pointers now records))
+  =/  admit=$-(pointer ?)
+    |=  candidate=pointer
+    (pointer-fresh now expires.body.candidate)
+  (choose-pointer records admit)
 ::
 ::  provider-choice: the greatest revision observed for one provider.
 ::

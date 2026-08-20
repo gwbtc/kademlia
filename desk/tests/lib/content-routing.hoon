@@ -116,6 +116,24 @@
     !>((select-pointer:content-routing now %app 0x12 0x34 allow [one conflict ~]))
   ==
 ::
+++  test-pointer-newer-revision-supersedes-conflict
+  =/  now=@da  ~2026.8.4
+  =/  a=digest  (digest-cask:content-routing `(cask)`[%noun 1])
+  =/  b=digest  (digest-cask:content-routing `(cask)`[%noun 2])
+  =/  old-a=pointer  [[%app 0x12 0x34 7 ~ [%content a]] [1 0x3]]
+  =/  old-b=pointer  [[%app 0x12 0x34 7 ~ [%content b]] [1 0x2]]
+  =/  newest=pointer  [[%app 0x12 0x34 8 ~ [%content a]] [1 0x1]]
+  =/  out=pointer-selection
+    (select-pointer:content-routing now %app 0x12 0x34 allow [old-a newest old-b ~])
+  =/  reordered=pointer-selection
+    (select-pointer:content-routing now %app 0x12 0x34 allow [newest old-b old-a ~])
+  ;:  weld
+    %+  expect-eq  !>(`pointer-selection`[%found newest])
+    !>(out)
+    %+  expect-eq  !>(out)
+    !>(reordered)
+  ==
+::
 ++  test-admitted-pointer-selection-rechecks-only-expiry
   =/  now=@da  ~2026.8.4
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])

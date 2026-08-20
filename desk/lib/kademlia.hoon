@@ -468,11 +468,11 @@
       tab(one child)
     %leaf
       =/  live=roster  live.buc.tab
-      =/  replacements=roster  replacements.buc.tab
       =^  old-live  live  (take id live)
-      =^  old-replacement  replacements  (take id replacements)
       ?:  ?=(^ old-live)
-        [%leaf refreshed.buc.tab (push k.cfg con live) replacements]
+        [%leaf refreshed.buc.tab (push k.cfg con live) replacements.buc.tab]
+      =/  replacements=roster  replacements.buc.tab
+      =^  old-replacement  replacements  (take id replacements)
       ?:  (lth count.live k.cfg)
         [%leaf refreshed.buc.tab (push k.cfg con live) replacements]
       ?:  ?&(owns-self !=(0 k.cfg) (lth depth 128))

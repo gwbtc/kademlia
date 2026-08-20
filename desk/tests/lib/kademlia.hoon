@@ -224,6 +224,25 @@
     (expect !>((~(table-valid kademlia small-cfg) self tab)))
   ==
 ::
+++  test-live-refresh-preserves-replacements
+  =/  small-cfg=config  [1 2 3 12 %kademlia-urbit-v1]
+  =/  self=node-id  0x0
+  =/  high=node-id  (@ux (pow 2 127))
+  =/  replacement=node-id  (@ux (add high (pow 2 126)))
+  =/  latest=@da  (add ~h1 now)
+  =/  replacement-contact=contact  [replacement +(now) 0]
+  =/  tab=table
+    [%leaf now [1 [[high now 2] ~]] [1 [replacement-contact ~]]]
+  =.  tab  (~(record-success kademlia small-cfg) self high latest tab)
+  ?>  ?=(%leaf -.tab)
+  ;:  weld
+    %+  expect-eq  !>(`contacts`[[high latest 0] ~])
+    !>(items.live.buc.tab)
+    %+  expect-eq  !>(`roster`[1 [replacement-contact ~]])
+    !>(replacements.buc.tab)
+    (expect !>((~(table-valid kademlia small-cfg) self tab)))
+  ==
+::
 ++  test-replacement-refresh
   =/  small-cfg=config  [1 2 3 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0

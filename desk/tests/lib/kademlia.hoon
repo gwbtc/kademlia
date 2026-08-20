@@ -269,6 +269,22 @@
     (expect !>((~(table-valid kademlia small-cfg) self tab)))
   ==
 ::
+++  test-split-roster-preserves-order-and-counts
+  =/  high=node-id  (@ux (pow 2 127))
+  =/  low-a=contact  [0x1 (add 4 now) 0]
+  =/  high-a=contact  [high (add 3 now) 0]
+  =/  low-b=contact  [0x2 (add 2 now) 0]
+  =/  high-b=contact  [(@ux (add high 1)) +(now) 0]
+  =/  ros=roster  [4 [low-a high-a low-b high-b ~]]
+  =/  out=[zero=roster one=roster]
+    (~(split-roster kademlia cfg) 0 ros)
+  ;:  weld
+    %+  expect-eq  !>(`roster`[2 [low-a low-b ~]])
+    !>(zero.out)
+    %+  expect-eq  !>(`roster`[2 [high-a high-b ~]])
+    !>(one.out)
+  ==
+::
 ++  test-failure-promotes-in-one-leaf
   =/  small-cfg=config  [1 2 3 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0

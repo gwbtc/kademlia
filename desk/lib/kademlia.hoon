@@ -334,16 +334,23 @@
       (rosters-disjoint live.buc replacements.buc)
   ==
 ::
-::  roster-side: retain contacts matching one bit of an ID prefix.
+::  split-roster: partition a roster on one ID bit in a single traversal.
 ::
-++  roster-side
-  |=  [depth=@ud side=@ub ros=roster]
-  ^-  roster
-  =/  selected=contacts
-    %+  skim  items.ros
-    |=  con=contact
-    =(side (node-bit depth id.con))
-  [(lent selected) selected]
+::    Counts are accumulated with the output lists.  Recursing through the
+::    tail before prepending preserves the roster's existing order.
+::
+++  split-roster
+  |=  [depth=@ud ros=roster]
+  ^-  [zero=roster one=roster]
+  =/  partition
+    |=  items=contacts
+    ^-  [zero=roster one=roster]
+    ?~  items  [[0 ~] [0 ~]]
+    =/  children=[zero=roster one=roster]  $(items t.items)
+    ?:  =(0b0 (node-bit depth id.i.items))
+      [[+(count.zero.children) [i.items items.zero.children]] one.children]
+    [zero.children [+(count.one.children) [i.items items.one.children]]]
+  (partition items.ros)
 ::
 ::  fill-bucket: promote replacements into unused live capacity.
 ::
@@ -368,10 +375,14 @@
 ++  split-bucket
   |=  [depth=@ud buc=bucket]
   ^-  [zero=bucket one=bucket]
+  =/  live=[zero=roster one=roster]
+    (split-roster depth live.buc)
+  =/  replacements=[zero=roster one=roster]
+    (split-roster depth replacements.buc)
   =/  zero=bucket
-    [refreshed.buc (roster-side depth 0b0 live.buc) (roster-side depth 0b0 replacements.buc)]
+    [refreshed.buc zero.live zero.replacements]
   =/  one=bucket
-    [refreshed.buc (roster-side depth 0b1 live.buc) (roster-side depth 0b1 replacements.buc)]
+    [refreshed.buc one.live one.replacements]
   [(fill-bucket zero) (fill-bucket one)]
 ::
 ::  prefix-match: test whether an ID begins with one compact prefix.

@@ -8,6 +8,11 @@
   ^-  ?
   &
 ::
+++  deny
+  |=  [signer=node-id message=digest signature=*]
+  ^-  ?
+  |
+::
 ++  initial
   ^-  content-state
   ~(init logic [~zod now ~zod *content-state allow])
@@ -27,6 +32,13 @@
   |=  [who=node-id revision=@ud address=*]
   ^-  record
   (provider-for content-id who revision address)
+::
+++  pointer-for
+  |=  [namespace=@tas publisher=node-id name=* revision=@ud expires=(unit @da)]
+  ^-  record
+  =/  target=target  [%content content-id]
+  =/  key=key  (pointer-key:cr namespace publisher name)
+  [%pointer [namespace key publisher revision expires target] [1 `@ux`revision]]
 ::
 ++  pending-for
   |=  [id=operation-id state=content-state]
@@ -478,6 +490,61 @@
   ?>  ?=(%providers -.value.got)
   %+  expect-eq  !>(`providers`[value.rec ~])
   !>(records.selection.value.value.got)
+::
+++  test-operation-admission-checks-query-context
+  =/  state=content-state  initial
+  =/  other=digest  (digest-cask:cr `(cask)`[%noun 43])
+  =/  correct=record  (provider-for content-id 0x12 1 %correct)
+  =/  wrong=record  (provider-for other 0x13 1 %wrong)
+  =/  op=operation
+    [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~]
+  =/  merged=operation
+    (~(merge-records logic [~zod now ~nec state allow]) op [wrong correct ~])
+  =/  pointer=record  (pointer-for %test 0x12 %name 1 `~2026.8.12)
+  =/  pointer-key=key  (pointer-key:cr %test 0x12 %name)
+  =/  pointer-op=operation
+    [[%find-pointer %other 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~]
+  =/  pointer-merged=operation
+    (~(merge-records logic [~zod now ~nec state allow]) pointer-op [pointer ~])
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>((lent providers.merged))
+    %+  expect-eq  !>(0)
+    !>((lent pointers.merged))
+    %+  expect-eq  !>(0)
+    !>((lent pointers.pointer-merged))
+    %+  expect-eq  !>(0)
+    !>((lent providers.pointer-merged))
+  ==
+::
+++  test-operation-completion-does-not-reverify-records
+  =/  state=content-state  initial
+  =/  provider-rec=record  (provider 0x12 1 %provider)
+  =/  provider-op=operation
+    [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~]
+  =/  provider-op=operation
+    (~(merge-records logic [~zod now ~nec state allow]) provider-op [provider-rec ~])
+  =/  provider-finished=[operation-completion content-state]
+    (~(finish logic [~zod now ~nec state deny]) 0v1 provider-op)
+  =/  provider-result=operation-result  result.-.provider-finished
+  ?>  ?=(%providers -.provider-result)
+  =/  pointer-rec=record  (pointer-for %test 0x12 %name 1 `~2026.8.12)
+  ?>  ?=(%pointer -.pointer-rec)
+  =/  pointer-key=key  (pointer-key:cr %test 0x12 %name)
+  =/  pointer-op=operation
+    [[%find-pointer %test 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~]
+  =/  pointer-op=operation
+    (~(merge-records logic [~zod now ~nec state allow]) pointer-op [pointer-rec ~])
+  =/  pointer-finished=[operation-completion content-state]
+    (~(finish logic [~zod now ~nec state deny]) 0v2 pointer-op)
+  =/  pointer-result=operation-result  result.-.pointer-finished
+  ?>  ?=(%pointer -.pointer-result)
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>((lent records.selection.value.provider-result))
+    %+  expect-eq  !>(`pointer-selection`[%found value.pointer-rec])
+    !>(selection.value.pointer-result)
+  ==
 ::
 ++  test-concurrency-bound
   =/  state=content-state  initial

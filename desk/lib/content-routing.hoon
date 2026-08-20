@@ -208,6 +208,17 @@
     [i.records rest]
   rest
 ::
+::  fresh-pointers: retain admitted pointers that have not since expired.
+::
+++  fresh-pointers
+  |=  [now=@da records=pointers]
+  ^-  pointers
+  ?~  records  ~
+  =/  rest=pointers  $(records t.records)
+  ?:  (pointer-fresh now expires.body.i.records)
+    [i.records rest]
+  rest
+::
 ::  pointers-at-revision: retain pointers at one exact revision.
 ::
 ++  pointers-at-revision
@@ -219,7 +230,19 @@
     [i.records rest]
   rest
 ::
-::  select-pointer: choose the greatest valid revision or report equivocation.
+::  choose-pointer: select among authenticated, context-checked fresh records.
+::
+++  choose-pointer
+  |=  records=pointers
+  ^-  pointer-selection
+  ?~  records  [%none ~]
+  =/  greatest=@ud  (greatest-pointer-revision records)
+  =/  latest=pointers  (pointers-at-revision greatest records)
+  =/  first=pointer  (canonical-pointer latest)
+  ?.  (pointer-bodies-agree body.first latest)  [%conflict greatest]
+  [%found first]
+::
+::  select-pointer: authenticate, context-check, and select pointers.
 ::
 ++  select-pointer
   |=  $:  now=@da
@@ -230,14 +253,18 @@
           records=pointers
       ==
   ^-  pointer-selection
-  =/  valid=pointers
-    (valid-pointers now expected-namespace expected-key expected-publisher verify records)
-  ?~  valid  [%none ~]
-  =/  greatest=@ud  (greatest-pointer-revision valid)
-  =/  latest=pointers  (pointers-at-revision greatest valid)
-  =/  first=pointer  (canonical-pointer latest)
-  ?.  (pointer-bodies-agree body.first latest)  [%conflict greatest]
-  [%found first]
+  (choose-pointer (valid-pointers now expected-namespace expected-key expected-publisher verify records))
+::
+::  select-admitted-pointer: recheck expiry and select admitted pointers.
+::
+::    The caller must already have authenticated each record and checked it
+::    against the lookup context.  This arm deliberately performs no
+::    cryptographic verification.
+::
+++  select-admitted-pointer
+  |=  [now=@da records=pointers]
+  ^-  pointer-selection
+  (choose-pointer (fresh-pointers now records))
 ::
 ::  provider-choice: the greatest revision observed for one provider.
 ::
@@ -247,14 +274,14 @@
 +$  provider-choice
   [best=provider conflict=?]
 ::
-::  select-providers: select one latest announcement per provider.
+::  choose-providers: select one latest accepted record per provider.
 ::
 ::    An equivocating provider is excluded and reported without affecting
-::    valid announcements from other providers.  Records are authenticated
-::    and grouped in one pass; no provider causes a rescan of the input list.
+::    other providers.  The admission gate and grouping run in one pass; no
+::    provider causes a rescan of the input list.
 ::
-++  select-providers
-  |=  [now=@da expected=digest verify=verifier records=providers]
+++  choose-providers
+  |=  [records=providers admit=$-(provider ?)]
   ^-  provider-selection
   =/  remaining=providers  records
   =/  choices=(map node-id provider-choice)  ~
@@ -275,7 +302,7 @@
       $(pending t.pending, conflicts (~(put in conflicts) id))
     $(pending t.pending, selected [best.choice selected])
   =/  candidate=provider  i.remaining
-  ?.  (provider-valid now expected verify candidate)
+  ?.  (admit candidate)
     $(remaining t.remaining)
   =/  id=node-id  provider.body.candidate
   =/  old=(unit provider-choice)  (~(get by choices) id)
@@ -292,4 +319,28 @@
   =?  canonical  (dor signature.candidate signature.canonical)  candidate
   =/  conflict=?  |(conflict.choice !=(body.candidate body.best.choice))
   $(remaining t.remaining, choices (~(put by choices) id [canonical conflict]))
+::
+::  select-providers: authenticate, context-check, and select providers.
+::
+++  select-providers
+  |=  [now=@da expected=digest verify=verifier records=providers]
+  ^-  provider-selection
+  =/  admit=$-(provider ?)
+    |=  candidate=provider
+    (provider-valid now expected verify candidate)
+  (choose-providers records admit)
+::
+::  select-admitted-providers: recheck expiry and select admitted providers.
+::
+::    The caller must already have authenticated each record and checked it
+::    against the lookup context.  This arm deliberately performs no
+::    cryptographic verification.
+::
+++  select-admitted-providers
+  |=  [now=@da records=providers]
+  ^-  provider-selection
+  =/  admit=$-(provider ?)
+    |=  candidate=provider
+    (lth now expires.body.candidate)
+  (choose-providers records admit)
 --

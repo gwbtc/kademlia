@@ -211,6 +211,27 @@
       (record-auth-valid rec)
   ==
 ::
+::  record-valid-for: authenticate a bounded record for one lookup context.
+::
+::    Operation records pass this gate once, before entering the admitted
+::    pointer or provider lists.  Completion may therefore select those
+::    lists without repeating signature and invariant verification.
+::
+++  record-valid-for
+  |=  [op=operation rec=record]
+  ^-  ?
+  ?.  (lte (met 3 (jam rec)) max-record-bytes.config.state)  |
+  ?-  -.kind.op
+    %publish
+      |
+    %find-pointer
+      ?.  ?=(%pointer -.rec)  |
+      (pointer-valid:cr now namespace.kind.op key.kind.op publisher.kind.op verify value.rec)
+    %find-providers
+      ?.  ?=(%provider -.rec)  |
+      (provider-valid:cr now content.kind.op verify value.rec)
+  ==
+::
 ++  prune-list
   |=  values=leased-records
   ^-  leased-records
@@ -491,7 +512,7 @@
   ?~  incoming  op
   =/  rec=record  i.incoming
   =/  op
-    ?:  (record-valid rec)
+    ?:  (record-valid-for op rec)
       ?-  -.rec
         %pointer   op(pointers [value.rec pointers.op])
         %provider  op(providers [value.rec providers.op])
@@ -508,11 +529,11 @@
         [%published (operation-key op) accepted.op rejected.op timed-out.op]
       %find-pointer
         =/  selected=pointer-selection
-          (select-pointer:cr now namespace.kind.op key.kind.op publisher.kind.op verify pointers.op)
+          (select-admitted-pointer:cr now pointers.op)
         [%pointer selected responders.op timed-out.op]
       %find-providers
         =/  selected=provider-selection
-          (select-providers:cr now content.kind.op verify providers.op)
+          (select-admitted-providers:cr now providers.op)
         [%providers selected responders.op timed-out.op]
     ==
   =.  active.state  (~(del by active.state) id)

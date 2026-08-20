@@ -116,6 +116,17 @@
     !>((select-pointer:content-routing now %app 0x12 0x34 allow [one conflict ~]))
   ==
 ::
+++  test-admitted-pointer-selection-rechecks-only-expiry
+  =/  now=@da  ~2026.8.4
+  =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
+  =/  live=pointer  [[%app 0x12 0x34 2 `~2026.8.5 [%content dig]] [1 0x2]]
+  ;:  weld
+    %+  expect-eq  !>(`pointer-selection`[%found live])
+    !>((select-admitted-pointer:content-routing now [live ~]))
+    %+  expect-eq  !>(`pointer-selection`[%none ~])
+    !>((select-admitted-pointer:content-routing ~2026.8.5 [live ~]))
+  ==
+::
 ++  test-provider-selection
   =/  now=@da  ~2026.8.4
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
@@ -136,6 +147,22 @@
     !>(records.out)
     %+  expect-eq  !>(records.out)
     !>(records.reordered)
+    %+  expect-eq  !>(`(set node-id)`~)
+    !>(conflicts.out)
+  ==
+::
+++  test-admitted-provider-selection-rechecks-only-expiry
+  =/  now=@da  ~2026.8.4
+  =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
+  =/  live=provider
+    [[dig 0x20 2 ~2026.8.5 ~[(custom %live)]] [1 0x2]]
+  =/  expired=provider
+    [[dig 0x10 1 now ~[(custom %expired)]] [1 0x1]]
+  =/  out=provider-selection
+    (select-admitted-providers:content-routing now [expired live ~])
+  ;:  weld
+    %+  expect-eq  !>(`providers`[live ~])
+    !>(records.out)
     %+  expect-eq  !>(`(set node-id)`~)
     !>(conflicts.out)
   ==

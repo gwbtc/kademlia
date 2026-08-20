@@ -430,10 +430,10 @@
 ++  get-summary
   ^-  summary
   :*  self-id
-      (lent ~(tap in seeds.state))
-      (lent ~(tap by active.state))
-      (lent ~(tap by pending.state))
-      (lent ~(tap by completed.state))
+      ~(wyt in seeds.state)
+      ~(wyt by active.state)
+      ~(wyt by pending.state)
+      ~(wyt by completed.state)
       refresh-at.state
       maintenance.state
   ==

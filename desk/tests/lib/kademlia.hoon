@@ -476,6 +476,8 @@
     !>(candidates.lup)
     %+  expect-eq  !>([0xf 0xe ~])
     !>(-.out)
+    %+  expect-eq  !>(2)
+    !>(in-flight.+.out)
     %+  expect-eq  !>([[0xf %in-flight] [0xe %in-flight] [0x8 %unasked] ~])
     !>(candidates.+.out)
     %+  expect-eq  !>(`(list node-id)`~)
@@ -487,7 +489,7 @@
   =/  small-cfg=config  [4 4 3 12 %kademlia-urbit-v1]
   =/  self=node-id  0x8
   =/  too-wide=node-id  (@ux (pow 2 128))
-  =/  lup=lookup  [0x0 [[0x1 %succeeded] [0x4 %failed] ~]]
+  =/  lup=lookup  [0x0 0 [[0x1 %succeeded] [0x4 %failed] ~]]
   =/  out=lookup
     (~(learn kademlia small-cfg) self [0x3 0x1 0x2 0x3 self too-wide ~] lup)
   ;:  weld
@@ -501,7 +503,7 @@
   =/  small-cfg=config  [2 2 3 12 %kademlia-urbit-v1]
   =/  self=node-id  0x8
   =/  lup=lookup
-    [0x0 [[0x1 %failed] [0x2 %succeeded] [0x3 %unasked] [0x4 %unasked] ~]]
+    [0x0 0 [[0x1 %failed] [0x2 %succeeded] [0x3 %unasked] [0x4 %unasked] ~]]
   =/  out=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) lup)
   ;:  weld
     %+  expect-eq  !>(`(list node-id)`[0x3 ~])
@@ -515,10 +517,10 @@
 ++  test-result-detects-in-flight-outside-frontier
   =/  small-cfg=config  [2 2 2 12 %kademlia-urbit-v1]
   =/  lup=lookup
-    [0x0 [[0x1 %succeeded] [0x2 %succeeded] [0x3 %in-flight] ~]]
+    [0x0 1 [[0x1 %succeeded] [0x2 %succeeded] [0x3 %in-flight] ~]]
   =/  settled=(unit lookup-candidates)
     (~(settle-candidate kademlia small-cfg) 0x3 %failed candidates.lup)
-  =/  done=lookup  lup(candidates (need settled))
+  =/  done=lookup  lup(in-flight 0, candidates (need settled))
   ;:  weld
     (expect !>(!(~(lookup-complete kademlia small-cfg) lup)))
     %+  expect-eq  !>(`(unit (list node-id))`~)
@@ -547,8 +549,12 @@
     %+  expect-eq
       !>([[0x1 %unasked] [0x2 %unasked] [0x8 %succeeded] [0x9 %in-flight] [0xa %unasked] ~])
     !>(candidates.+.received)
+    %+  expect-eq  !>(1)
+    !>(in-flight.+.received)
     %+  expect-eq  !>([0x1 ~])
     !>(-.refilled)
+    %+  expect-eq  !>(2)
+    !>(in-flight.+.refilled)
     %+  expect-eq  !>([[0x8 now 0] ~])
     !>(items.live.buc)
     (expect !>((~(lookup-valid kademlia small-cfg) self +.refilled)))
@@ -572,6 +578,8 @@
     !>(-.sent)
     %+  expect-eq  !>([0x3 ~])
     !>(-.refilled)
+    %+  expect-eq  !>(2)
+    !>(in-flight.+.refilled)
     %+  expect-eq  !>([[0x1 now 1] ~])
     !>(items.live.buc)
     %+  expect-eq
@@ -594,6 +602,8 @@
     (~(receive kademlia small-cfg) self 0x2 +(now) ~ -.first +.first)
   =/  after=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) +.second)
   ;:  weld
+    %+  expect-eq  !>(0)
+    !>(in-flight.+.second)
     (expect !>((~(lookup-complete kademlia small-cfg) +.second)))
     %+  expect-eq  !>(`(unit (list node-id))`[~ [0x1 0x2 ~]])
     !>((~(lookup-result kademlia small-cfg) +.second))
@@ -615,6 +625,8 @@
   =/  second=[table lookup]
     (~(timeout kademlia small-cfg) self 0x2 1 -.first +.first)
   ;:  weld
+    %+  expect-eq  !>(0)
+    !>(in-flight.+.second)
     (expect !>((~(lookup-complete kademlia small-cfg) +.second)))
     %+  expect-eq  !>(`(unit (list node-id))`[~ [0x1 ~]])
     !>((~(lookup-result kademlia small-cfg) +.second))
@@ -655,6 +667,31 @@
     !>(+.failure)
   ==
 ::
+++  test-in-flight-stale-safe
+  =/  small-cfg=config  [2 2 1 12 %kademlia-urbit-v1]
+  =/  now=@da  ~2026.8.3..10.00.00
+  =/  initial=table  (~(empty-table kademlia small-cfg) now)
+  =/  lup=lookup  (~(start-lookup kademlia small-cfg) 0x0 0xf initial)
+  =.  lup  (~(learn kademlia small-cfg) 0x0 [0x8 ~] lup)
+  =/  sent=[(list node-id) lookup]  (~(dispatch kademlia small-cfg) lup)
+  =/  settled=[table lookup]
+    (~(receive kademlia small-cfg) 0x0 0x8 now ~ initial +.sent)
+  =/  duplicate=[table lookup]
+    (~(receive kademlia small-cfg) 0x0 0x8 +(now) ~ -.settled +.settled)
+  =/  stale-timeout=[table lookup]
+    (~(timeout kademlia small-cfg) 0x0 0x8 1 -.duplicate +.duplicate)
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>(in-flight.+.sent)
+    %+  expect-eq  !>(0)
+    !>(in-flight.+.settled)
+    %+  expect-eq  !>(+.settled)
+    !>(+.duplicate)
+    %+  expect-eq  !>(+.duplicate)
+    !>(+.stale-timeout)
+    (expect !>((~(lookup-valid kademlia small-cfg) 0x0 +.stale-timeout)))
+  ==
+::
 ++  test-lookup-response-cap-and-validation
   =/  small-cfg=config  [3 3 1 12 %kademlia-urbit-v1]
   =/  self=node-id  0x0
@@ -678,15 +715,19 @@
   =/  zero-alpha-cfg=config  [2 2 0 12 %kademlia-urbit-v1]
   =/  self=node-id  0x8
   =/  too-wide=node-id  (@ux (pow 2 128))
-  =/  good=lookup  [0x0 [[0x1 %unasked] [0x2 %failed] ~]]
-  =/  bad-target=lookup  [too-wide ~]
-  =/  local=lookup  [0x0 [[self %unasked] ~]]
+  =/  good=lookup  [0x0 0 [[0x1 %unasked] [0x2 %failed] ~]]
+  =/  bad-target=lookup  [too-wide 0 ~]
+  =/  local=lookup  [0x0 0 [[self %unasked] ~]]
   =/  duplicate=lookup
-    [0x0 [[0x1 %unasked] [0x1 %succeeded] ~]]
+    [0x0 0 [[0x1 %unasked] [0x1 %succeeded] ~]]
   =/  unordered=lookup
-    [0x0 [[0x2 %unasked] [0x1 %unasked] ~]]
+    [0x0 0 [[0x2 %unasked] [0x1 %unasked] ~]]
   =/  over-alpha=lookup
-    [0x0 [[0x1 %in-flight] [0x2 %in-flight] ~]]
+    [0x0 2 [[0x1 %in-flight] [0x2 %in-flight] ~]]
+  =/  under-count=lookup
+    [0x0 0 [[0x1 %in-flight] ~]]
+  =/  over-count=lookup
+    [0x0 1 [[0x1 %succeeded] ~]]
   ;:  weld
     (expect !>((~(lookup-valid kademlia small-cfg) self good)))
     (expect !>(!(~(lookup-valid kademlia zero-alpha-cfg) self good)))
@@ -695,5 +736,7 @@
     (expect !>(!(~(lookup-valid kademlia small-cfg) self duplicate)))
     (expect !>(!(~(lookup-valid kademlia small-cfg) self unordered)))
     (expect !>(!(~(lookup-valid kademlia small-cfg) self over-alpha)))
+    (expect !>(!(~(lookup-valid kademlia small-cfg) self under-count)))
+    (expect !>(!(~(lookup-valid kademlia small-cfg) self over-count)))
   ==
 --

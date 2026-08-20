@@ -44,6 +44,7 @@
   ==
 +$  lookup
   $:  target=node-id
+      in-flight=@ud                 ::  cached count of active requests
       candidates=lookup-candidates  ::  all discovered IDs, nearest first
   ==
 --

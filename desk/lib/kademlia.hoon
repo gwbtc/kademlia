@@ -638,7 +638,7 @@
       %+  sort  candidates
       |=  [a=lookup-candidate b=lookup-candidate]
       (candidate-nearer tar a b)
-    [tar ordered]
+    [tar 0 ordered]
   =/  id=node-id  id.i.remaining
   ?:  |(!(valid-node id) =(self id) (~(has in seen) id))
     $(remaining t.remaining)
@@ -684,17 +684,12 @@
   ?~  rest  ~
   `[i.can u.rest]
 ::
-::  in-flight-count: count requests currently owned by a lookup.
+::  in-flight-count: return the cached number of requests owned by a lookup.
 ::
 ++  in-flight-count
   |=  lup=lookup
   ^-  @ud
-  =/  remaining=lookup-candidates  candidates.lup
-  =/  count=@ud  0
-  |-
-  ?~  remaining  count
-  =?  count  =(%in-flight status.i.remaining)  +(count)
-  $(remaining t.remaining)
+  in-flight.lup
 ::
 ::  active-frontier: return the closest .k candidates not known to have failed.
 ::
@@ -717,29 +712,29 @@
 ++  dispatch
   |=  lup=lookup
   ^-  [(list node-id) lookup]
-  =/  flying=@ud  (in-flight-count lup)
+  =/  flying=@ud  in-flight.lup
   ?:  (gte flying alpha.cfg)  [~ lup]
   =/  walk
     |=  [can=lookup-candidates frontier=@ud slots=@ud]
-    ^-  [(list node-id) lookup-candidates]
-    ?:  |(?=(~ can) =(0 slots))  [~ can]
+    ^-  [peers=(list node-id) sent=@ud candidates=lookup-candidates]
+    ?:  |(?=(~ can) =(0 slots))  [~ 0 can]
     =/  one=lookup-candidate  i.can
     ?:  =(%failed status.one)
-      =/  rest=[(list node-id) lookup-candidates]
+      =/  rest=[peers=(list node-id) sent=@ud candidates=lookup-candidates]
         $(can t.can)
-      [-.rest [one +.rest]]
-    ?:  =(0 frontier)  [~ can]
+      [peers.rest sent.rest [one candidates.rest]]
+    ?:  =(0 frontier)  [~ 0 can]
     =/  next-frontier=@ud  (dec frontier)
     ?:  =(%unasked status.one)
-      =/  rest=[(list node-id) lookup-candidates]
+      =/  rest=[peers=(list node-id) sent=@ud candidates=lookup-candidates]
         $(can t.can, frontier next-frontier, slots (dec slots))
-      [[id.one -.rest] [one(status %in-flight) +.rest]]
-    =/  rest=[(list node-id) lookup-candidates]
+      [[id.one peers.rest] +(sent.rest) [one(status %in-flight) candidates.rest]]
+    =/  rest=[peers=(list node-id) sent=@ud candidates=lookup-candidates]
       $(can t.can, frontier next-frontier)
-    [-.rest [one +.rest]]
-  =/  out=[(list node-id) lookup-candidates]
+    [peers.rest sent.rest [one candidates.rest]]
+  =/  out=[peers=(list node-id) sent=@ud candidates=lookup-candidates]
     (walk candidates.lup k.cfg (sub alpha.cfg flying))
-  [-.out lup(candidates +.out)]
+  [peers.out lup(in-flight (add flying sent.out), candidates candidates.out)]
 ::
 ::  receive: apply a successful response from an in-flight candidate.
 ::
@@ -759,7 +754,9 @@
   =/  updated=(unit lookup-candidates)
     (settle-candidate id %succeeded candidates.lup)
   ?~  updated  [tab lup]
-  =/  out=lookup  lup(candidates u.updated)
+  ?:  =(0 in-flight.lup)  [tab lup]
+  =/  out=lookup
+    lup(in-flight (dec in-flight.lup), candidates u.updated)
   =.  out  (learn self (scag k.cfg returned) out)
   [(record-success self id now tab) out]
 ::
@@ -774,7 +771,9 @@
   =/  updated=(unit lookup-candidates)
     (settle-candidate id %failed candidates.lup)
   ?~  updated  [tab lup]
-  =/  out=lookup  lup(candidates u.updated)
+  ?:  =(0 in-flight.lup)  [tab lup]
+  =/  out=lookup
+    lup(in-flight (dec in-flight.lup), candidates u.updated)
   [(record-failure self id max-fails tab) out]
 ::
 ::  lookup-complete: test whether the active frontier has settled.
@@ -785,17 +784,16 @@
 ++  lookup-complete
   |=  lup=lookup
   ^-  ?
+  ?:  !=(0 in-flight.lup)  |
   =/  remaining=lookup-candidates  candidates.lup
   =/  frontier=@ud  k.cfg
   |-
   ?~  remaining  &
   =/  one=lookup-candidate  i.remaining
-  ?:  =(%in-flight status.one)  |
   ?:  =(%failed status.one)
     $(remaining t.remaining)
-  ?:  =(0 frontier)
-    $(remaining t.remaining)
-  ?:  =(%unasked status.one)  |
+  ?:  =(0 frontier)  &
+  ?:  ?=(?(%unasked %in-flight) status.one)  |
   $(remaining t.remaining, frontier (dec frontier))
 ::
 ::  lookup-result: return the closest responsive IDs after completion.
@@ -803,18 +801,17 @@
 ++  lookup-result
   |=  lup=lookup
   ^-  (unit (list node-id))
+  ?:  !=(0 in-flight.lup)  ~
   =/  remaining=lookup-candidates  candidates.lup
   =/  frontier=@ud  k.cfg
   =/  successful=(list node-id)  ~
   |-
   ?~  remaining  `(flop successful)
   =/  one=lookup-candidate  i.remaining
-  ?:  =(%in-flight status.one)  ~
   ?:  =(%failed status.one)
     $(remaining t.remaining)
-  ?:  =(0 frontier)
-    $(remaining t.remaining)
-  ?:  =(%unasked status.one)  ~
+  ?:  =(0 frontier)  `(flop successful)
+  ?:  ?=(?(%unasked %in-flight) status.one)  ~
   %=  $
     remaining   t.remaining
     frontier    (dec frontier)
@@ -833,6 +830,7 @@
   ?.  ?&  (valid-node self)
           (valid-node target.lup)
           !=(0 alpha.cfg)
+          (lte in-flight.lup alpha.cfg)
       ==
     |
   =/  remaining=lookup-candidates  candidates.lup
@@ -840,7 +838,7 @@
   =/  previous=(unit lookup-candidate)  ~
   =/  flying=@ud  0
   |-
-  ?~  remaining  &
+  ?~  remaining  =(flying in-flight.lup)
   =/  one=lookup-candidate  i.remaining
   ?.  (valid-node id.one)  |
   ?:  =(self id.one)  |

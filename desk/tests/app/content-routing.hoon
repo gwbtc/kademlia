@@ -191,6 +191,7 @@
     (~(put by pending.state) 0v3 `pending-content-request`[0v30 peer %.y +(now)])
   =.  pending.state
     (~(put by pending.state) 0v4 `pending-content-request`[0v40 peer %.n +(now)])
+  =.  pending-count.state  2
   =/  records-message=content-message
     [%records %content-routing-v1 0v3 1 0]
   =/  stored-message=content-message
@@ -216,6 +217,10 @@
     (expect !>((~(has by pending.wrong-stored-state) 0v4)))
     (expect !>(!(~(has by pending.correct-records-state) 0v3)))
     (expect !>(!(~(has by pending.correct-stored-state) 0v4)))
+    %+  expect-eq  !>(1)
+    !>(pending-count.correct-records-state)
+    %+  expect-eq  !>(1)
+    !>(pending-count.correct-stored-state)
   ==
 ::
 ++  test-malformed-store-payload-is-ignored

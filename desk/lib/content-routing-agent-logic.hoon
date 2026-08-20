@@ -136,7 +136,7 @@
 ::
 ++  init
   ^-  content-state
-  [defaults ~ 0 ~ ~ ~ ~ 0v1 (add refresh.defaults now) 0v1 ~ ~ ~ ~ ~]
+  [defaults ~ 0 ~ ~ ~ ~ 0 0v1 (add refresh.defaults now) 0v1 ~ ~ ~ ~ ~]
 ::
 ++  config-valid
   |=  cfg=content-config
@@ -685,6 +685,7 @@
   =/  query=?  !=(%publish -.kind.next)
   =/  pen=pending-content-request  [id peer query deadline]
   =.  pending.state  (~(put by pending.state) request pen)
+  =.  pending-count.state  +(pending-count.state)
   =.  in-flight.next  +(in-flight.next)
   =/  message=content-message  (message-for request next)
   =/  ship=@p  (~(node-to-ship kad kad-cfg) peer)
@@ -710,7 +711,7 @@
   |-
   =/  stopped=?
     ?|  ?=(~ ready.state)
-        (gte ~(wyt by pending.state) global-concurrency.config.state)
+        (gte pending-count.state global-concurrency.config.state)
     ==
   ?:  stopped
     [(flop cards) (flop completions) state]
@@ -757,6 +758,7 @@
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
   =/  pen=pending-content-request  (need found)
   =.  pending.state  (~(del by pending.state) request)
+  =.  pending-count.state  (dec pending-count.state)
   =/  active=(unit operation)  (~(get by active.state) operation.pen)
   ?~  active  [~ ~ state]
   =/  op=operation  u.active
@@ -780,6 +782,7 @@
   =/  found=(unit pending-content-request)  (~(get by pending.state) request)
   =/  pen=pending-content-request  (need found)
   =.  pending.state  (~(del by pending.state) request)
+  =.  pending-count.state  (dec pending-count.state)
   =/  active=(unit operation)  (~(get by active.state) operation.pen)
   ?~  active  [~ ~ state]
   =/  op=operation  u.active
@@ -801,6 +804,7 @@
   ?~  found  [~ ~ state]
   =/  pen=pending-content-request  u.found
   =.  pending.state  (~(del by pending.state) request)
+  =.  pending-count.state  (dec pending-count.state)
   =/  active=(unit operation)  (~(get by active.state) operation.pen)
   ?~  active  [~ ~ state]
   =/  op=operation  u.active

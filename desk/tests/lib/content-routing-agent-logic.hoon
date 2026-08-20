@@ -86,6 +86,8 @@
     !>(refresh-batch.config.state)
     %+  expect-eq  !>(0)
     !>(replica-count.state)
+    %+  expect-eq  !>(0)
+    !>(pending-count.state)
   ==
 ::
 ++  test-record-payload-round-trip
@@ -644,6 +646,8 @@
   ;:  weld
     %+  expect-eq  !>(3)
     !>((lent ~(tap by pending.state.+.found)))
+    %+  expect-eq  !>(3)
+    !>(pending-count.state.+.found)
     %+  expect-eq  !>(6)
     !>((lent -.found))
     (expect !>(?=(~ completions.+.found)))
@@ -673,12 +677,18 @@
   ;:  weld
     %+  expect-eq  !>(2)
     !>(~(wyt by pending.state.+.both-ready))
+    %+  expect-eq  !>(2)
+    !>(pending-count.state.+.both-ready)
     %+  expect-eq  !>(0)
     !>((pending-for 0v2 state.+.both-ready))
     %+  expect-eq  !>(2)
     !>(~(wyt by pending.state.+.freed-one))
     %+  expect-eq  !>(2)
+    !>(pending-count.state.+.freed-one)
+    %+  expect-eq  !>(2)
     !>(~(wyt by pending.state.+.freed-two))
+    %+  expect-eq  !>(2)
+    !>(pending-count.state.+.freed-two)
     %+  expect-eq  !>(1)
     !>((pending-for 0v2 state.+.freed-two))
   ==

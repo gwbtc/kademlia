@@ -127,6 +127,7 @@
       active=(map operation-id operation)
       completed=(map operation-id operation-result)
       pending=(map content-request-id pending-content-request)
+      pending-count=@ud
       next-request=content-request-id
       refresh-at=@da
       next-operation=operation-id

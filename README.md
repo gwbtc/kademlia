@@ -126,7 +126,10 @@ completed result. `%set-verbosity` selects `%off`, `%info`, or `%debug`
 application logging and persists independently from the generic `verb` wrapper.
 `%find-for` is the internal callback form: it allocates a
 lookup ID and pokes a typed `%kademlia-result` notice to the requesting local
-agent when lookup completes. Commands are accepted only from the local ship. Read-only
+agent when lookup completes. Lookup transitions return the exact completed ID,
+so callback delivery performs one map lookup rather than scanning every
+registered callback after each response or timeout. Commands are accepted only
+from the local ship. Read-only
 diagnostics are available through `/summary`, `/settings`, `/table`, `/seeds`,
 `/verbosity`, and `/lookup/<id>` Gall scries using the `%noun` output mark. For example:
 

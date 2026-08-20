@@ -90,12 +90,12 @@
   =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-request-timeout logic [~zod now ~zod state]) ~s45)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) agent-state]
+  =/  started=[(list card:agent:gall) lookup-update]
     (~(start logic [~zod now ~zod state]) 0v20 0x1234)
-  =/  pen=[request-id pending-request]  (first-pending +.started)
+  =/  pen=[request-id pending-request]  (first-pending state.+.started)
   ;:  weld
     %+  expect-eq  !>(~s45)
-    !>(request-timeout.settings.+.started)
+    !>(request-timeout.settings.state.+.started)
     %+  expect-eq  !>((add ~s45 now))
     !>(deadline.+.pen)
   ==
@@ -160,10 +160,10 @@
     (~(run-refresh logic [~zod deadline ~zod state]) deadline 0x1234)
   =/  id=lookup-id  (need maintenance.+.fired)
   =/  pen=[request-id pending-request]  (first-pending +.fired)
-  =/  answered=[(list card:agent:gall) agent-state]
+  =/  answered=[(list card:agent:gall) lookup-update]
     (~(receive-nodes logic [~zod +(deadline) ~nec +.fired]) -.pen 0 0)
   =/  continued=[(list card:agent:gall) agent-state]
-    (~(continue-refresh logic [~zod +(deadline) ~zod +.answered]) 0xabcd)
+    (~(continue-refresh logic [~zod +(deadline) ~zod state.+.answered]) id 0xabcd)
   =/  next=@da  (add ~h1 deadline)
   ;:  weld
     %+  expect-eq  !>(2)
@@ -188,10 +188,10 @@
     (~(run-refresh logic [~zod deadline ~zod state]) deadline 0x0)
   =/  first-id=lookup-id  (need maintenance.+.first)
   =/  pen=[request-id pending-request]  (first-pending +.first)
-  =/  answered=[(list card:agent:gall) agent-state]
+  =/  answered=[(list card:agent:gall) lookup-update]
     (~(receive-nodes logic [~zod +(deadline) ~nec +.first]) -.pen 0 0)
   =/  second=[(list card:agent:gall) agent-state]
-    (~(continue-refresh logic [~zod +(deadline) ~zod +.answered]) 0x0)
+    (~(continue-refresh logic [~zod +(deadline) ~zod state.+.answered]) first-id 0x0)
   =/  second-id=lookup-id  (need maintenance.+.second)
   =/  second-lookup=lookup  (need (~(get by active.+.second) second-id))
   ;:  weld
@@ -203,27 +203,29 @@
 ::
 ++  test-empty-lookup-completes
   =/  state=agent-state  (initial ~zod ~zod)
-  =/  out=[(list card:agent:gall) agent-state]
+  =/  out=[(list card:agent:gall) lookup-update]
     (~(start logic [~zod now ~zod state]) 0v1 0x1234)
   =/  view=(unit lookup-view)
-    (~(get-lookup logic [~zod now ~zod +.out]) 0v1)
+    (~(get-lookup logic [~zod now ~zod state.+.out]) 0v1)
   =/  got=lookup-view  (need view)
   ?>  ?=(%complete -.got)
   ;:  weld
     %+  expect-eq  !>(`(list card:agent:gall)`~)
     !>(-.out)
+    %+  expect-eq  !>(`(unit lookup-id)`[~ 0v1])
+    !>(completion.+.out)
     %+  expect-eq  !>(`(list node-id)`~)
     !>(contacts.result.got)
   ==
 ::
 ++  test-empty-callback-lookup-notifies
   =/  state=agent-state  (initial ~zod ~zod)
-  =/  started=[(list card:agent:gall) agent-state]
+  =/  started=[(list card:agent:gall) lookup-update]
     %+  ~(start-for logic [~zod now ~zod state])
       0x1234
     [%sink /lookup-result]
   =/  notified=[(list card:agent:gall) agent-state]
-    ~(notify logic [~zod now ~zod +.started])
+    (~(notify logic [~zod now ~zod state.+.started]) 0v1)
   =/  result=lookup-result  [0x1234 ~]
   =/  notice=lookup-notice  [/lookup-result result]
   =/  expected=card:agent:gall
@@ -244,12 +246,31 @@
     !>(next-lookup.+.notified)
   ==
 ::
+++  test-notify-targets-one-callback
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  one=lookup-result  [0x1 ~]
+  =/  two=lookup-result  [0x2 ~]
+  =.  completed.state  (~(put by completed.state) 0v1 one)
+  =.  completed.state  (~(put by completed.state) 0v2 two)
+  =.  callbacks.state  (~(put by callbacks.state) 0v1 [%one /one])
+  =.  callbacks.state  (~(put by callbacks.state) 0v2 [%two /two])
+  =/  notified=[(list card:agent:gall) agent-state]
+    (~(notify logic [~zod now ~zod state]) 0v1)
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>((lent -.notified))
+    (expect !>(!(~(has by callbacks.+.notified) 0v1)))
+    (expect !>(!(~(has by completed.+.notified) 0v1)))
+    (expect !>((~(has by callbacks.+.notified) 0v2)))
+    (expect !>((~(has by completed.+.notified) 0v2)))
+  ==
+::
 ++  test-seeded-dispatch
   =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~bud ~])
-  =/  out=[(list card:agent:gall) agent-state]
+  =/  out=[(list card:agent:gall) lookup-update]
     (~(start logic [~zod now ~zod state]) 0v2 0x1234)
-  =/  summary=summary  ~(get-summary logic [~zod now ~zod +.out])
+  =/  summary=summary  ~(get-summary logic [~zod now ~zod state.+.out])
   ;:  weld
     %+  expect-eq  !>(4)
     !>((lent -.out))
@@ -258,7 +279,7 @@
     %+  expect-eq  !>(1)
     !>(active.summary)
     %+  expect-eq  !>(0v3)
-    !>(next-request.+.out)
+    !>(next-request.state.+.out)
   ==
 ::
 ++  test-node-payload-round-trip
@@ -304,20 +325,20 @@
 ++  test-response-admits-only-sender
   =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) agent-state]
+  =/  started=[(list card:agent:gall) lookup-update]
     (~(start logic [~zod now ~zod state]) 0v3 0x0)
-  =/  pen=[request-id pending-request]  (first-pending +.started)
+  =/  pen=[request-id pending-request]  (first-pending state.+.started)
   =/  returned=node-id  (node ~bud)
   =/  payload=[count=@ud packed=@]
-    (~(pack-nodes logic [~zod +(now) ~nec +.started]) [returned ~])
-  =/  received=[(list card:agent:gall) agent-state]
-    %+  ~(receive-nodes logic [~zod +(now) ~nec +.started])
+    (~(pack-nodes logic [~zod +(now) ~nec state.+.started]) [returned ~])
+  =/  received=[(list card:agent:gall) lookup-update]
+    %+  ~(receive-nodes logic [~zod +(now) ~nec state.+.started])
       -.pen
     [count.payload packed.payload]
   =/  cancellation=card:agent:gall
     [%pass /timeout/(scot %uv -.pen) %arvo %b %rest deadline.+.pen]
   =/  contacts=(list contact)
-    (~(contacts kad [20 20 3 12 %kademlia-urbit-v1]) routing.+.received)
+    (~(contacts kad [20 20 3 12 %kademlia-urbit-v1]) routing.state.+.received)
   =/  contact=contact  (head contacts)
   ;:  weld
     %+  expect-eq  !>(1)
@@ -325,92 +346,98 @@
     %+  expect-eq  !>((node ~nec))
     !>(id.contact)
     %+  expect-eq  !>(1)
-    !>((pending-count +.received))
+    !>((pending-count state.+.received))
     (expect !>((lien -.received |=(got=card:agent:gall =(cancellation got)))))
   ==
 ::
 ++  test-wrong-sender-is-ignored
   =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) agent-state]
+  =/  started=[(list card:agent:gall) lookup-update]
     (~(start logic [~zod now ~zod state]) 0v4 0x0)
-  =/  pen=[request-id pending-request]  (first-pending +.started)
-  =/  received=[(list card:agent:gall) agent-state]
-    (~(receive-nodes logic [~zod +(now) ~bud +.started]) -.pen 0 0)
+  =/  pen=[request-id pending-request]  (first-pending state.+.started)
+  =/  received=[(list card:agent:gall) lookup-update]
+    (~(receive-nodes logic [~zod +(now) ~bud state.+.started]) -.pen 0 0)
   ;:  weld
     %+  expect-eq  !>(`(list card:agent:gall)`~)
     !>(-.received)
-    %+  expect-eq  !>(+.started)
-    !>(+.received)
+    %+  expect-eq  !>(state.+.started)
+    !>(state.+.received)
   ==
 ::
 ++  test-invalid-response-fails-request
   =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) agent-state]
+  =/  started=[(list card:agent:gall) lookup-update]
     (~(start logic [~zod now ~zod state]) 0v22 0x0)
-  =/  pen=[request-id pending-request]  (first-pending +.started)
+  =/  pen=[request-id pending-request]  (first-pending state.+.started)
   =/  cancellation=card:agent:gall
     [%pass /timeout/(scot %uv -.pen) %arvo %b %rest deadline.+.pen]
-  =/  failed=[(list card:agent:gall) agent-state]
-    %+  ~(receive-nodes logic [~zod +(now) ~nec +.started])
+  =/  failed=[(list card:agent:gall) lookup-update]
+    %+  ~(receive-nodes logic [~zod +(now) ~nec state.+.started])
       -.pen
     [1 (pow 2 128)]
   =/  view=(unit lookup-view)
-    (~(get-lookup logic [~zod +(now) ~zod +.failed]) 0v22)
+    (~(get-lookup logic [~zod +(now) ~zod state.+.failed]) 0v22)
   ;:  weld
     %+  expect-eq  !>(0)
-    !>((pending-count +.failed))
+    !>((pending-count state.+.failed))
+    %+  expect-eq  !>(`(unit lookup-id)`[~ 0v22])
+    !>(completion.+.failed)
     (expect !>(?=([~ [%complete *]] view)))
     (expect !>((lien -.failed |=(card=card:agent:gall =(cancellation card)))))
   ==
 ::
 ++  test-unsolicited-invalid-response-is-ignored
   =/  state=agent-state  (initial ~zod ~zod)
-  =/  received=[(list card:agent:gall) agent-state]
+  =/  received=[(list card:agent:gall) lookup-update]
     (~(receive-nodes logic [~zod +(now) ~nec state]) 0v404 21 0)
   ;:  weld
     %+  expect-eq  !>(`(list card:agent:gall)`~)
     !>(-.received)
     %+  expect-eq  !>(state)
-    !>(+.received)
+    !>(state.+.received)
   ==
 ::
 ++  test-timeout-completes-and-is-stale-safe
   =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) agent-state]
+  =/  started=[(list card:agent:gall) lookup-update]
     (~(start logic [~zod now ~zod state]) 0v5 0x0)
-  =/  pen=[request-id pending-request]  (first-pending +.started)
-  =/  failed=[(list card:agent:gall) agent-state]
-    (~(fail-request logic [~zod (add ~s10 now) ~zod +.started]) -.pen |)
-  =/  stale=[(list card:agent:gall) agent-state]
-    (~(fail-request logic [~zod (add ~s20 now) ~zod +.failed]) -.pen |)
+  =/  pen=[request-id pending-request]  (first-pending state.+.started)
+  =/  failed=[(list card:agent:gall) lookup-update]
+    (~(fail-request logic [~zod (add ~s10 now) ~zod state.+.started]) -.pen |)
+  =/  stale=[(list card:agent:gall) lookup-update]
+    (~(fail-request logic [~zod (add ~s20 now) ~zod state.+.failed]) -.pen |)
   =/  view=(unit lookup-view)
-    (~(get-lookup logic [~zod (add ~s20 now) ~zod +.stale]) 0v5)
+    (~(get-lookup logic [~zod (add ~s20 now) ~zod state.+.stale]) 0v5)
   ;:  weld
     %+  expect-eq  !>(0)
-    !>((pending-count +.failed))
+    !>((pending-count state.+.failed))
+    %+  expect-eq  !>(`(unit lookup-id)`[~ 0v5])
+    !>(completion.+.failed)
+    %+  expect-eq  !>(`(unit lookup-id)`~)
+    !>(completion.+.stale)
     (expect !>(?=([~ [%complete *]] view)))
-    %+  expect-eq  !>(+.failed)
-    !>(+.stale)
+    %+  expect-eq  !>(state.+.failed)
+    !>(state.+.stale)
   ==
 ::
 ++  test-poke-failure-cancels-timer
   =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
-  =/  started=[(list card:agent:gall) agent-state]
+  =/  started=[(list card:agent:gall) lookup-update]
     (~(start logic [~zod now ~zod state]) 0v21 0x0)
-  =/  pen=[request-id pending-request]  (first-pending +.started)
+  =/  pen=[request-id pending-request]  (first-pending state.+.started)
   =/  cancellation=card:agent:gall
     [%pass /timeout/(scot %uv -.pen) %arvo %b %rest deadline.+.pen]
-  =/  failed=[(list card:agent:gall) agent-state]
-    (~(fail-request logic [~zod +(now) ~zod +.started]) -.pen &)
+  =/  failed=[(list card:agent:gall) lookup-update]
+    (~(fail-request logic [~zod +(now) ~zod state.+.started]) -.pen &)
   ;:  weld
     %+  expect-eq  !>(`(list card:agent:gall)`[cancellation ~])
     !>(-.failed)
     %+  expect-eq  !>(0)
-    !>((pending-count +.failed))
+    !>((pending-count state.+.failed))
   ==
 ::
 ++  test-incoming-find-node
@@ -432,10 +459,10 @@
 ::
 ++  test-forget-result
   =/  state=agent-state  (initial ~zod ~zod)
-  =/  completed=[(list card:agent:gall) agent-state]
+  =/  completed=[(list card:agent:gall) lookup-update]
     (~(start logic [~zod now ~zod state]) 0v12 0x1)
   =/  forgotten=agent-state
-    (~(forget logic [~zod now ~zod +.completed]) 0v12)
+    (~(forget logic [~zod now ~zod state.+.completed]) 0v12)
   %+  expect-eq  !>(`(unit lookup-view)`~)
   !>((~(get-lookup logic [~zod now ~zod forgotten]) 0v12))
 --

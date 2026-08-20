@@ -65,6 +65,8 @@
       refresh-at=(unit @da)
       maintenance=(unit lookup-id)
   ==
++$  lookup-update
+  [completion=(unit lookup-id) state=agent-state]
 +$  kademlia-saved-state
   [state=agent-state verbosity=verbosity]
 --

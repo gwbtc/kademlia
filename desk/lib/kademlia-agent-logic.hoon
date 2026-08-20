@@ -92,18 +92,18 @@
 ::
 ++  advance
   |=  [id=lookup-id lup=lookup]
-  ^-  [(list card:agent:gall) agent-state]
+  ^-  [(list card:agent:gall) lookup-update]
   =/  dispatched=[peers=(list node-id) state=lookup]
     (~(dispatch kad cfg) lup)
   =.  lup  state.dispatched
   =.  active.state  (~(put by active.state) id lup)
   =/  result=(unit (list node-id))  (~(lookup-result kad cfg) lup)
   ?^  result
-    [~ (complete id lup u.result)]
+    [~ `id (complete id lup u.result)]
   =/  peers=(list node-id)  peers.dispatched
   =/  cards=(list card:agent:gall)  ~
   |-
-  ?~  peers  [(flop cards) state]
+  ?~  peers  [(flop cards) ~ state]
   =/  peer=node-id  i.peers
   =^  request  state  take-request-id
   =/  deadline=@da  (add request-timeout.settings.state now)
@@ -122,10 +122,10 @@
 ::
 ++  fail-request
   |=  [request=request-id cancel=?]
-  ^-  [(list card:agent:gall) agent-state]
-  ?.  (valid-id request)  [~ state]
+  ^-  [(list card:agent:gall) lookup-update]
+  ?.  (valid-id request)  [~ ~ state]
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
-  ?~  pending  [~ state]
+  ?~  pending  [~ ~ state]
   =/  pen=pending-request  u.pending
   =.  pending.state  (~(del by pending.state) request)
   =/  cancellation=(list card:agent:gall)
@@ -134,11 +134,11 @@
       ==
     ~
   =/  active=(unit lookup)  (~(get by active.state) lookup.pen)
-  ?~  active  [cancellation state]
+  ?~  active  [cancellation ~ state]
   =/  failed=[routing=table state=lookup]
     (~(timeout kad cfg) self-id peer.pen max-fails routing.state u.active)
   =.  routing.state  routing.failed
-  =/  advanced=[(list card:agent:gall) agent-state]
+  =/  advanced=[(list card:agent:gall) lookup-update]
     (advance lookup.pen state.failed)
   [(weld cancellation -.advanced) +.advanced]
 ::
@@ -173,13 +173,13 @@
 ::
 ++  receive-nodes
   |=  [request=request-id count=@ud packed=@]
-  ^-  [(list card:agent:gall) agent-state]
-  ?.  (valid-id request)  [~ state]
+  ^-  [(list card:agent:gall) lookup-update]
+  ?.  (valid-id request)  [~ ~ state]
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
-  ?~  pending  [~ state]
+  ?~  pending  [~ ~ state]
   =/  pen=pending-request  u.pending
   =/  sender=node-id  (~(ship-to-node kad cfg) src)
-  ?.  =(sender peer.pen)  [~ state]
+  ?.  =(sender peer.pen)  [~ ~ state]
   ?.  (valid-node-payload count packed)
     (fail-request request &)
   =/  ids=(list node-id)  (unpack-nodes count packed)
@@ -187,11 +187,11 @@
   =/  cancellation=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen]
   =/  active=(unit lookup)  (~(get by active.state) lookup.pen)
-  ?~  active  [[cancellation ~] state]
+  ?~  active  [[cancellation ~] ~ state]
   =/  received=[routing=table state=lookup]
     (~(receive kad cfg) self-id sender now (scag k.cfg ids) routing.state u.active)
   =.  routing.state  routing.received
-  =/  advanced=[(list card:agent:gall) agent-state]
+  =/  advanced=[(list card:agent:gall) lookup-update]
     (advance lookup.pen state.received)
   [[cancellation -.advanced] +.advanced]
 ::
@@ -271,7 +271,7 @@
 ::
 ++  start
   |=  [id=lookup-id target=node-id]
-  ^-  [(list card:agent:gall) agent-state]
+  ^-  [(list card:agent:gall) lookup-update]
   ?>  (valid-id id)
   ?>  (~(valid-node kad cfg) target)
   ?>  !(~(has by active.state) id)
@@ -345,9 +345,9 @@
   =/  target=node-id  (~(refresh-target kad cfg) u.due entropy)
   =^  id  state  take-lookup-id
   =.  maintenance.state  `id
-  =/  started=[(list card:agent:gall) agent-state]  (start id target)
-  =.  state  +.started
-  ?:  (~(has by active.state) id)
+  =/  started=[(list card:agent:gall) lookup-update]  (start id target)
+  =.  state  state.+.started
+  ?~  completion.+.started
     [-.started state]
   ::  An empty lookup completed synchronously.  Reap it and yield via Behn.
   =.  completed.state  (~(del by completed.state) id)
@@ -371,12 +371,9 @@
 ::  continue-refresh: after a maintenance lookup settles, start the next due leaf.
 ::
 ++  continue-refresh
-  |=  entropy=@
+  |=  [id=lookup-id entropy=@]
   ^-  [(list card:agent:gall) agent-state]
-  =/  current=(unit lookup-id)  maintenance.state
-  ?~  current  [~ state]
-  =/  id=lookup-id  u.current
-  ?:  (~(has by active.state) id)  [~ state]
+  ?.  =(maintenance.state `id)  [~ state]
   ?.  (~(has by completed.state) id)  [~ state]
   =.  completed.state  (~(del by completed.state) id)
   =.  maintenance.state  ~
@@ -386,32 +383,29 @@
 ::
 ++  start-for
   |=  [target=node-id callback=lookup-callback]
-  ^-  [(list card:agent:gall) agent-state]
+  ^-  [(list card:agent:gall) lookup-update]
   =^  id  state  take-lookup-id
   =.  callbacks.state  (~(put by callbacks.state) id callback)
   (start id target)
 ::
-::  notify: emit each completed callback exactly once.
+::  notify: emit the callback for one completed lookup, if it has one.
 ::
 ++  notify
+  |=  id=lookup-id
   ^-  [(list card:agent:gall) agent-state]
-  =/  remaining=(list [lookup-id lookup-callback])  ~(tap by callbacks.state)
-  =/  cards=(list card:agent:gall)  ~
-  |-
-  ?~  remaining  [(flop cards) state]
-  =/  id=lookup-id  -.i.remaining
-  =/  callback=lookup-callback  +.i.remaining
+  =/  callback=(unit lookup-callback)  (~(get by callbacks.state) id)
+  ?~  callback  [~ state]
   =/  result=(unit lookup-result)  (~(get by completed.state) id)
-  ?~  result  $(remaining t.remaining)
-  =/  notice=lookup-notice  [reply-path.callback u.result]
+  ?~  result  [~ state]
+  =/  notice=lookup-notice  [reply-path.u.callback u.result]
   =/  card=card:agent:gall
     :*  %pass  /callback/(scot %uv id)
-        %agent  [our recipient.callback]
+        %agent  [our recipient.u.callback]
         %poke  %kademlia-result  !>(notice)
     ==
   =.  callbacks.state  (~(del by callbacks.state) id)
   =.  completed.state  (~(del by completed.state) id)
-  $(remaining t.remaining, cards [card cards])
+  [[card ~] state]
 ::
 ++  forget
   |=  id=lookup-id

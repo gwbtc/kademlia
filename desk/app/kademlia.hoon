@@ -28,14 +28,30 @@
   ~
 ::
 ++  log-completion
-  |=  [=bowl:gall id=(unit lookup-id) maintenance=?]
+  |=  [=bowl:gall id=lookup-id result=lookup-result maintenance=?]
   ^-  ~
-  ?~  id  ~
-  =/  result=(unit lookup-result)  (~(get by completed.state) u.id)
-  ?~  result  ~
   ?:  maintenance
-    (log bowl %debug [%refresh-complete u.id (lent contacts.u.result)])
-  (log bowl %info [%lookup-complete u.id (lent contacts.u.result)])
+    (log bowl %debug [%refresh-complete id (lent contacts.result)])
+  (log bowl %info [%lookup-complete id (lent contacts.result)])
+::
+++  apply-lookup-transition
+  |=  $:  =bowl:gall
+          transition=[cards=(list card) update=lookup-update]
+      ==
+  ^-  [(list card) agent-state]
+  =/  out=agent-state  state.update.transition
+  ?~  completion.update.transition  [cards.transition out]
+  =/  id=lookup-id  u.completion.update.transition
+  =/  result=(unit lookup-result)  (~(get by completed.out) id)
+  ?~  result  [cards.transition out]
+  =/  maintenance=?  =(maintenance.out `id)
+  =/  ignored  (log-completion bowl id u.result maintenance)
+  =/  notified=[(list card) agent-state]
+    (~(notify logic [our.bowl now.bowl src.bowl out]) id)
+  =/  continued=[(list card) agent-state]
+    (~(continue-refresh logic [our.bowl now.bowl src.bowl +.notified]) id eny.bowl)
+  :_  +.continued
+  (weld cards.transition (weld -.notified -.continued))
 --
 ^-  agent:gall
 |_  =bowl:gall
@@ -88,19 +104,20 @@
         ?>  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.command)
         ?>  (~(valid-node-id logic [our.bowl now.bowl src.bowl state]) target.command)
         =/  ignored  (log bowl %info [%lookup-start id.command target.command])
-        =^  cards  state
+        =/  transition=[cards=(list card) update=lookup-update]
           (~(start logic [our.bowl now.bowl src.bowl state]) id.command target.command)
+        =^  cards  state  (apply-lookup-transition bowl transition)
         [cards this]
       %find-for
         ?>  (~(valid-node-id logic [our.bowl now.bowl src.bowl state]) target.command)
         =/  ignored
           (log bowl %info [%lookup-start-for target.command recipient.command reply-path.command])
-        =^  cards  state
+        =/  transition=[cards=(list card) update=lookup-update]
           %+  ~(start-for logic [our.bowl now.bowl src.bowl state])
             target.command
           [recipient.command reply-path.command]
-        =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
-        [(weld cards notices) this]
+        =^  cards  state  (apply-lookup-transition bowl transition)
+        [cards this]
       %forget
         ?>  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.command)
         =/  ignored  (log bowl %debug [%lookup-forget id.command])
@@ -123,23 +140,15 @@
         (~(receive-find-node logic [our.bowl now.bowl src.bowl state]) id.message target.message)
       [cards this]
     ::
-        %nodes
+      %nodes
       ?.  (~(valid-id logic [our.bowl now.bowl src.bowl state]) id.message)  `this
-      =/  pending=(unit pending-request)  (~(get by pending.state) id.message)
-      =/  maintenance=?
-        ?^  pending  =(maintenance.state `lookup.u.pending)
-        |
       =/  ignored  (log bowl %debug [%peer-nodes src.bowl id.message count.message])
-      =^  cards  state
+      =/  transition=[cards=(list card) update=lookup-update]
         %+  ~(receive-nodes logic [our.bowl now.bowl src.bowl state])
           id.message
         [count.message packed.message]
-      =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
-      =^  maintenance-cards  state
-        (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)
-      =/  ignored
-        (log-completion bowl ?~(pending ~ `lookup.u.pending) maintenance)
-      [(weld cards (weld notices maintenance-cards)) this]
+      =^  cards  state  (apply-lookup-transition bowl transition)
+      [cards this]
     ==
   ==
 ::
@@ -172,19 +181,11 @@
   ?~  p.sign  `this
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
-  =/  pending=(unit pending-request)  (~(get by pending.state) u.request)
-  =/  maintenance=?
-    ?^  pending  =(maintenance.state `lookup.u.pending)
-    |
   =/  ignored  (log bowl %debug [%request-poke-failed u.request])
-  =^  cards  state
+  =/  transition=[cards=(list card) update=lookup-update]
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request &)
-  =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
-  =^  maintenance-cards  state
-    (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)
-  =/  ignored
-    (log-completion bowl ?~(pending ~ `lookup.u.pending) maintenance)
-  [(weld cards (weld notices maintenance-cards)) this]
+  =^  cards  state  (apply-lookup-transition bowl transition)
+  [cards this]
 ::
 ++  on-arvo
   |=  [=wire =sign-arvo]
@@ -202,19 +203,11 @@
   =/  request=(unit @uv)  (slaw %uv i.t.wire)
   ?~  request  `this
   ?.  (~(has by pending.state) u.request)  `this
-  =/  pending=(unit pending-request)  (~(get by pending.state) u.request)
-  =/  maintenance=?
-    ?^  pending  =(maintenance.state `lookup.u.pending)
-    |
   =/  ignored  (log bowl %debug [%request-timeout u.request])
-  =^  cards  state
+  =/  transition=[cards=(list card) update=lookup-update]
     (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request |)
-  =^  notices  state  ~(notify logic [our.bowl now.bowl src.bowl state])
-  =^  maintenance-cards  state
-    (~(continue-refresh logic [our.bowl now.bowl src.bowl state]) eny.bowl)
-  =/  ignored
-    (log-completion bowl ?~(pending ~ `lookup.u.pending) maintenance)
-  [(weld cards (weld notices maintenance-cards)) this]
+  =^  cards  state  (apply-lookup-transition bowl transition)
+  [cards this]
 ::
 ++  on-watch  on-watch:def
 ++  on-leave  on-leave:def

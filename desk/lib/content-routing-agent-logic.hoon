@@ -245,11 +245,18 @@
 ::
 ++  prune-list
   |=  values=leased-records
-  ^-  leased-records
-  ?~  values  ~
-  =/  rest=leased-records  $(values t.values)
-  ?:  (lth now lease-until.i.values)  [i.values rest]
-  rest
+  ^-  [changed=? values=leased-records]
+  =/  changed=(unit leased-records)
+    |-
+    ?~  values  ~
+    =/  rest=(unit leased-records)  $(values t.values)
+    ?:  (lth now lease-until.i.values)
+      ?~  rest  ~
+      `[i.values u.rest]
+    ?~  rest  `t.values
+    `u.rest
+  ?~  changed  [| values]
+  [& u.changed]
 ::
 ::  prune-all: remove expired leases across the complete replica store.
 ::
@@ -263,7 +270,9 @@
   =/  count=@ud  0
   |-
   ?~  entries  state(replicas fresh, replica-count count)
-  =/  values=leased-records  (prune-list +.i.entries)
+  =/  pruned=[changed=? values=leased-records]
+    (prune-list +.i.entries)
+  =/  values=leased-records  values.pruned
   ?~  values  $(entries t.entries)
   %=  $
     entries  t.entries
@@ -275,8 +284,10 @@
   |=  target=key
   ^-  content-state
   =/  present=?  (~(has by replicas.state) target)
-  =/  values=leased-records
+  =/  pruned=[changed=? values=leased-records]
     (prune-list (~(gut by replicas.state) [target ~]))
+  ?.  changed.pruned  state
+  =/  values=leased-records  values.pruned
   ?~  values
     ?.  present  state
     %=  state
@@ -318,8 +329,9 @@
 ++  values-for
   |=  target=key
   ^-  records
-  =/  values=leased-records
+  =/  pruned=[changed=? values=leased-records]
     (prune-list (~(gut by replicas.state) [target ~]))
+  =/  values=leased-records  values.pruned
   =/  out=records  (turn values |=(item=leased-record value.item))
   =/  origin=(unit record)  (~(get by origins.state) target)
   ?~  origin  out

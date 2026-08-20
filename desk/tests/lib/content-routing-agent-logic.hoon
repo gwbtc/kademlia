@@ -384,6 +384,52 @@
     !>(replica-count.out)
   ==
 ::
+++  test-prune-list-change-reporting
+  =/  state=content-state  initial
+  =/  engine  [~zod now ~zod state allow]
+  =/  a=leased-record  [(provider 0x11 1 %a) +(now)]
+  =/  b=leased-record  [(provider 0x12 1 %b) (dec now)]
+  =/  c=leased-record  [(provider 0x13 1 %c) (add 2 now)]
+  =/  d=leased-record  [(provider 0x14 1 %d) now]
+  =/  unchanged=[changed=? values=leased-records]
+    (~(prune-list logic engine) [a c ~])
+  =/  head=[changed=? values=leased-records]
+    (~(prune-list logic engine) [b a c ~])
+  =/  middle=[changed=? values=leased-records]
+    (~(prune-list logic engine) [a b c ~])
+  =/  tail=[changed=? values=leased-records]
+    (~(prune-list logic engine) [a c d ~])
+  =/  all=[changed=? values=leased-records]
+    (~(prune-list logic engine) [b d ~])
+  ;:  weld
+    %+  expect-eq  !>(`[changed=? values=leased-records]`[| [a c ~]])
+    !>(unchanged)
+    %+  expect-eq  !>(`[changed=? values=leased-records]`[& [a c ~]])
+    !>(head)
+    %+  expect-eq  !>(`[changed=? values=leased-records]`[& [a c ~]])
+    !>(middle)
+    %+  expect-eq  !>(`[changed=? values=leased-records]`[& [a c ~]])
+    !>(tail)
+    %+  expect-eq  !>(`[changed=? values=leased-records]`[& ~])
+    !>(all)
+  ==
+::
+++  test-prune-key-unchanged-count
+  =/  state=content-state  initial
+  =/  rec=record  (provider 0x12 1 %live)
+  =/  target=key  (provider-key:cr content-id)
+  =.  replicas.state
+    (~(put by replicas.state) target [[rec +(now)] ~])
+  =.  replica-count.state  1
+  =/  out=content-state
+    (~(prune-key logic [~zod now ~zod state allow]) target)
+  ;:  weld
+    %+  expect-eq  !>(state)
+    !>(out)
+    %+  expect-eq  !>(1)
+    !>(replica-count.out)
+  ==
+::
 ++  test-prune-all-recomputes-replica-count
   =/  state=content-state  initial
   =/  expired=digest  (digest-cask:cr `(cask)`[%noun 1])

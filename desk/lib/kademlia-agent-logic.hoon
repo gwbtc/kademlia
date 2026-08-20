@@ -290,49 +290,61 @@
   ?:  !=(depth.a depth.b)  (lth depth.a depth.b)
   (lth prefix.a prefix.b)
 ::
-::  due-refresh: return the stalest leaf whose interval has elapsed.
+::  scan-refresh: find the oldest due leaf and earliest future deadline.
 ::
-++  due-refresh
-  ^-  (unit bucket-ref)
-  =/  refs=(list bucket-ref)  (~(bucket-refs kad cfg) routing.state)
-  =/  chosen=(unit bucket-ref)  ~
-  |-
-  ?~  refs  chosen
-  =/  ref=bucket-ref  i.refs
-  ?:  (gth (add refresh-interval.settings.state refreshed.ref) now)
-    $(refs t.refs)
-  ?~  chosen
-    $(refs t.refs, chosen `ref)
-  ?:  (refresh-ref-before ref u.chosen)
-    $(refs t.refs, chosen `ref)
-  $(refs t.refs)
+::    Prefix identity, age ordering, and scheduling are folded through the
+::    routing tree once without allocating a complete bucket-reference list.
 ::
-::  next-refresh-deadline: find the earliest future due time across all leaves.
+++  scan-refresh
+  ^-  [due=(unit bucket-ref) future=(unit @da)]
+  =/  walk
+    |=  [tab=table depth=@ud prefix=@ux]
+    ^-  [due=(unit bucket-ref) future=(unit @da)]
+    ?-  -.tab
+      %leaf
+        =/  ref=bucket-ref  [depth prefix refreshed.buc.tab]
+        =/  deadline=@da  (add refresh-interval.settings.state refreshed.ref)
+        ?:  (lte deadline now)  [`ref ~]
+        [~ `deadline]
+      %fork
+        =/  next-depth=@ud  +(depth)
+        =/  zero-prefix=@ux  (mul 2 prefix)
+        =/  zero=[due=(unit bucket-ref) future=(unit @da)]
+          $(tab zero.tab, depth next-depth, prefix zero-prefix)
+        =/  one=[due=(unit bucket-ref) future=(unit @da)]
+          $(tab one.tab, depth next-depth, prefix +(zero-prefix))
+        =/  due=(unit bucket-ref)
+          ?~  due.zero  due.one
+          ?~  due.one  due.zero
+          ?:  (refresh-ref-before u.due.zero u.due.one)  due.zero
+          due.one
+        =/  future=(unit @da)
+          ?~  future.zero  future.one
+          ?~  future.one  future.zero
+          ?:  (lth u.future.zero u.future.one)  future.zero
+          future.one
+        [due future]
+    ==
+  (walk routing.state 0 0x0)
 ::
-++  next-refresh-deadline
-  ^-  @da
-  =/  tab=table  routing.state
-  |-
-  ?-  -.tab
-    %leaf  (add refresh-interval.settings.state refreshed.buc.tab)
-    %fork
-      =/  zero-due=@da  $(tab zero.tab)
-      =/  one-due=@da  $(tab one.tab)
-      ?:  (lth zero-due one-due)  zero-due
-      one-due
-  ==
+::  schedule-refresh: install the sole global wake at one known deadline.
+::
+++  schedule-refresh
+  |=  deadline=@da
+  ^-  [(list card:agent:gall) agent-state]
+  =.  refresh-at.state  `deadline
+  :-  :~  [%pass /refresh/(scot %da deadline) %arvo %b %wait deadline]
+      ==
+  state
 ::
 ::  schedule-next-refresh: install the sole global wake for the earliest leaf.
 ::
 ++  schedule-next-refresh
   ^-  [(list card:agent:gall) agent-state]
   ?>  ?=(~ maintenance.state)
-  =/  due=@da  next-refresh-deadline
-  =/  deadline=@da  ?:((lte due now) +(now) due)
-  =.  refresh-at.state  `deadline
-  :-  :~  [%pass /refresh/(scot %da deadline) %arvo %b %wait deadline]
-      ==
-  state
+  =/  scan=[due=(unit bucket-ref) future=(unit @da)]  scan-refresh
+  ?^  due.scan  (schedule-refresh +(now))
+  (schedule-refresh (need future.scan))
 ::
 ::  drive-refresh: start one stale-bucket lookup or schedule the next wake.
 ::
@@ -340,9 +352,10 @@
   |=  entropy=@
   ^-  [(list card:agent:gall) agent-state]
   ?.  =(~ maintenance.state)  [~ state]
-  =/  due=(unit bucket-ref)  due-refresh
-  ?~  due  schedule-next-refresh
-  =/  target=node-id  (~(refresh-target kad cfg) u.due entropy)
+  =/  scan=[due=(unit bucket-ref) future=(unit @da)]  scan-refresh
+  ?~  due.scan
+    (schedule-refresh (need future.scan))
+  =/  target=node-id  (~(refresh-target kad cfg) u.due.scan entropy)
   =^  id  state  take-lookup-id
   =.  maintenance.state  `id
   =/  started=[(list card:agent:gall) lookup-update]  (start id target)

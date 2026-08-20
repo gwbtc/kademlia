@@ -129,6 +129,32 @@
   %-  expect-fail
   |.  (~(set-refresh-interval logic [~zod now ~zod state]) `@dr`0)
 ::
+++  test-refresh-scan-finds-due-and-future-in-one-fold
+  =/  state=agent-state  (initial ~zod ~zod)
+  =/  due-new=@da  ~2026.8.4..10.30.00
+  =/  due-old=@da  ~2026.8.4..09.00.00
+  =/  future-late=@da  ~2026.8.4..11.45.00
+  =/  future-early=@da  ~2026.8.4..11.30.00
+  =.  routing.state
+    :*  %fork
+        :*  %fork
+            [%leaf due-new [0 ~] [0 ~]]
+            [%leaf future-late [0 ~] [0 ~]]
+        ==
+        :*  %fork
+            [%leaf due-old [0 ~] [0 ~]]
+            [%leaf future-early [0 ~] [0 ~]]
+        ==
+    ==
+  =/  scan=[due=(unit bucket-ref) future=(unit @da)]
+    ~(scan-refresh logic [~zod now ~zod state])
+  ;:  weld
+    %+  expect-eq  !>(`(unit bucket-ref)`[~ [2 0x2 due-old]])
+    !>(due.scan)
+    %+  expect-eq  !>(`(unit @da)`[~ ~2026.8.4..12.30.00])
+    !>(future.scan)
+  ==
+::
 ++  test-seeds-trigger-bootstrap-wake
   =/  state=agent-state  (initial ~zod ~zod)
   =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])

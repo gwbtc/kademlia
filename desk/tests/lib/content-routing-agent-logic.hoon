@@ -284,6 +284,40 @@
   %+  expect-eq  !>(`store-status`[%rejected %provider-cap])
   !>(-.second)
 ::
+++  test-replica-admission-preserves-order-and-refreshes-duplicate
+  =/  state=content-state  initial
+  =/  old=record  (provider 0x12 1 %old)
+  =/  other=record  (provider 0x13 1 %other)
+  =/  newest=record  (provider 0x12 2 %newest)
+  =/  stale=record  (provider 0x12 1 %stale)
+  =/  a=[store-status content-state]
+    (~(put-replica logic [~zod now ~nec state allow]) old)
+  =/  b=[store-status content-state]
+    (~(put-replica logic [~zod now ~nec +.a allow]) other)
+  =/  c=[store-status content-state]
+    (~(put-replica logic [~zod now ~nec +.b allow]) newest)
+  =/  later=@da  (add ~h1 now)
+  =/  refreshed=[store-status content-state]
+    (~(put-replica logic [~zod later ~nec +.c allow]) newest)
+  =/  rejected=[store-status content-state]
+    (~(put-replica logic [~zod later ~nec +.refreshed allow]) stale)
+  =/  target=key  (provider-key:cr content-id)
+  =/  stored=leased-records
+    (~(gut by replicas.+.refreshed) [target ~])
+  ?>  ?=(^ stored)
+  ;:  weld
+    %+  expect-eq  !>(`store-status`[%accepted ~])
+    !>(-.refreshed)
+    %+  expect-eq  !>(`records`[newest other ~])
+    !>((turn stored |=(item=leased-record value.item)))
+    %+  expect-eq  !>((add ~d1 later))
+    !>(lease-until.i.stored)
+    %+  expect-eq  !>(`store-status`[%rejected %stale])
+    !>(-.rejected)
+    %+  expect-eq  !>(replicas.+.refreshed)
+    !>(replicas.+.rejected)
+  ==
+::
 ++  test-values-for-filters-only-requested-key
   =/  state=content-state  initial
   =/  requested=digest  (digest-cask:cr `(cask)`[%noun 1])

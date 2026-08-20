@@ -314,16 +314,6 @@
   ?~  origin  out
   [u.origin out]
 ::
-++  signer-count
-  |=  values=leased-records
-  ^-  @ud
-  =/  ids=(set node-id)  ~
-  =/  remaining=leased-records  values
-  |-
-  ?~  remaining  (lent ~(tap in ids))
-  =.  ids  (~(put in ids) (record-signer value.i.remaining))
-  $(remaining t.remaining)
-::
 ++  put-replica
   |=  rec=record
   ^-  [store-status content-state]
@@ -337,42 +327,62 @@
   =/  existing=leased-records  (~(gut by replicas.state) [target ~])
   =/  signer=node-id  (record-signer rec)
   =/  revision=@ud  (record-revision rec)
-  =/  same=leased-records
-    (skim existing |=(item=leased-record =(signer (record-signer value.item))))
-  =/  greatest=@ud
-    %+  roll  same
-    |=  [item=leased-record best=@ud]
-    (max (record-revision value.item) best)
-  ?:  (lth revision greatest)  [[%rejected %stale] state]
-  =/  at-revision=leased-records
-    %+  skim  same
-    |=  item=leased-record
-    =(revision (record-revision value.item))
-  =/  matches=leased-records
-    %+  skim  at-revision
-    |=  item=leased-record
-    =(rec value.item)
-  =/  duplicate=(unit leased-record)  ?~(matches ~ `i.matches)
-  ?:  ?&  ?=(~ duplicate)
-          =(revision greatest)
-          (gte (lent at-revision) 2)
+  =/  provider=?  ?=(%provider -.rec)
+  =/  classify
+    |=  values=leased-records
+    ^-  $:  higher=?
+            found-signer=?
+            equal-count=@ud
+            duplicate=(unit leased-record)
+            at-revision=leased-records
+            others=leased-records
+            signers=(set node-id)
+        ==
+    ?~  values  [| | 0 ~ ~ ~ ~]
+    =/  out
+      ^-  $:  higher=?
+              found-signer=?
+              equal-count=@ud
+              duplicate=(unit leased-record)
+              at-revision=leased-records
+              others=leased-records
+              signers=(set node-id)
+          ==
+      $(values t.values)
+    =/  item=leased-record  i.values
+    =/  item-signer=node-id  (record-signer value.item)
+    =/  all-signers=(set node-id)
+      ?:(provider (~(put in signers.out) item-signer) signers.out)
+    ?:  !=(signer item-signer)
+      out(others [item others.out], signers all-signers)
+    =.  found-signer.out  &
+    =/  item-revision=@ud  (record-revision value.item)
+    ?:  (gth item-revision revision)
+      out(higher &, signers all-signers)
+    ?:  (lth item-revision revision)
+      out(signers all-signers)
+    =.  equal-count.out  +(equal-count.out)
+    ?:  =(rec value.item)
+      out(duplicate `item, signers all-signers)
+    out(at-revision [item at-revision.out], signers all-signers)
+  =/  classified  (classify existing)
+  ?:  higher.classified  [[%rejected %stale] state]
+  ?:  ?&  ?=(~ duplicate.classified)
+          (gte equal-count.classified 2)
       ==
     [[%rejected %conflict-cap] state]
-  ?:  ?&  ?=(%provider -.rec)
-          ?=(~ same)
-          (gte (signer-count existing) max-providers.config.state)
+  ?:  ?&  provider
+          =(%.n found-signer.classified)
+          (gte ~(wyt in signers.classified) max-providers.config.state)
       ==
     [[%rejected %provider-cap] state]
-  =/  others=leased-records
-    %+  skip  existing
-    |=  item=leased-record
-    =(signer (record-signer value.item))
-  =/  kept=leased-records  ?:(=(revision greatest) (weld at-revision others) others)
+  =/  kept=leased-records
+    (weld at-revision.classified others.classified)
   =/  until=@da  (add lease.config.state now)
   =?  until  ?=(^ expiry)  (min until u.expiry)
   =.  kept
-    ?:  ?=(^ duplicate)
-      [[value.u.duplicate until] (skim kept |=(item=leased-record !=(rec value.item)))]
+    ?:  ?=(^ duplicate.classified)
+      [[value.u.duplicate.classified until] kept]
     [[rec until] kept]
   =/  adding-key=?  ?=(~ (~(get by replicas.state) target))
   =?  state  ?&  adding-key

@@ -464,7 +464,7 @@
   ?>  (valid-id id)
   ?>  !(~(has by active.state) id)
   ?>  !(~(has by completed.state) id)
-  =/  op=operation  [kind %.n ~ 0 ~ ~ ~ ~ ~ ~]
+  =/  op=operation  [kind %.n ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =.  active.state  (~(put by active.state) id op)
   [[(lookup-card id (operation-key op)) ~] state]
 ::
@@ -553,13 +553,16 @@
   ^-  operation
   ?~  incoming  op
   =/  rec=record  i.incoming
-  =/  op
-    ?:  (record-valid-for op rec)
-      ?-  -.rec
-        %pointer   op(pointers [value.rec pointers.op])
-        %provider  op(providers [value.rec providers.op])
-      ==
-    op
+  ?:  (~(has in admitted.op) rec)
+    $(incoming t.incoming)
+  ?.  (record-valid-for op rec)
+    $(incoming t.incoming)
+  =.  admitted.op  (~(put in admitted.op) rec)
+  =.  op
+    ?-  -.rec
+      %pointer   op(pointers [value.rec pointers.op])
+      %provider  op(providers [value.rec providers.op])
+    ==
   $(op op, incoming t.incoming)
 ::
 ::  merge-sized-records: merge transport-decoded records while reusing the
@@ -570,13 +573,16 @@
   ^-  operation
   ?~  incoming  op
   =/  rec=record  value.i.incoming
-  =/  op
-    ?:  (record-valid-for-sized op i.incoming)
-      ?-  -.rec
-        %pointer   op(pointers [value.rec pointers.op])
-        %provider  op(providers [value.rec providers.op])
-      ==
-    op
+  ?:  (~(has in admitted.op) rec)
+    $(incoming t.incoming)
+  ?.  (record-valid-for-sized op i.incoming)
+    $(incoming t.incoming)
+  =.  admitted.op  (~(put in admitted.op) rec)
+  =.  op
+    ?-  -.rec
+      %pointer   op(pointers [value.rec pointers.op])
+      %provider  op(providers [value.rec providers.op])
+    ==
   $(op op, incoming t.incoming)
 ::
 ++  finish

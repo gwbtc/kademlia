@@ -106,6 +106,7 @@
       rejected=(map node-id reject-reason)
       timed-out=(set node-id)
       responders=(set node-id)
+      admitted=(set record)                         :: authenticated exact records
       pointers=pointers
       providers=providers
   ==

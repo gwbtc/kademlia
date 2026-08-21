@@ -13,6 +13,11 @@
   ^-  ?
   |
 ::
+++  explode
+  |=  [signer=node-id message=digest signature=*]
+  ^-  ?
+  !!
+::
 ++  initial
   ^-  content-state
   ~(init logic [~zod now ~zod *content-state allow])
@@ -587,13 +592,13 @@
   =/  correct=record  (provider-for content-id 0x12 1 %correct)
   =/  wrong=record  (provider-for other 0x13 1 %wrong)
   =/  op=operation
-    [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~]
+    [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  merged=operation
     (~(merge-records logic [~zod now ~nec state allow]) op [wrong correct ~])
   =/  pointer=record  (pointer-for %test 0x12 %name 1 `~2026.8.12)
   =/  pointer-key=key  (pointer-key:cr %test 0x12 %name)
   =/  pointer-op=operation
-    [[%find-pointer %other 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~]
+    [[%find-pointer %other 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  pointer-merged=operation
     (~(merge-records logic [~zod now ~nec state allow]) pointer-op [pointer ~])
   ;:  weld
@@ -607,11 +612,38 @@
     !>((lent providers.pointer-merged))
   ==
 ::
+++  test-operation-admission-deduplicates-records
+  =/  state=content-state  initial
+  =/  rec=record  (provider 0x12 1 %duplicate)
+  =/  size=@ud  (met 3 (jam rec))
+  =/  op=operation
+    [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
+  =/  local=operation
+    (~(merge-records logic [~zod now ~nec state allow]) op [rec rec ~])
+  =/  decoded=operation
+    %+  ~(merge-sized-records logic [~zod now ~nec state allow])  op
+    [[rec size] [rec size] ~]
+  =/  repeated=operation
+    %+  ~(merge-sized-records logic [~zod now ~nec state explode])  decoded
+    [[rec size] ~]
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>((lent providers.local))
+    %+  expect-eq  !>(1)
+    !>(~(wyt in admitted.local))
+    %+  expect-eq  !>(1)
+    !>((lent providers.decoded))
+    %+  expect-eq  !>(1)
+    !>(~(wyt in admitted.decoded))
+    %+  expect-eq  !>(decoded)
+    !>(repeated)
+  ==
+::
 ++  test-operation-completion-does-not-reverify-records
   =/  state=content-state  initial
   =/  provider-rec=record  (provider 0x12 1 %provider)
   =/  provider-op=operation
-    [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~]
+    [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  provider-op=operation
     (~(merge-records logic [~zod now ~nec state allow]) provider-op [provider-rec ~])
   =/  provider-finished=[operation-completion content-state]
@@ -622,7 +654,7 @@
   ?>  ?=(%pointer -.pointer-rec)
   =/  pointer-key=key  (pointer-key:cr %test 0x12 %name)
   =/  pointer-op=operation
-    [[%find-pointer %test 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~]
+    [[%find-pointer %test 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  pointer-op=operation
     (~(merge-records logic [~zod now ~nec state allow]) pointer-op [pointer-rec ~])
   =/  pointer-finished=[operation-completion content-state]

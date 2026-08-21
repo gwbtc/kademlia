@@ -485,6 +485,35 @@
     !>(~(wyt by replicas.+.out))
   ==
 ::
+++  test-eviction-selects-oldest-horizon-and-key-tie
+  =/  state=content-state  initial
+  =/  one=digest  (digest-cask:cr `(cask)`[%noun 11])
+  =/  two=digest  (digest-cask:cr `(cask)`[%noun 22])
+  =/  three=digest  (digest-cask:cr `(cask)`[%noun 33])
+  =/  one-key=key  (provider-key:cr one)
+  =/  two-key=key  (provider-key:cr two)
+  =/  three-key=key  (provider-key:cr three)
+  =/  tied=@da  (add ~h1 now)
+  =.  replicas.state
+    (~(put by replicas.state) one-key [[(provider-for one 0x11 1 %one) tied] ~])
+  =.  replicas.state
+    (~(put by replicas.state) two-key [[(provider-for two 0x12 1 %two) tied] ~])
+  =.  replicas.state
+    %+  ~(put by replicas.state)  three-key
+    [[(provider-for three 0x13 1 %three) (add ~h2 now)] ~]
+  =.  replica-count.state  3
+  =/  victim=key  (min one-key two-key)
+  =/  survivor=key  (max one-key two-key)
+  =/  out=content-state
+    ~(evict-one logic [~zod now ~zod state allow])
+  ;:  weld
+    (expect !>(!(~(has by replicas.out) victim)))
+    (expect !>((~(has by replicas.out) survivor)))
+    (expect !>((~(has by replicas.out) three-key)))
+    %+  expect-eq  !>(2)
+    !>(replica-count.out)
+  ==
+::
 ++  test-capacity-sweep-reclaims-expired-key
   =/  state=content-state  initial
   =.  state

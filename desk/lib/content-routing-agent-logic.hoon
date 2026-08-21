@@ -265,20 +265,24 @@
 ::
 ++  prune-all
   ^-  content-state
-  =/  entries=(list [key leased-records])  ~(tap by replicas.state)
-  =/  fresh=(map key leased-records)  ~
-  =/  count=@ud  0
-  |-
-  ?~  entries  state(replicas fresh, replica-count count)
-  =/  pruned=[changed=? values=leased-records]
-    (prune-list +.i.entries)
-  =/  values=leased-records  values.pruned
-  ?~  values  $(entries t.entries)
-  %=  $
-    entries  t.entries
-    fresh    (~(put by fresh) -.i.entries values)
-    count    +(count)
-  ==
+  =/  rebuild
+    |=  $:  entries=(map key leased-records)
+            fresh=(map key leased-records)
+            count=@ud
+        ==
+    ^-  [fresh=(map key leased-records) count=@ud]
+    ?~  entries  [fresh count]
+    =/  left=[fresh=(map key leased-records) count=@ud]
+      $(entries l.entries, fresh fresh, count count)
+    =/  pruned=[changed=? values=leased-records]
+      (prune-list q.n.entries)
+    =/  next=[fresh=(map key leased-records) count=@ud]
+      ?~  values.pruned  left
+      [(~(put by fresh.left) p.n.entries values.pruned) +(count.left)]
+    $(entries r.entries, fresh fresh.next, count count.next)
+  =/  rebuilt=[fresh=(map key leased-records) count=@ud]
+    (rebuild replicas.state ~ 0)
+  state(replicas fresh.rebuilt, replica-count count.rebuilt)
 ::
 ++  prune-key
   |=  target=key
@@ -305,26 +309,32 @@
 ::
 ++  evict-one
   ^-  content-state
-  =/  entries=(list [key leased-records])  ~(tap by replicas.state)
-  ?~  entries  state
-  =/  victim=key  -.i.entries
-  =/  horizon=@da  (lease-horizon +.i.entries)
-  =/  remaining=(list [key leased-records])  t.entries
-  |-
-  ?~  remaining
-    %=  state
-      replicas       (~(del by replicas.state) victim)
-      replica-count  (dec replica-count.state)
-    ==
-  =/  candidate=key  -.i.remaining
-  =/  candidate-horizon=@da  (lease-horizon +.i.remaining)
-  =/  replace=?
-    ?|  (lth candidate-horizon horizon)
-        ?&  =(candidate-horizon horizon)
-            (lth candidate victim)
+  =/  choose
+    |=  $:  entries=(map key leased-records)
+            best=(unit [victim=key horizon=@da])
         ==
-    ==
-  $(remaining t.remaining, victim ?:(replace candidate victim), horizon ?:(replace candidate-horizon horizon))
+    ^-  (unit [victim=key horizon=@da])
+    ?~  entries  best
+    =/  best=(unit [victim=key horizon=@da])
+      $(entries l.entries, best best)
+    =/  candidate=key  p.n.entries
+    =/  candidate-horizon=@da  (lease-horizon q.n.entries)
+    =/  replace=?
+      ?~  best  &
+      ?|  (lth candidate-horizon horizon.u.best)
+          ?&  =(candidate-horizon horizon.u.best)
+              (lth candidate victim.u.best)
+          ==
+      ==
+    =?  best  replace  `[candidate candidate-horizon]
+    $(entries r.entries, best best)
+  =/  selected=(unit [victim=key horizon=@da])
+    (choose replicas.state ~)
+  ?~  selected  state
+  %=  state
+    replicas       (~(del by replicas.state) victim.u.selected)
+    replica-count  (dec replica-count.state)
+  ==
 ::
 ++  values-for
   |=  target=key
@@ -494,14 +504,16 @@
 ::
 ++  publishing-keys
   ^-  (set key)
-  =/  entries=(list [operation-id operation])  ~(tap by active.state)
-  =/  targets=(set key)  ~
-  |-
-  ?~  entries  targets
-  =/  op=operation  +.i.entries
-  ?.  ?=(%publish -.kind.op)
-    $(entries t.entries)
-  $(entries t.entries, targets (~(put in targets) key.kind.op))
+  =/  collect
+    |=  [entries=(map operation-id operation) targets=(set key)]
+    ^-  (set key)
+    ?~  entries  targets
+    =/  targets=(set key)  $(entries l.entries, targets targets)
+    =/  op=operation  q.n.entries
+    =?  targets  ?=(%publish -.kind.op)
+      (~(put in targets) key.kind.op)
+    $(entries r.entries, targets targets)
+  (collect active.state ~)
 ::
 ++  refresh-card
   ^-  card:agent:gall
@@ -512,9 +524,12 @@
   =/  publishing=(set key)  publishing-keys
   =/  queue=(list key)  refresh-queue.state
   =?  queue  ?=(~ queue)
-    %+  turn  ~(tap by origins.state)
-    |=  entry=[key record]
-    -.entry
+    =/  collect
+      |=  [entries=(map key record) out=(list key)]
+      ^-  (list key)
+      ?~  entries  out
+      $(entries r.entries, out [p.n.entries $(entries l.entries, out out)])
+    (collect origins.state ~)
   =/  cards=(list card:agent:gall)  ~
   =/  left=@ud  refresh-batch.config.state
   |-

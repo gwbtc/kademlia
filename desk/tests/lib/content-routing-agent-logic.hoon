@@ -541,6 +541,24 @@
     !>(id.completion)
   ==
 ::
+++  test-local-publication-reuses-packed-record
+  =/  state=content-state  initial
+  =/  rec=record  (provider 0x12 1 %packed)
+  =/  expected=@  (jam rec)
+  =/  started=[(list card:agent:gall) content-state]
+    (~(start-publish logic [~zod now ~zod state allow]) 0v1 rec)
+  =/  active=(unit operation)  (~(get by active.+.started) 0v1)
+  =/  op=operation  (need active)
+  ?>  ?=(%publish -.kind.op)
+  =/  origin=(unit record)
+    (~(get by origins.+.started) key.kind.op)
+  ;:  weld
+    %+  expect-eq  !>(expected)
+    !>(payload.kind.op)
+    %+  expect-eq  !>(rec)
+    !>((need origin))
+  ==
+::
 ++  test-remote-publication-completes-after-stored
   =/  state=content-state  initial
   =.  state

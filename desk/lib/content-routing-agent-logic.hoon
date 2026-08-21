@@ -432,7 +432,18 @@
 ++  put-origin
   |=  rec=record
   ^-  content-state
-  ?>  (record-valid rec)
+  =/  payload=@  (jam rec)
+  (put-origin-sized [rec (met 3 payload)])
+::
+::  put-origin-sized: admit a local record whose encoded size is already known.
+::
+++  put-origin-sized
+  |=  incoming=sized-record
+  ^-  content-state
+  ?>  (lte bytes.incoming max-wire-record-bytes)
+  ?>  (lte bytes.incoming max-record-bytes.config.state)
+  =/  rec=record  value.incoming
+  ?>  (record-auth-valid rec)
   =/  target=key  (record-key rec)
   =/  old=(unit record)  (~(get by origins.state) target)
   ?~  old  state(origins (~(put by origins.state) target rec))
@@ -532,8 +543,10 @@
 ++  start-publish
   |=  [id=operation-id rec=record]
   ^-  [(list card:agent:gall) content-state]
-  =.  state  (put-origin rec)
-  (start-operation id [%publish rec (record-key rec) (pack-record rec)])
+  =/  payload=@  (jam rec)
+  =/  size=@ud  (met 3 payload)
+  =.  state  (put-origin-sized [rec size])
+  (start-operation id [%publish rec (record-key rec) payload])
 ::
 ++  start-find-pointer
   |=  [id=operation-id namespace=@tas publisher=node-id name=*]

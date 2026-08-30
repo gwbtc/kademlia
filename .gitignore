@@ -4,3 +4,6 @@
 /dist-aqua-base/
 /dist-aqua-test/
 /.mortar/
+/demo/dist/
+/demo/ui/dist/
+/demo/ui/node_modules/

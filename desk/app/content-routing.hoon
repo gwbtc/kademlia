@@ -197,6 +197,14 @@
     ?>  =(src.bowl our.bowl)
     =/  command=content-command  !<(content-command vase)
     ?-  -.command
+      %reset
+        =/  old-refresh=@da  refresh-at.state
+        =.  state  ~(init logic engine)
+        =.  verbosity  %off
+        :_  this
+        :~  [%pass /refresh %arvo %b %rest old-refresh]
+            ~(refresh-card logic engine)
+        ==
       %publish-pointer
         ?>  (~(valid-id logic engine) id.command)
         ?>  (target-valid:cr target.command)

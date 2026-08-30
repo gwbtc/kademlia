@@ -8,7 +8,8 @@
 +$  verbosity         ?(%off %info %debug)
 +$  log-level         ?(%info %debug)
 +$  command
-  $%  [%set-seeds ships=(list @p)]
+  $%  [%reset ~]
+      [%set-seeds ships=(list @p)]
       [%set-request-timeout duration=@dr]
       [%set-refresh-interval duration=@dr]
       [%set-verbosity level=verbosity]

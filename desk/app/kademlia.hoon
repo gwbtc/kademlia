@@ -81,6 +81,13 @@
     ?>  =(src.bowl our.bowl)
     =/  command=command  !<(command vase)
     ?-  -.command
+      %reset
+        =/  cancel=(list card)
+          ?~  refresh-at.state  ~
+          ~[[%pass /refresh/(scot %da u.refresh-at.state) %arvo %b %rest u.refresh-at.state]]
+        =.  state  ~(init logic [our.bowl now.bowl src.bowl state])
+        =.  verbosity  %off
+        [(weld cancel ~(refresh-card logic [our.bowl now.bowl src.bowl state])) this]
       %set-seeds
         =/  ignored  (log bowl %info [%seeds-set (lent ships.command)])
         =.  state  (~(set-seeds logic [our.bowl now.bowl src.bowl state]) ships.command)

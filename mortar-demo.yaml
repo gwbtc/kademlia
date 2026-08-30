@@ -1,0 +1,59 @@
+output: demo/dist
+
+local demo:
+  path: ./demo/desk
+  priority: 110
+
+local kademlia:
+  path: ./desk
+  include:
+    - app/content-routing.hoon
+    - app/kademlia.hoon
+    - lib/content-routing-agent-logic.hoon
+    - lib/content-routing.hoon
+    - lib/feistel.hoon
+    - lib/kademlia-agent-logic.hoon
+    - lib/kademlia.hoon
+    - mar/content-routing/command.hoon
+    - mar/content-routing/message.hoon
+    - mar/content-routing/result.hoon
+    - mar/kademlia/command.hoon
+    - mar/kademlia/message.hoon
+    - mar/kademlia/result.hoon
+    - sur/content-routing.hoon
+    - sur/content-routing-agent.hoon
+    - sur/kademlia.hoon
+    - sur/kademlia-agent.hoon
+  priority: 100
+
+github base-dev:
+  repo: urbit/urbit
+  branch: master
+  revision: 0a9a312e133891937de9c4df1ebecad5cf669c7c
+  root: pkg/base-dev
+  include:
+    - lib/dbug.hoon
+    - lib/default-agent.hoon
+    - lib/skeleton.hoon
+    - lib/test.hoon
+    - lib/verb.hoon
+    - mar/bill.hoon
+    - mar/hoon.hoon
+    - mar/json.hoon
+    - mar/kelvin.hoon
+    - mar/mime.hoon
+    - mar/noun.hoon
+    - mar/txt.hoon
+    - sur/verb.hoon
+  priority: 10
+
+github landscape-dev:
+  repo: tloncorp/landscape
+  branch: develop
+  revision: 46c6ed8738082b6a94558710b1e3619befa83057
+  root: desk-dev
+  include:
+    - lib/docket.hoon
+    - mar/docket-0.hoon
+    - sur/docket.hoon
+  priority: 9

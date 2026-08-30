@@ -236,4 +236,24 @@
     %+  expect-eq  !>(before)
     !>(after)
   ==
+::
+++  test-reset-restores-empty-default-state
+  =/  bol=bowl:gall  (bowl ~zod ~zod)
+  =/  initialized  on-init:~(. agent bol)
+  =/  changed-config=content-config
+    [1 1 1 ~s1 ~d2 ~d1 1 1.024 2 3]
+  =/  changed
+    %+  on-poke:+.initialized  %content-routing-command
+    !>(`content-command`[%set-config changed-config])
+  =/  reset
+    (on-poke:+.changed %content-routing-command !>(`content-command`[%reset ~]))
+  =/  state=content-state  (get-state on-save:+.reset)
+  ;:  weld
+    %+  expect-eq  !>(20)
+    !>(replication.config.state)
+    %+  expect-eq  !>(0)
+    !>(replica-count.state)
+    %+  expect-eq  !>(0)
+    !>((lent ~(tap by origins.state)))
+  ==
 --

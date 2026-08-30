@@ -44,7 +44,8 @@
       [%records version=content-version id=content-request-id count=@ud payload=@]
   ==
 +$  content-command
-  $%  $:  %publish-pointer
+  $%  [%reset ~]
+      $:  %publish-pointer
           id=operation-id
           namespace=@tas
           name=*

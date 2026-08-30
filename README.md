@@ -27,6 +27,21 @@ libraries and two headless Gall agents:
   `tests/app/content-routing.hoon`: transport storage, operation, refresh,
   concurrency, callback, and Gall-interface coverage.
 
+## Profiling demo
+
+[`demo/`](demo/) contains Kademlia Lab, a separate Gall application and React
+frontend for exercising the overlay interactively. It can generate resources,
+publish provider and mutable-name records, fetch resources in parallel chunks,
+run node lookups, and display browser-measured phase timings and batch
+percentiles. The complete demo desk—including this project's Kademlia sources
+and pinned Urbit dependencies—is assembled with:
+
+```sh
+mortar build -config mortar-demo.yaml
+```
+
+See [`demo/README.md`](demo/README.md) for the desk, UI, and test workflow.
+
 ## Discovery and data transport
 
 Kademlia discovery and data retrieval are separate protocols. Iterative node
@@ -287,6 +302,13 @@ content digest and use it to discover the provider locator:
 
 ```hoon
 -kademlia-mortar!content-routing-network-test
+```
+
+`kademlia-demo-network-test` additionally verifies complete resource retrieval
+over both the custom chunk protocol and an exact-revision Ames remote scry:
+
+```hoon
+-kademlia-mortar!kademlia-demo-network-test
 ```
 
 The Aqua pill includes both secondary desks. Virtual ships therefore boot with

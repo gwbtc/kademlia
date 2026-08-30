@@ -1,0 +1,9 @@
+:~  title+'Kademlia Lab'
+    info+'Interactive Kademlia and content-routing profiler'
+    color+0x62.73f5
+    base+'kademlia-demo'
+    glob-ames+~zod^0v2.jsgrr.qrd7e.pjtdp.0oseq.5btn6
+    version+[0 1 0]
+    website+'https://github.com/tinnus-napbus/kademlia-urbit'
+    license+'MIT'
+==

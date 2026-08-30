@@ -1,5 +1,15 @@
 output: dist-pill
 
+local kademlia-demo:
+  path: ./demo/desk
+  include:
+    - app/kademlia-demo.hoon
+    - desk.bill
+    - lib/kademlia-demo.hoon
+    - mar/kademlia-demo
+    - sur/kademlia-demo.hoon
+  priority: 120
+
 local kademlia:
   path: ./desk
   include:

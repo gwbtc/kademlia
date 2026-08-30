@@ -205,4 +205,23 @@
     %+  expect-eq  !>(before)
     !>(after)
   ==
+::
+++  test-reset-restores-empty-default-state
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
+  =/  initialized  on-init:~(. agent bol)
+  =/  seeded
+    (on-poke:+.initialized %kademlia-command !>(`command`[%set-seeds ~[~nec]]))
+  =/  changed
+    (on-poke:+.seeded %kademlia-command !>(`command`[%set-request-timeout ~s1]))
+  =/  reset
+    (on-poke:+.changed %kademlia-command !>(`command`[%reset ~]))
+  =/  state=agent-state  (get-state on-save:+.reset)
+  ;:  weld
+    %+  expect-eq  !>(0)
+    !>((lent ~(tap in seeds.state)))
+    %+  expect-eq  !>(~m5)
+    !>(request-timeout.settings.state)
+    %+  expect-eq  !>(0)
+    !>((lent (~(contacts kad [20 20 3 12 %kademlia-urbit-v1]) routing.state)))
+  ==
 --

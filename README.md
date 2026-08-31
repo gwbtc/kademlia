@@ -246,6 +246,10 @@ records from one publisher under a key. Records use Jael-backed Ames-key
 signatures, leases, periodic refresh, bounded wire atoms, request timeouts, and
 the same global fair scheduler as content routing.
 
+See [`docs/content-discovery.md`](docs/content-discovery.md) for the complete
+data model, publisher and format semantics, publication and browsing flows,
+selection rules, API, resource limits, and application integration guidance.
+
 ## Routing buckets
 
 A routing table starts as one empty leaf created by `+empty-table`. Leaves

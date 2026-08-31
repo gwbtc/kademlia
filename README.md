@@ -157,6 +157,10 @@ diagnostics are available through `/summary`, `/settings`, `/table`, `/seeds`,
 .^(* %gx /=kademlia=/lookup/0v1/noun)
 ```
 
+See [`docs/kademlia.md`](docs/kademlia.md) for the complete identity model,
+routing-table and bucket policy, iterative lookup state machine, refresh
+scheduler, peer protocol, Gall API, and invariants.
+
 ## Content-record transport agent
 
 The separate `%content-routing` agent keeps Kademlia itself agnostic about
@@ -213,6 +217,10 @@ Operation results are exposed at `/operation/<id>`. Stored records can be read
 at `/records/<key>`, pointer records at `/pointer/<key>`, and provider records at
 `/providers/<digest>`, all under the agent's `%gx` namespace with `%noun` output.
 The transport returns records and locators only—it does not fetch final content.
+
+See [`docs/content-routing.md`](docs/content-routing.md) for the complete naming
+model, pointer and provider semantics, publication and query flows, signature
+and conflict policy, transport bounds, and application integration guidance.
 
 ## Topic discovery
 

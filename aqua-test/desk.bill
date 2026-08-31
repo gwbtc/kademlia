@@ -1,3 +1,4 @@
 :~  %kademlia-test-observer
+    %content-discovery-test-observer
     %kademlia-demo-test-observer
 ==

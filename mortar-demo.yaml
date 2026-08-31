@@ -8,20 +8,28 @@ local kademlia:
   path: ./desk
   include:
     - app/content-routing.hoon
+    - app/content-discovery.hoon
     - app/kademlia.hoon
     - lib/content-routing-agent-logic.hoon
     - lib/content-routing.hoon
+    - lib/content-discovery-agent-logic.hoon
+    - lib/content-discovery.hoon
     - lib/feistel.hoon
     - lib/kademlia-agent-logic.hoon
     - lib/kademlia.hoon
     - mar/content-routing/command.hoon
     - mar/content-routing/message.hoon
     - mar/content-routing/result.hoon
+    - mar/content-discovery/command.hoon
+    - mar/content-discovery/message.hoon
+    - mar/content-discovery/result.hoon
     - mar/kademlia/command.hoon
     - mar/kademlia/message.hoon
     - mar/kademlia/result.hoon
     - sur/content-routing.hoon
     - sur/content-routing-agent.hoon
+    - sur/content-discovery.hoon
+    - sur/content-discovery-agent.hoon
     - sur/kademlia.hoon
     - sur/kademlia-agent.hoon
   priority: 100

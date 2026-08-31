@@ -11,6 +11,7 @@ local aqua-test:
 local kademlia-test:
   path: ./desk
   include:
+    - mar/content-discovery/result.hoon
     - mar/content-routing/result.hoon
     - mar/kademlia/result.hoon
     - sur

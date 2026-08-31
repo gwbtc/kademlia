@@ -1,7 +1,7 @@
 # Kademlia for Urbit
 
 This desk contains a Kademlia-style overlay for Urbit, including pure routing
-libraries and two headless Gall agents:
+libraries and three headless Gall agents:
 
 - `lib/feistel.hoon`: the supplied Feistel permutation over the complete
   128-bit Ames ship-ID and Kademlia node-ID domain.
@@ -17,6 +17,9 @@ libraries and two headless Gall agents:
   `app/content-routing.hoon`: the ordinary-Ames record transport, leased replica
   store, publication/query state machine, Jael-backed signatures, and Gall
   interface layered over node lookup.
+- `sur/content-discovery.hoon`, `lib/content-discovery.hoon`, and
+  `app/content-discovery.hoon`: an open, signed hierarchical topic index whose
+  catalog payloads are addressed through the content-routing layer.
 - `app/kademlia.hoon`: a headless Gall agent that runs iterative `FIND_NODE`
   lookups over ordinary Ames pokes, with its pure transitions in
   `lib/kademlia-agent-logic.hoon`.
@@ -210,6 +213,38 @@ at `/records/<key>`, pointer records at `/pointer/<key>`, and provider records a
 `/providers/<digest>`, all under the agent's `%gx` namespace with `%noun` output.
 The transport returns records and locators only—it does not fetch final content.
 
+## Topic discovery
+
+`%content-discovery` provides application-independent browsing above content
+routing. A topic is a nonempty list of up to eight `%tas` segments, with at
+most 64 bytes per segment. Each exact path derives its own 128-bit Kademlia key.
+Applications publish only an opaque catalog reference:
+
+```hoon
+[format=%my-catalog-v1 digest=<content-digest> entries=42]
+```
+
+The catalog body is not interpreted by discovery. Its digest can be resolved
+and fetched through `%content-routing`, preserving referential transparency for
+the catalog payload while allowing its contents to use any application mold.
+
+Advertising `/software/urbit/hoon` publishes one signed catalog record at that
+exact path and signed edges at `/software` and `/software/urbit`. No global
+empty-root record is created. An exact browse returns the current catalog from
+each publisher plus the immediate child names and the authenticated publishers
+supporting each child. Catalogs are ordered by publisher and children
+lexicographically. The greatest revision wins per publisher and topic; distinct
+records at the same greatest revision are reported as conflicts.
+
+The local command API is `%advertise`, `%browse`, `%observe`, `%forget`,
+`%set-config`, `%set-verbosity`, and `%reset`. Publication is a batch operation:
+its single external ID completes only after the catalog and every generated
+edge have each completed bounded Kademlia replication. Peer responses are
+bounded to 64 records per key, with an additional default limit of eight
+records from one publisher under a key. Records use Jael-backed Ames-key
+signatures, leases, periodic refresh, bounded wire atoms, request timeouts, and
+the same global fair scheduler as content routing.
+
 ## Routing buckets
 
 A routing table starts as one empty leaf created by `+empty-table`. Leaves
@@ -302,6 +337,14 @@ content digest and use it to discover the provider locator:
 
 ```hoon
 -kademlia-mortar!content-routing-network-test
+```
+
+`content-discovery-network-test` advertises a three-segment topic from `~wes`,
+then browses every level from `~bud`, checking the automatically generated
+parent edges and the exact leaf catalog without host-side polling:
+
+```hoon
+-kademlia-mortar!content-discovery-network-test
 ```
 
 `kademlia-demo-network-test` additionally verifies complete resource retrieval

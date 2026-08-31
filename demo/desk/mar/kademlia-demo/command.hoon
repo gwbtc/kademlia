@@ -63,6 +63,16 @@
                 (string-field object 'name')
             ==
         ==
+      %advertise-topic
+        :*  %advertise-topic
+            run
+            (atom-field object 'content' %uv)
+            (topic-field object 'topic')
+            `@tas`(atom-field object 'format' %tas)
+            (atom-field object 'revision' %ud)
+        ==
+      %browse-topic
+        [%browse-topic run (topic-field object 'topic')]
       %cancel
         [%cancel run]
       %network
@@ -115,4 +125,14 @@
     %b  !!
     %o  !!
   ==
+::
+++  topic-field
+  |=  [object=(map @t ^json) key=@t]
+  ^-  (list @tas)
+  =/  value=^json  (json-field object key)
+  ?>  ?=([%a *] value)
+  %+  turn  p.value
+  |=  item=^json
+  ?>  ?=([%s *] item)
+  (need (slaw %tas p.item))
 --

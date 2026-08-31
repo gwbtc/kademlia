@@ -37,6 +37,14 @@
       ==
       [%lookup run=run-id target=@p]
       [%fetch run=run-id query=fetch-query]
+      $:  %advertise-topic
+          run=run-id
+          content=digest
+          topic=(list @tas)
+          format=@tas
+          revision=@ud
+      ==
+      [%browse-topic run=run-id topic=(list @tas)]
       [%cancel run=run-id]
       $:  %network
           seeds=(list @p)
@@ -71,7 +79,7 @@
       ==
   ==
 +$  phase
-  ?(%started %lookup-started %lookup-complete %pointer-started %pointer-complete %providers-started %providers-complete %transfer-started %first-byte %transfer-progress %transfer-complete %verify-complete %complete %cancelled %failed)
+  ?(%started %lookup-started %lookup-complete %pointer-started %pointer-complete %providers-started %providers-complete %topic-advertise-started %topic-advertise-complete %topic-browse-started %topic-browse-complete %transfer-started %first-byte %transfer-progress %transfer-complete %verify-complete %complete %cancelled %failed)
 +$  pending-chunk
   $:  run=run-id
       provider=node-id
@@ -106,6 +114,8 @@
   $%  [%lookup target=@p]
       [%publish state=publication-state]
       [%fetch state=fetch-state]
+      [%advertise-topic content=digest topic=(list @tas)]
+      [%browse-topic topic=(list @tas)]
   ==
 +$  operation
   [kind=operation-kind started=@da]

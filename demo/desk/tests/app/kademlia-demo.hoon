@@ -1,4 +1,5 @@
 /-  *content-routing, *content-routing-agent, *kademlia, *kademlia-demo
+/-  cd=content-discovery, cda=content-discovery-agent
 /+  kad=kademlia, cr=content-routing, demo=kademlia-demo, *test
 /=  agent  /app/kademlia-demo
 |%
@@ -93,6 +94,8 @@
         [%pass /kademlia/request-timeout %agent [~zod %kademlia] %poke %kademlia-command !>(`kademlia-command`[%set-request-timeout ~s30])]
         [%pass /kademlia/refresh-interval %agent [~zod %kademlia] %poke %kademlia-command !>(`kademlia-command`[%set-refresh-interval ~h1])]
         [%pass /kademlia/verbosity %agent [~zod %kademlia] %poke %kademlia-command !>(`kademlia-command`[%set-verbosity %debug])]
+        [%pass /discovery/0v0/network-config %agent [~zod %content-discovery] %poke %content-discovery-command !>(`discovery-command:cda`[%set-config [20 3 12 ~s30 ~d1 ~h12 8 65.536 64 8 10.000]])]
+        [%pass /discovery/0v0/network-verbosity %agent [~zod %content-discovery] %poke %content-discovery-command !>(`discovery-command:cda`[%set-verbosity %debug])]
     ==
   (expect-eq !>(expected) !>(cards))
 ::
@@ -177,6 +180,54 @@
     !>((lent ~(tap by resources.after)))
   ==
 ::
+++  test-topic-advertisement-callback-completes-run
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.21)
+  =/  initialized  on-init:~(. agent bol)
+  =/  res=resource  (make-resource:demo 7 1.024 'text/plain')
+  =/  created
+    (on-poke:+.initialized %kademlia-demo-command !>(`demo-command`[%create %create 7 1.024 'text/plain']))
+  =/  advertised
+    %+  on-poke:+.created  %kademlia-demo-command
+    !>(`demo-command`[%advertise-topic %topic-ad content.res ~[%software %urbit] %demo 1])
+  =/  before=demo-state  (get-state on-save:+.advertised)
+  =/  accepted=(set node-id)  (silt ~[0x1])
+  =/  publication=publication-result:cda
+    [[%catalog 0x1] 0x2 accepted ~ ~]
+  =/  result=discovery-result:cda  [%advertised ~[publication]]
+  =/  notice=operation-notice:cda
+    [[%topic-advertise (scot %uv 0v1) %topic-ad ~] result]
+  =/  finished
+    (on-poke:+.advertised %content-discovery-result !>(notice))
+  =/  after=demo-state  (get-state on-save:+.finished)
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>((lent ~(tap by active.before)))
+    %+  expect-eq  !>(0)
+    !>((lent ~(tap by active.after)))
+    (expect !>((gte (lent -.finished) 3)))
+  ==
+::
+++  test-topic-browse-callback-exposes-selection
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.21)
+  =/  initialized  on-init:~(. agent bol)
+  =/  started
+    %+  on-poke:+.initialized  %kademlia-demo-command
+    !>(`demo-command`[%browse-topic %topic-browse ~[%software]])
+  =/  child=child-selection:cd  [%urbit (silt ~[0x1])]
+  =/  selected=topic-selection:cd  [~ ~[child] ~]
+  =/  browse=browse-result:cda
+    [~[%software] selected (silt ~[0x1]) ~]
+  =/  notice=operation-notice:cda
+    [[%topic-browse (scot %uv 0v1) %topic-browse ~] [%topic browse]]
+  =/  finished
+    (on-poke:+.started %content-discovery-result !>(notice))
+  =/  state=demo-state  (get-state on-save:+.finished)
+  ;:  weld
+    %+  expect-eq  !>(0)
+    !>((lent ~(tap by active.state)))
+    (expect !>((gte (lent -.finished) 3)))
+  ==
+::
 ++  test-peer-chunk-request
   =/  home=bowl:gall  (bowl ~zod ~zod ~2026.8.21)
   =/  initialized  on-init:~(. agent home)
@@ -209,6 +260,6 @@
     !>((lent ~(tap by active.state)))
     %+  expect-eq  !>(0)
     !>((lent ~(tap in scry-spurs.state)))
-    (expect !>((gte (lent -.reset) 4)))
+    (expect !>((gte (lent -.reset) 5)))
   ==
 --

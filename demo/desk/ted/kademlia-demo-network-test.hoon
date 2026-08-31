@@ -1,9 +1,12 @@
 ::  Publish and retrieve one generated resource across two Aqua ships.
 ::
 /-  spider, *kademlia-agent, *content-routing-agent, *kademlia-demo
+/-  cda=content-discovery-agent
 /+  *ph-io, demo=kademlia-demo
 =,  strand=strand:spider
 =/  content-cfg=content-config  [1 1 2 ~s10 ~d1 ~h12 2 65.536 64 10.000]
+=/  discovery-cfg=discovery-config:cda
+  [2 1 2 ~s10 ~d1 ~h12 2 65.536 64 8 10.000]
 ^-  thread:spider
 |=  argument=vase
 |^
@@ -26,6 +29,15 @@
 ;<  ~  bind:m  (expect ~bud %fetch)
 ;<  ~  bind:m  (poke-demo ~bud [%fetch %fetch [%content content.resource]])
 ;<  ~  bind:m  (await ~bud %fetch)
+;<  ~  bind:m  (expect ~wes %advertise-topic)
+;<  ~  bind:m
+  %+  poke-demo  ~wes
+  [%advertise-topic %advertise-topic content.resource ~[%software %urbit %hoon] %kademlia-demo-resource-v1 1]
+;<  ~  bind:m  (await ~wes %advertise-topic)
+;<  ~  bind:m  (expect ~bud %browse-topic)
+;<  ~  bind:m
+  (poke-demo ~bud [%browse-topic %browse-topic ~[%software %urbit]])
+;<  ~  bind:m  (await ~bud %browse-topic)
 =/  scry-resource
   (make-resource:demo 43 262.144 'application/octet-stream')
 ;<  ~  bind:m  (expect ~wes %create-scry)
@@ -55,7 +67,9 @@
   ;<  ~  bind:m  (poke-kademlia ~wes [%set-seeds ~[~bud]])
   ;<  ~  bind:m  (poke-kademlia ~wes [%set-request-timeout ~s10])
   ;<  ~  bind:m  (poke-content ~bud [%set-config content-cfg])
-  (poke-content ~wes [%set-config content-cfg])
+  ;<  ~  bind:m  (poke-content ~wes [%set-config content-cfg])
+  ;<  ~  bind:m  (poke-discovery ~bud [%set-config discovery-cfg])
+  (poke-discovery ~wes [%set-config discovery-cfg])
 ::
 ++  poke-kademlia
   |=  [who=@p command=command]
@@ -66,6 +80,11 @@
   |=  [who=@p command=content-command]
   =/  m  (strand ,~)
   (dojo who ":content-routing &content-routing-command {<command>}")
+::
+++  poke-discovery
+  |=  [who=@p command=discovery-command:cda]
+  =/  m  (strand ,~)
+  (dojo who ":content-discovery &content-discovery-command {<command>}")
 ::
 ++  poke-demo
   |=  [who=@p command=demo-command]

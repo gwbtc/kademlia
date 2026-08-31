@@ -37,6 +37,7 @@ h1 span { color: #70e5bd; }
 form, .benchmark > :not(.panel-heading), .network > :not(.panel-heading) { margin: 0; padding: 18px 20px; }
 .controls form + form { border-top: 1px solid #173029; }
 h3 { margin: 0 0 14px; color: #b9dacf; font-size: 13px; letter-spacing: .02em; }
+.form-note { margin: 0 0 12px; color: #5f8377; font-size: 11px; line-height: 1.5; }
 label { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; color: #75998d; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 input, select { width: 100%; min-width: 0; padding: 10px 11px; border: 1px solid #285044; border-radius: 9px; outline: none; color: #e9fff8; background: #07110f; }
 input:focus, select:focus { border-color: #70e5bd; box-shadow: 0 0 0 3px #70e5bd1a; }
@@ -60,6 +61,20 @@ button:disabled { cursor: not-allowed; opacity: .35; }
 .phase i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2d8066, #70e5bd); }
 .phase time { color: #5f8579; text-align: right; font-variant-numeric: tabular-nums; }
 .phase-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 16px 20px 20px; border-top: 1px solid #173029; }
+.topic-result { padding: 18px 20px 22px; border-top: 1px solid #173029; }
+.topic-result-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.topic-result-heading strong { color: #70e5bd; }
+.topic-result-heading span { color: #608377; font-size: 11px; }
+.topic-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.topic-columns h3 { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.topic-columns h3 b { color: #70e5bd; }
+.topic-columns p { color: #5f8377; font-size: 11px; }
+.topic-columns article { display: flex; flex-direction: column; gap: 4px; margin-bottom: 7px; padding: 10px; border: 1px solid #1c3b32; border-radius: 9px; background: #07130f; }
+.topic-columns article strong { color: #bdddd2; font-size: 12px; }
+.topic-columns article small { color: #608377; font-size: 10px; }
+.topic-columns article code { overflow-wrap: anywhere; color: #75998d; font-size: 9px; }
+.topic-columns article button { align-self: flex-start; margin-top: 5px; padding: 6px 9px; font-size: 10px; }
+.topic-conflicts { margin-top: 10px; padding: 8px 10px; border: 1px solid #743d43; border-radius: 8px; color: #ffb6bd; background: #2b1518; font-size: 11px; }
 .benchmark .row { padding: 18px 20px 8px; grid-template-columns: 1.5fr .7fr .7fr; align-items: end; }
 .benchmark .row label { margin: 0; }
 .benchmark > button { margin: 0 20px 16px; }
@@ -83,4 +98,5 @@ button.destructive { justify-self: start; color: #ffd9dc; background: #702c36; }
   .controls { grid-row: auto; }
   .phase { grid-template-columns: 110px 1fr 70px; }
   .phase-grid { grid-template-columns: 1fr 1fr; }
+  .topic-columns { grid-template-columns: 1fr; }
 }

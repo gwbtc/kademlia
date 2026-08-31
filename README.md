@@ -35,9 +35,10 @@ libraries and three headless Gall agents:
 [`demo/`](demo/) contains Kademlia Lab, a separate Gall application and React
 frontend for exercising the overlay interactively. It can generate resources,
 publish provider and mutable-name records, fetch resources in parallel chunks,
-run node lookups, and display browser-measured phase timings and batch
-percentiles. The complete demo desk—including this project's Kademlia sources
-and pinned Urbit dependencies—is assembled with:
+advertise catalogs in hierarchical topics, browse catalogs and immediate topic
+children, run node lookups, and display browser-measured phase timings and
+batch percentiles. The complete demo desk—including this project's Kademlia
+sources and pinned Urbit dependencies—is assembled with:
 
 ```sh
 mortar build -config mortar-demo.yaml
@@ -348,7 +349,8 @@ parent edges and the exact leaf catalog without host-side polling:
 ```
 
 `kademlia-demo-network-test` additionally verifies complete resource retrieval
-over both the custom chunk protocol and an exact-revision Ames remote scry:
+over both the custom chunk protocol and an exact-revision Ames remote scry,
+then advertises and browses a topic through the demo API:
 
 ```hoon
 -kademlia-mortar!kademlia-demo-network-test

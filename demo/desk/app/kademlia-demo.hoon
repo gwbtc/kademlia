@@ -1,6 +1,7 @@
 ::  Interactive resource transport and profiling agent layered over Kademlia.
 ::
 /-  *kademlia, *kademlia-agent, *content-routing, *content-routing-agent
+/-  cd=content-discovery, cda=content-discovery-agent
 /-  *kademlia-demo
 /+  kad=kademlia, cr=content-routing, demo=kademlia-demo
 /+  default-agent, dbug, verb
@@ -90,6 +91,11 @@
   |=  [our=@p id=@uv run=run-id command=content-command]
   ^-  card
   (local-poke our %content-routing %content-routing-command !>(command) /content/(scot %uv id)/[run])
+::
+++  discovery-poke
+  |=  [our=@p id=@uv run=run-id command=discovery-command:cda]
+  ^-  card
+  (local-poke our %content-discovery %content-discovery-command !>(command) /discovery/(scot %uv id)/[run])
 ::
 ++  kademlia-poke
   |=  [our=@p tag=@tas command=command]
@@ -201,6 +207,52 @@
   |=  [our=@p id=@uv run=run-id]
   ^-  card
   (content-poke our id run [%forget id])
+::
+++  forget-discovery-card
+  |=  [our=@p id=@uv run=run-id]
+  ^-  card
+  (discovery-poke our id run [%forget id])
+::
+::  Topic-discovery result encoding.
+++  topic-json
+  |=  topic=(list @tas)
+  ^-  json
+  a+(turn topic |=(segment=@tas s+(@t segment)))
+::
+++  catalog-json
+  |=  record=catalog-record:cd
+  ^-  json
+  %-  pairs:enjs:format
+  :~  ['publisher' (text-number %ux publisher.body.record)]
+      ['revision' (number-json revision.body.record)]
+      ['format' s+(@t format.catalog.body.record)]
+      ['content' (text-number %uv digest.catalog.body.record)]
+      ['entries' (number-json entries.catalog.body.record)]
+  ==
+::
+++  child-json
+  |=  child=child-selection:cd
+  ^-  json
+  =/  supporters=(list node-id)  ~(tap in supporters.child)
+  %-  pairs:enjs:format
+  :~  ['name' s+(@t name.child)]
+      ['supporters' a+(turn supporters |=(id=node-id (text-number %ux id)))]
+  ==
+::
+++  identity-json
+  |=  identity=record-identity:cd
+  ^-  json
+  ?-  -.identity
+    %catalog
+      %-  pairs:enjs:format
+      ~[['type' s+'catalog'] ['publisher' (text-number %ux publisher.identity)]]
+    %edge
+      %-  pairs:enjs:format
+      :~  ['type' s+'edge']
+          ['publisher' (text-number %ux publisher.identity)]
+          ['source' (topic-json source.identity)]
+      ==
+  ==
 ::
 ::  Transfer scheduler.
 ++  install-fetch
@@ -430,6 +482,45 @@
       =/  started=action  (start-pointer-query our.bowl run publisher.query namespace.query name.query)
       [[begun cards.started] next.started]
   ==
+::
+++  start-topic-advertisement
+  |=  $:  =bowl:gall
+          run=run-id
+          content=digest
+          topic=(list @tas)
+          format=@tas
+          revision=@ud
+      ==
+  ^-  action
+  =/  res=(unit resource)  (~(get by resources.state) content)
+  ?~  res  (finish run | ~[['reason' s+'unknown-resource']])
+  =/  op=operation  [[%advertise-topic content topic] now.bowl]
+  =.  state  (put-op run op)
+  =/  allocated=allocation  allocate-content
+  =.  state  next.allocated
+  =/  id=@uv  id.allocated
+  =/  expires=@da  (add now.bowl ~d1)
+  :-  :~  (phase-card run %started ~[['kind' s+'advertise-topic']])
+          (phase-card run %topic-advertise-started ~[['topic' (topic-json topic)]])
+          (discovery-poke our.bowl id run [%observe id %kademlia-demo /topic-advertise/(scot %uv id)/[run]])
+          (discovery-poke our.bowl id run [%advertise id topic format content 1 revision expires])
+      ==
+  state
+::
+++  start-topic-browse
+  |=  [=bowl:gall run=run-id topic=(list @tas)]
+  ^-  action
+  =/  op=operation  [[%browse-topic topic] now.bowl]
+  =.  state  (put-op run op)
+  =/  allocated=allocation  allocate-content
+  =.  state  next.allocated
+  =/  id=@uv  id.allocated
+  :-  :~  (phase-card run %started ~[['kind' s+'browse-topic']])
+          (phase-card run %topic-browse-started ~[['topic' (topic-json topic)]])
+          (discovery-poke our.bowl id run [%observe id %kademlia-demo /topic-browse/(scot %uv id)/[run]])
+          (discovery-poke our.bowl id run [%browse id topic])
+      ==
+  state
 --
 ::
 ^-  agent:gall
@@ -480,6 +571,7 @@
         =/  cards=(list card)
           :~  (kademlia-poke our.bowl %reset [%reset ~])
               (local-poke our.bowl %content-routing %content-routing-command !>(`content-command`[%reset ~]) /content/reset)
+              (local-poke our.bowl %content-discovery %content-discovery-command !>(`discovery-command:cda`[%reset ~]) /discovery/reset)
               (fact (snapshot-json bowl))
           ==
         [(weld cancel (weld culls cards)) this]
@@ -514,16 +606,40 @@
           [cards.rejected this(state next.rejected)]
         =/  action=action  (start-fetch bowl run.command query.command)
         [cards.action this(state next.action)]
+      %advertise-topic
+        ?:  (~(has by active.state) run.command)
+          =/  rejected=action  (reject run.command 'run-already-active')
+          [cards.rejected this(state next.rejected)]
+        ?.  (lth (lent ~(tap by active.state)) max-active.config.state)
+          =/  rejected=action  (reject run.command 'too-many-active-operations')
+          [cards.rejected this(state next.rejected)]
+        =/  action=action
+          %-  start-topic-advertisement
+          [bowl run.command content.command topic.command format.command revision.command]
+        [cards.action this(state next.action)]
+      %browse-topic
+        ?:  (~(has by active.state) run.command)
+          =/  rejected=action  (reject run.command 'run-already-active')
+          [cards.rejected this(state next.rejected)]
+        ?.  (lth (lent ~(tap by active.state)) max-active.config.state)
+          =/  rejected=action  (reject run.command 'too-many-active-operations')
+          [cards.rejected this(state next.rejected)]
+        =/  action=action  (start-topic-browse bowl run.command topic.command)
+        [cards.action this(state next.action)]
       %cancel
         =.  state  (drop-run-requests run.command)
         =.  active.state  (~(del by active.state) run.command)
         [[(phase-card run.command %cancelled ~) ~] this]
       %network
+        =/  discovery-config=discovery-config:cda
+          [20 3 12 request-timeout.command ~d1 ~h12 8 65.536 64 8 10.000]
         =/  cards=(list card)
           :~  (kademlia-poke our.bowl %seeds [%set-seeds seeds.command])
               (kademlia-poke our.bowl %request-timeout [%set-request-timeout request-timeout.command])
               (kademlia-poke our.bowl %refresh-interval [%set-refresh-interval refresh-interval.command])
               (kademlia-poke our.bowl %verbosity [%set-verbosity verbosity.command])
+              (discovery-poke our.bowl 0v0 %network-config [%set-config discovery-config])
+              (discovery-poke our.bowl 0v0 %network-verbosity [%set-verbosity verbosity.command])
           ==
         [cards this]
     ==
@@ -671,6 +787,82 @@
             (finish run | ~[['reason' s+'publication-rejected']])
             (finish run & ~[['content' (text-number %uv content.pub)]])
         [(weld forget cards.finished) this(state next.finished)]
+    ==
+  ::
+      %content-discovery-result
+    =/  notice=operation-notice:cda  !<(operation-notice:cda vase)
+    ?>  =(src.bowl our.bowl)
+    ?>  ?=([@ @ @ ~] reply-path.notice)
+    =/  tag=@tas  i.reply-path.notice
+    =/  id=(unit @uv)  (slaw %uv i.t.reply-path.notice)
+    =/  run=run-id  i.t.t.reply-path.notice
+    =/  forget=(list card)
+      ?~(id ~ ~[(forget-discovery-card our.bowl u.id run)])
+    =/  respond
+      |=  result=action
+      ^-  (quip card _this)
+      [(weld forget cards.result) this(state next.result)]
+    ?+  tag  [forget this]
+      %topic-advertise
+        =/  op=(unit operation)  (get-op run)
+        ?~  op  [forget this]
+        ?.  ?=(%advertise-topic -.kind.u.op)  [forget this]
+        ?.  ?=(%advertised -.result.notice)
+          (respond (finish run | ~[['reason' s+'topic-advertisement-failed']]))
+        =/  results=(list publication-result:cda)  records.value.result.notice
+        =/  accepted=@ud
+          %+  roll  results
+          |=  [item=publication-result:cda total=@ud]
+          (add total (lent ~(tap in accepted.item)))
+        =/  rejected=@ud
+          %+  roll  results
+          |=  [item=publication-result:cda total=@ud]
+          (add total (lent ~(tap by rejected.item)))
+        =/  timed-out=@ud
+          %+  roll  results
+          |=  [item=publication-result:cda total=@ud]
+          (add total (lent ~(tap in timed-out.item)))
+        =/  complete=card
+          %-  phase-card
+          :*  run  %topic-advertise-complete
+              ~[ ['records' (number-json (lent results))]
+                 ['accepted' (number-json accepted)]
+                 ['rejected' (number-json rejected)]
+                 ['timedOut' (number-json timed-out)]
+               ]
+          ==
+        =/  finished=action
+          (finish run & ~[['content' (text-number %uv content.kind.u.op)] ['topic' (topic-json topic.kind.u.op)]])
+        [(weld forget [complete cards.finished]) this(state next.finished)]
+      %topic-browse
+        =/  op=(unit operation)  (get-op run)
+        ?~  op  [forget this]
+        ?.  ?=(%browse-topic -.kind.u.op)  [forget this]
+        ?.  ?=(%topic -.result.notice)
+          (respond (finish run | ~[['reason' s+'topic-browse-failed']]))
+        =/  selected=topic-selection:cd  selection.value.result.notice
+        =/  catalogs=(list json)
+          (turn catalogs.selected |=(record=catalog-record:cd (catalog-json record)))
+        =/  children=(list json)
+          (turn children.selected |=(child=child-selection:cd (child-json child)))
+        =/  conflicts=(list json)
+          %+  turn  ~(tap in conflicts.selected)
+          |=  identity=record-identity:cd
+          (identity-json identity)
+        =/  complete=card
+          %-  phase-card
+          :*  run  %topic-browse-complete
+              ~[ ['topic' (topic-json topic.value.result.notice)]
+                 ['catalogs' a+catalogs]
+                 ['children' a+children]
+                 ['conflicts' a+conflicts]
+                 ['responders' (number-json (lent ~(tap in responders.value.result.notice)))]
+                 ['timedOut' (number-json (lent ~(tap in timed-out.value.result.notice)))]
+               ]
+          ==
+        =/  finished=action
+          (finish run & ~[['catalogCount' (number-json (lent catalogs))] ['childCount' (number-json (lent children))]])
+        [(weld forget [complete cards.finished]) this(state next.finished)]
     ==
   ::
       %kademlia-demo-message
@@ -891,6 +1083,12 @@
     ?~  run  `this
     ?~  (get-op u.run)  `this
     =/  failed=action  (finish u.run | ~[['reason' s+'content-routing-unavailable']])
+    [cards.failed this(state next.failed)]
+  ?:  ?=([%discovery @ @ ~] wire)
+    =/  run=(unit @tas)  (slaw %tas i.t.t.wire)
+    ?~  run  `this
+    ?~  (get-op u.run)  `this
+    =/  failed=action  (finish u.run | ~[['reason' s+'content-discovery-unavailable']])
     [cards.failed this(state next.failed)]
   ?:  ?=([%peer @ @ ~] wire)
     =/  id=(unit @uv)  (slaw %uv i.t.t.wire)

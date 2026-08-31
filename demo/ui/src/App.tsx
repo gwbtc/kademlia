@@ -44,9 +44,12 @@ export default function App() {
   const [resourceName, setResourceName] = useState('latest');
   const [publishName, setPublishName] = useState(true);
   const [publishTransport, setPublishTransport] = useState<'custom' | 'scry'>('custom');
+  const [topic, setTopic] = useState('software/urbit/hoon');
+  const [catalogFormat, setCatalogFormat] = useState('kademlia-demo-resource-v1');
+  const [topicRevision, setTopicRevision] = useState(1);
   const [seeds, setSeeds] = useState('');
   const [verbosity, setVerbosity] = useState('info');
-  const [batchScenario, setBatchScenario] = useState<'lookup' | 'fetch-content'>('fetch-content');
+  const [batchScenario, setBatchScenario] = useState<'lookup' | 'fetch-content' | 'browse-topic'>('fetch-content');
   const [repetitions, setRepetitions] = useState(10);
   const [warmups, setWarmups] = useState(2);
   const [batchRunning, setBatchRunning] = useState(false);
@@ -177,6 +180,28 @@ export default function App() {
     await start('fetch by name', { action: 'fetch-name', publisher, namespace, name: resourceName });
   }
 
+  function topicSegments(): string[] {
+    return topic.split('/').map((segment) => segment.trim()).filter(Boolean);
+  }
+
+  async function submitAdvertiseTopic(event: FormEvent) {
+    event.preventDefault();
+    if (!digest || topicSegments().length === 0) return;
+    await start('advertise topic catalog', {
+      action: 'advertise-topic',
+      content: digest,
+      topic: topicSegments(),
+      format: catalogFormat,
+      revision: topicRevision
+    });
+  }
+
+  async function submitBrowseTopic(event: FormEvent) {
+    event.preventDefault();
+    if (topicSegments().length === 0) return;
+    await start('browse topic', { action: 'browse-topic', topic: topicSegments() });
+  }
+
   async function submitNetwork(event: FormEvent) {
     event.preventDefault();
     await command({
@@ -214,7 +239,9 @@ export default function App() {
       for (let index = 0; index < total; index += 1) {
         const body = batchScenario === 'lookup'
           ? { action: 'lookup', target: lookupShip }
-          : { action: 'fetch-content', content: digest };
+          : batchScenario === 'browse-topic'
+            ? { action: 'browse-topic', topic: topicSegments() }
+            : { action: 'fetch-content', content: digest };
         const run = await start(`${batchScenario}${index < warmups ? ' warmup' : ''}`, body);
         await awaitRun(run);
       }
@@ -230,6 +257,7 @@ export default function App() {
     item.phase === 'complete' || item.phase === 'failed' || item.phase === 'cancelled'
   )?.event;
   const terminalReason = typeof terminalEvent?.reason === 'string' ? terminalEvent.reason : undefined;
+  const topicResult = selectedRun?.phases.slice().reverse().find((item) => item.phase === 'topic-browse-complete')?.event;
   const measuredRuns = useMemo(() => runs.filter((run) => !run.scenario.includes('warmup')), [runs]);
   const stats = useMemo(() => summarize(measuredRuns), [measuredRuns]);
   const maxPhase = selectedRun ? Math.max(1, ...selectedRun.phases.map((phase) => phase.at - selectedRun.startedAt)) : 1;
@@ -240,7 +268,7 @@ export default function App() {
         <div>
           <p className="eyebrow">Urbit overlay instrumentation</p>
           <h1>Kademlia <span>Lab</span></h1>
-          <p className="lede">Publish deterministic resources, resolve them across the overlay, and time every boundary from the browser.</p>
+          <p className="lede">Publish deterministic resources, advertise and browse hierarchical topics, and time every overlay boundary from the browser.</p>
         </div>
         <div className="status-card">
           <span className={`status-dot ${snapshot ? 'online' : ''}`} />
@@ -280,6 +308,21 @@ export default function App() {
             <label className="check"><input type="checkbox" checked={publishName} onChange={(e) => setPublishName(e.target.checked)} /> publish named pointer</label>
             {publishName && <div className="row"><input value={namespace} onChange={(e) => setNamespace(e.target.value)} placeholder="namespace" /><input value={resourceName} onChange={(e) => setResourceName(e.target.value)} placeholder="name" /></div>}
             <button disabled={!digest}>Publish records</button>
+          </form>
+
+          <form onSubmit={submitAdvertiseTopic}>
+            <h3>Advertise topic catalog</h3>
+            <ResourceSelect resources={resources} value={digest} onChange={setDigest} />
+            <label>Topic path<input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="software/urbit/hoon" /></label>
+            <div className="row"><label>Catalog format<input value={catalogFormat} onChange={(e) => setCatalogFormat(e.target.value)} /></label><label>Revision<input type="number" min="0" value={topicRevision} onChange={(e) => setTopicRevision(Number(e.target.value))} /></label></div>
+            <p className="form-note">Publish the resource records first. Its digest is then advertised as an opaque catalog, with parent edges generated automatically.</p>
+            <button disabled={!digest || topicSegments().length === 0}>Advertise catalog</button>
+          </form>
+
+          <form onSubmit={submitBrowseTopic}>
+            <h3>Browse exact topic</h3>
+            <label>Topic path<input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="software/urbit" /></label>
+            <button disabled={topicSegments().length === 0}>Find catalogs and children</button>
           </form>
 
           <form onSubmit={submitFetchDigest}>
@@ -324,13 +367,17 @@ export default function App() {
               <Metric label="First byte" value={formatMs(phaseDuration(selectedRun, 'first-byte'))} compact />
               <Metric label="Verified" value={formatMs(phaseDuration(selectedRun, 'verify-complete'))} compact />
             </div>
+            {topicResult && <TopicResult event={topicResult} onFetch={(content) => {
+              setDigest(content);
+              void start('fetch discovered catalog', { action: 'fetch-content', content });
+            }} />}
           </>}
         </section>
 
         <section className="panel benchmark">
           <div className="panel-heading"><h2>Batch runner</h2><span>serial</span></div>
-          <div className="row"><select value={batchScenario} onChange={(e) => setBatchScenario(e.target.value as typeof batchScenario)}><option value="fetch-content">Fetch content</option><option value="lookup">Node lookup</option></select><label>Runs<input type="number" min="1" max="100" value={repetitions} onChange={(e) => setRepetitions(Number(e.target.value))} /></label><label>Warmups<input type="number" min="0" max="10" value={warmups} onChange={(e) => setWarmups(Number(e.target.value))} /></label></div>
-          <button onClick={runBatch} disabled={batchRunning || (batchScenario === 'fetch-content' && !digest)}>{batchRunning ? 'Running…' : 'Run benchmark'}</button>
+          <div className="row"><select value={batchScenario} onChange={(e) => setBatchScenario(e.target.value as typeof batchScenario)}><option value="fetch-content">Fetch content</option><option value="browse-topic">Browse topic</option><option value="lookup">Node lookup</option></select><label>Runs<input type="number" min="1" max="100" value={repetitions} onChange={(e) => setRepetitions(Number(e.target.value))} /></label><label>Warmups<input type="number" min="0" max="10" value={warmups} onChange={(e) => setWarmups(Number(e.target.value))} /></label></div>
+          <button onClick={runBatch} disabled={batchRunning || (batchScenario === 'fetch-content' && !digest) || (batchScenario === 'browse-topic' && topicSegments().length === 0)}>{batchRunning ? 'Running…' : 'Run benchmark'}</button>
           <div className="history">
             {runs.slice(0, 12).map((run) => <button className={run.id === selectedRun?.id ? 'selected' : ''} key={run.id} onClick={() => setSelected(run.id)}><span>{run.scenario}</span><small>{run.status}</small><b>{formatMs(run.endedAt ? run.endedAt - run.startedAt : undefined)}</b></button>)}
           </div>
@@ -346,13 +393,41 @@ export default function App() {
           </form>
           <div className="danger-zone">
             <button className="destructive" type="button" disabled={batchRunning} onClick={resetAllState}>Clear all state</button>
-            <small>Resets the demo, routing table, seeds, content records, active operations, and saved profiling history on this ship.</small>
+            <small>Resets the demo, routing table, seeds, content and discovery records, active operations, and saved profiling history on this ship.</small>
           </div>
-          <p className="hint">Request timeout: 30 s · bucket refresh: 1 h. The Kademlia and content-routing desks must be installed on this ship.</p>
+          <p className="hint">Request timeout: 30 s · bucket refresh: 1 h. The Kademlia, content-routing, and content-discovery agents must be installed on this ship.</p>
         </section>
       </div>
     </main>
   );
+}
+
+interface TopicCatalog {
+  publisher: string;
+  revision: number;
+  format: string;
+  content: string;
+  entries: number;
+}
+
+interface TopicChild {
+  name: string;
+  supporters: string[];
+}
+
+function TopicResult({ event, onFetch }: { event: PhaseEvent; onFetch: (content: string) => void }) {
+  const catalogs = Array.isArray(event.catalogs) ? event.catalogs as TopicCatalog[] : [];
+  const children = Array.isArray(event.children) ? event.children as TopicChild[] : [];
+  const conflicts = Array.isArray(event.conflicts) ? event.conflicts : [];
+  const topic = Array.isArray(event.topic) ? event.topic.join('/') : '';
+  return <div className="topic-result">
+    <div className="topic-result-heading"><strong>/{topic}</strong><span>{String(event.responders ?? 0)} responders · {String(event.timedOut ?? 0)} timed out</span></div>
+    <div className="topic-columns">
+      <div><h3>Catalogs <b>{catalogs.length}</b></h3>{catalogs.length === 0 ? <p>None at this exact path.</p> : catalogs.map((catalog) => <article key={`${catalog.publisher}-${catalog.revision}`}><strong>{catalog.format}</strong><small>{catalog.publisher} · revision {catalog.revision} · {catalog.entries} entries</small><code>{catalog.content}</code><button type="button" onClick={() => onFetch(catalog.content)}>Fetch catalog</button></article>)}</div>
+      <div><h3>Immediate children <b>{children.length}</b></h3>{children.length === 0 ? <p>None.</p> : children.map((child) => <article key={child.name}><strong>/{child.name}</strong><small>{child.supporters.length} authenticated supporter{child.supporters.length === 1 ? '' : 's'}</small></article>)}</div>
+    </div>
+    {conflicts.length > 0 && <div className="topic-conflicts">{conflicts.length} conflicting record identit{conflicts.length === 1 ? 'y' : 'ies'}</div>}
+  </div>;
 }
 
 function Metric({ label, value, danger, compact }: { label: string; value: string; danger?: boolean; compact?: boolean }) {

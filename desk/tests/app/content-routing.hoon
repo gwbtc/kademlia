@@ -188,9 +188,9 @@
   =/  cfg=config  [20 20 3 12 %kademlia-urbit-v1]
   =/  peer=node-id  (~(ship-to-node kad cfg) ~nec)
   =.  pending.state
-    (~(put by pending.state) 0v3 `pending-content-request`[0v30 peer %.y +(now)])
+    (~(put by pending.state) 0v3 `pending-content-request`[0v30 peer %.y +(now) 0])
   =.  pending.state
-    (~(put by pending.state) 0v4 `pending-content-request`[0v40 peer %.n +(now)])
+    (~(put by pending.state) 0v4 `pending-content-request`[0v40 peer %.n +(now) 0])
   =.  pending-count.state  2
   =/  records-message=content-message
     [%records %content-routing-v1 0v3 1 0]

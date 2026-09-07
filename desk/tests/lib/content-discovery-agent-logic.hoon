@@ -1,4 +1,4 @@
-/-  *kademlia, *content-routing, *content-discovery, *content-discovery-agent
+/-  *kademlia, *content-routing, *content-discovery, *content-discovery-agent, *bounded-poke
 /+  logic=content-discovery-agent-logic, discovery=content-discovery, *test
 |%
 ++  now  ~2026.8.30
@@ -134,5 +134,22 @@
     (expect !>(?=(%| -.attempt)))
     %+  expect-eq  !>(1)
     !>((lent ~(tap by origins.state)))
+  ==
+::
+++  test-responses-share-peer-gate
+  =/  state=discovery-state  initial
+  =/  message=discovery-message
+    [%stored %content-discovery-v1 0v1 [%accepted ~]]
+  =/  first=[(list card:agent:gall) discovery-state]
+    (~(send-response logic [~zod now ~zod state allow]) ~nec 0v1 message)
+  =/  second=[(list card:agent:gall) discovery-state]
+    (~(send-response logic [~zod now ~zod +.first allow]) ~nec 0v2 message)
+  =/  peer=peer-delivery  (need (~(get by peers.outbound.+.second) ~nec))
+  ;:  weld
+    (expect !>(?=(^ active.peer)))
+    %+  expect-eq  !>(1)
+    !>((lent responses.peer))
+    %+  expect-eq  !>(0)
+    !>((lent requests.peer))
   ==
 --

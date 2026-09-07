@@ -92,14 +92,6 @@
     |
   &
 ::
-++  send-message
-  |=  [ship=@p message=discovery-message]
-  ^-  card
-  :*  %pass  /peer/(scot %p ship)
-      %agent  [ship %content-discovery]
-      %poke  %content-discovery-message  !>(message)
-  ==
-::
 ++  records-for
   |=  [=bowl:gall state=discovery-state topic=topic-path]
   ^-  records
@@ -233,12 +225,11 @@
     ?-  -.command
       %reset
         =/  old-refresh=@da  refresh-at.state
-        =.  state  ~(init logic engine)
+        =^  delivery-cards  state  ~(reset-state logic engine)
         =.  verbosity  %off
         :_  this
-        :~  [%pass /refresh %arvo %b %rest old-refresh]
-            ~(refresh-card logic engine)
-        ==
+        %+  weld  ~[[%pass /refresh %arvo %b %rest old-refresh]]
+        (weld delivery-cards [~(refresh-card logic engine) ~])
       %advertise
         ?>  (~(valid-id logic engine) id.command)
         ?>  (topic-valid:cd topic.command)
@@ -339,7 +330,9 @@
         =.  state  +.stored
         =/  ignored  (log bowl %debug [%peer-store src.bowl id.message -.stored])
         =/  response=discovery-message  [%stored %content-discovery-v1 id.message -.stored]
-        [[(send-message src.bowl response) ~] this]
+        =^  cards  state
+          (~(send-response logic engine) src.bowl id.message response)
+        [cards this]
       %find-topic
         ?.  (~(valid-id logic engine) id.message)  `this
         ?.  (~(valid-query logic engine) topic.message)  `this
@@ -349,7 +342,9 @@
           (log bowl %debug [%peer-find-topic src.bowl id.message topic.message count.packed])
         =/  response=discovery-message
           [%topic-records %content-discovery-v1 id.message count.packed payload.packed]
-        [[(send-message src.bowl response) ~] this]
+        =^  cards  state
+          (~(send-response logic engine) src.bowl id.message response)
+        [cards this]
       %stored
         ?.  (~(response-expected logic engine) id.message %.n)  `this
         =/  ignored  (log bowl %debug [%peer-stored src.bowl id.message status.message])
@@ -409,14 +404,17 @@
 ++  on-agent
   |=  [=wire =sign:agent:gall]
   ^-  (quip card _this)
-  ?.  ?=([%request @ ~] wire)  (on-agent:def wire sign)
+  ?.  ?=([%delivery @ @ ~] wire)  (on-agent:def wire sign)
   ?.  ?=(%poke-ack -.sign)  (on-agent:def wire sign)
-  ?~  p.sign  `this
-  =/  request=(unit @uv)  (slaw %uv i.t.wire)
-  ?~  request  `this
+  =/  peer=(unit @p)  (slaw %p i.t.wire)
+  =/  id=(unit @ud)  (slaw %ud i.t.t.wire)
+  ?~  peer  `this
+  ?~  id  `this
   =/  transition=[cards=(list card) update=operation-update]
-    (~(fail-request logic engine) u.request &)
-  =/  ignored  (log bowl %debug [%request-poke-failed u.request])
+    (~(delivery-ack logic engine) u.peer u.id p.sign)
+  =/  ignored
+    ?~  p.sign  ~
+    (log bowl %debug [%delivery-poke-failed u.peer u.id])
   =^  cards  state
     (apply-operation-transition bowl transition)
   [cards this]
@@ -427,6 +425,17 @@
   ?:  =(/refresh wire)
     ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
     =^  cards  state  ~(refresh-origins logic engine)
+    [cards this]
+  ?:  ?=([%delivery-expire @ @ ~] wire)
+    ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
+    =/  peer=(unit @p)  (slaw %p i.t.wire)
+    =/  deadline=(unit @da)  (slaw %da i.t.t.wire)
+    ?~  peer  `this
+    ?~  deadline  `this
+    =/  transition=[cards=(list card) update=operation-update]
+      (~(delivery-expire logic engine) u.peer u.deadline)
+    =^  cards  state
+      (apply-operation-transition bowl transition)
     [cards this]
   ?.  ?=([%timeout @ ~] wire)  (on-arvo:def wire sign-arvo)
   ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)

@@ -1,6 +1,6 @@
 ::  Content-record transport protocol and persistent-state molds.
 ::
-/-  *kademlia, *kademlia-agent, *content-routing
+/-  *kademlia, *kademlia-agent, *content-routing, *bounded-poke
 |%
 +$  content-version  @tas
 +$  operation-id     @uv
@@ -120,6 +120,7 @@
       peer=node-id
       kind=?                                      :: %.n store, %.y query
       deadline=@da
+      delivery=delivery-id
   ==
 +$  content-state
   $:  config=content-config
@@ -138,6 +139,7 @@
       ready=(qeu operation-id)
       queued=(set operation-id)
       refresh-queue=(list key)
+      outbound=delivery-state
   ==
 +$  operation-update
   [completions=(list operation-completion) state=content-state]

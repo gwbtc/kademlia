@@ -85,9 +85,11 @@
         =/  cancel=(list card)
           ?~  refresh-at.state  ~
           ~[[%pass /refresh/(scot %da u.refresh-at.state) %arvo %b %rest u.refresh-at.state]]
-        =.  state  ~(init logic [our.bowl now.bowl src.bowl state])
+        =^  delivery-cards  state
+          ~(reset-state logic [our.bowl now.bowl src.bowl state])
         =.  verbosity  %off
-        [(weld cancel ~(refresh-card logic [our.bowl now.bowl src.bowl state])) this]
+        :_  this
+        (weld cancel (weld delivery-cards ~(refresh-card logic [our.bowl now.bowl src.bowl state])))
       %set-seeds
         =/  ignored  (log bowl %info [%seeds-set (lent ships.command)])
         =.  state  (~(set-seeds logic [our.bowl now.bowl src.bowl state]) ships.command)
@@ -183,14 +185,17 @@
 ++  on-agent
   |=  [=wire =sign:agent:gall]
   ^-  (quip card _this)
-  ?.  ?=([%request @ ~] wire)  (on-agent:def wire sign)
+  ?.  ?=([%delivery @ @ ~] wire)  (on-agent:def wire sign)
   ?.  ?=(%poke-ack -.sign)  (on-agent:def wire sign)
-  ?~  p.sign  `this
-  =/  request=(unit @uv)  (slaw %uv i.t.wire)
-  ?~  request  `this
-  =/  ignored  (log bowl %debug [%request-poke-failed u.request])
+  =/  peer=(unit @p)  (slaw %p i.t.wire)
+  =/  id=(unit @ud)  (slaw %ud i.t.t.wire)
+  ?~  peer  `this
+  ?~  id  `this
+  =/  ignored
+    ?~  p.sign  ~
+    (log bowl %debug [%delivery-poke-failed u.peer u.id])
   =/  transition=[cards=(list card) update=lookup-update]
-    (~(fail-request logic [our.bowl now.bowl src.bowl state]) u.request &)
+    (~(delivery-ack logic [our.bowl now.bowl src.bowl state]) u.peer u.id p.sign)
   =^  cards  state  (apply-lookup-transition bowl transition)
   [cards this]
 ::
@@ -204,6 +209,15 @@
     =/  ignored  (log bowl %debug [%refresh-wake u.deadline])
     =^  cards  state
       (~(run-refresh logic [our.bowl now.bowl src.bowl state]) u.deadline eny.bowl)
+    [cards this]
+  ?:  ?=([%delivery-expire @ @ ~] wire)
+    ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
+    =/  peer=(unit @p)  (slaw %p i.t.wire)
+    =/  deadline=(unit @da)  (slaw %da i.t.t.wire)
+    ?~  peer  `this
+    ?~  deadline  `this
+    =^  cards  state
+      (~(delivery-expire logic [our.bowl now.bowl src.bowl state]) u.peer u.deadline)
     [cards this]
   ?.  ?=([%timeout @ ~] wire)  (on-arvo:def wire sign-arvo)
   ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)

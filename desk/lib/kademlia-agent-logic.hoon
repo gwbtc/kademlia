@@ -1,7 +1,7 @@
 ::  Pure state transitions and card construction for the Kademlia agent.
 ::
-/-  *kademlia, *kademlia-agent
-/+  kad=kademlia
+/-  *kademlia, *kademlia-agent, *bounded-poke
+/+  kad=kademlia, delivery=bounded-poke
 =/  cfg=config  [20 20 3 12 %kademlia-urbit-v1]
 =/  protocol=protocol-version  %kademlia-v1
 =/  default-request-timeout=@dr  ~m5
@@ -73,7 +73,18 @@
       ~  0v1
       `(add default-refresh-interval now)
       ~
+      ~(init delivery [now *delivery-state])
   ==
+::
+::  reset-state: reset protocol state without forgetting Gall pokes already sent.
+::
+++  reset-state
+  ^-  [(list card:agent:gall) agent-state]
+  =/  kept=[(list card:agent:gall) delivery-state]
+    ~(reset delivery [now outbound.state])
+  =/  fresh=agent-state  init
+  =.  outbound.fresh  +.kept
+  [-.kept fresh]
 ::
 ::  refresh-card: recreate the one currently expected global refresh wake.
 ::
@@ -107,18 +118,18 @@
   =/  peer=node-id  i.peers
   =^  request  state  take-request-id
   =/  deadline=@da  (add request-timeout.settings.state now)
-  =/  pending=pending-request  [id peer now deadline]
-  =.  pending.state  (~(put by pending.state) request pending)
   =/  ship=@p  (~(node-to-ship kad cfg) peer)
   =/  message=peer-message  [%find-node protocol request target.lup]
-  =/  poke=card:agent:gall
-    :*  %pass  /request/(scot %uv request)
-        %agent  [ship %kademlia]
-        %poke  %kademlia-message  !>(message)
-    ==
+  =/  note=note:agent:gall
+    [%agent [ship %kademlia] %poke %kademlia-message !>(message)]
+  =/  enqueued=[delivery-id delivery-update]
+    (~(enqueue delivery [now outbound.state]) ship deadline [%request request] note)
+  =.  outbound.state  state.+.enqueued
+  =/  pending=pending-request  [id peer now deadline -.enqueued]
+  =.  pending.state  (~(put by pending.state) request pending)
   =/  timer=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %wait deadline]
-  $(peers t.peers, cards [timer poke cards])
+  $(peers t.peers, cards (weld cards.+.enqueued [timer cards]))
 ::
 ++  fail-request
   |=  [request=request-id cancel=?]
@@ -127,6 +138,10 @@
   =/  pending=(unit pending-request)  (~(get by pending.state) request)
   ?~  pending  [~ ~ state]
   =/  pen=pending-request  u.pending
+  =/  ship=@p  (~(node-to-ship kad cfg) peer.pen)
+  =/  dropped=delivery-update
+    (~(cancel delivery [now outbound.state]) ship delivery.pen)
+  =.  outbound.state  state.dropped
   =.  pending.state  (~(del by pending.state) request)
   =/  cancellation=(list card:agent:gall)
     ?:  cancel
@@ -134,6 +149,7 @@
       ==
     ~
   =/  active=(unit lookup)  (~(get by active.state) lookup.pen)
+  =.  cancellation  (weld cards.dropped cancellation)
   ?~  active  [cancellation ~ state]
   =/  failed=[routing=table state=lookup]
     (~(timeout kad cfg) self-id peer.pen max-fails routing.state u.active)
@@ -207,12 +223,38 @@
   =/  ids=(list node-id)  (turn nearest |=(con=contact id.con))
   =/  payload=[count=@ud packed=@]  (pack-nodes ids)
   =/  message=peer-message  [%nodes protocol request count.payload packed.payload]
-  :-  :~  :*  %pass  /response/(scot %uv request)
-             %agent  [src %kademlia]
-             %poke  %kademlia-message  !>(message)
-         ==
-      ==
-  state
+  =/  deadline=@da  (add request-timeout.settings.state now)
+  =/  note=note:agent:gall
+    [%agent [src %kademlia] %poke %kademlia-message !>(message)]
+  =/  enqueued=[delivery-id delivery-update]
+    (~(enqueue delivery [now outbound.state]) src deadline [%response request] note)
+  =.  outbound.state  state.+.enqueued
+  [cards.+.enqueued state]
+::
+::  delivery-ack: release a peer gate and apply a request nack if still live.
+::
+++  delivery-ack
+  |=  [peer=@p id=delivery-id error=(unit tang)]
+  ^-  [(list card:agent:gall) lookup-update]
+  =/  updated=delivery-update
+    (~(acknowledge delivery [now outbound.state]) peer id error)
+  =.  outbound.state  state.updated
+  ?~  acked.updated  [cards.updated ~ state]
+  ?~  error.u.acked.updated  [cards.updated ~ state]
+  ?.  ?=(%request -.context.u.acked.updated)  [cards.updated ~ state]
+  =/  failed=[(list card:agent:gall) lookup-update]
+    (fail-request id.context.u.acked.updated &)
+  [(weld cards.updated -.failed) +.failed]
+::
+::  delivery-expire: discard expired local queue entries for one peer.
+::
+++  delivery-expire
+  |=  [peer=@p deadline=@da]
+  ^-  [(list card:agent:gall) agent-state]
+  =/  updated=delivery-update
+    (~(expire delivery [now outbound.state]) peer deadline)
+  =.  outbound.state  state.updated
+  [cards.updated state]
 ::
 ++  set-seeds
   |=  ships=(list @p)

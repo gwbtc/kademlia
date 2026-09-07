@@ -1,4 +1,4 @@
-/-  *kademlia, *kademlia-agent
+/-  *kademlia, *kademlia-agent, *bounded-poke
 /+  logic=kademlia-agent-logic, kad=kademlia, *test
 |%
 ++  now  ~2026.8.4..12.00.00
@@ -21,6 +21,11 @@
   |=  state=agent-state
   ^-  [request-id pending-request]
   (head ~(tap by pending.state))
+::
+++  outbound-for
+  |=  [ship=@p state=agent-state]
+  ^-  peer-delivery
+  (need (~(get by peers.outbound.state) ship))
 ::
 ++  test-init-and-seeds
   =/  state=agent-state  (initial ~zod ~zod)
@@ -56,7 +61,7 @@
 ++  test-request-id-wrap-skips-pending
   =/  state=agent-state  (initial ~zod ~zod)
   =/  max=request-id  ;;(@uv (dec (pow 2 64)))
-  =/  pen=pending-request  [0v9 (node ~nec) now +(now)]
+  =/  pen=pending-request  [0v9 (node ~nec) now +(now) 0]
   =.  pending.state  (~(put by pending.state) max pen)
   =.  pending.state  (~(put by pending.state) ;;(@uv 0) pen)
   =.  next-request.state  max
@@ -464,6 +469,63 @@
     !>(-.failed)
     %+  expect-eq  !>(0)
     !>((pending-count state.+.failed))
+  ==
+::
+++  test-per-peer-delivery-gates-and-promotes-lookups
+  =/  state=agent-state  (initial ~zod ~zod)
+  =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
+  =/  first=[(list card:agent:gall) lookup-update]
+    (~(start logic [~zod now ~zod state]) 0v30 0x1234)
+  =/  second=[(list card:agent:gall) lookup-update]
+    (~(start logic [~zod now ~zod state.+.first]) 0v31 0x1234)
+  =/  before=peer-delivery  (outbound-for ~nec state.+.second)
+  ?>  ?=(^ active.before)
+  ?>  ?=(^ requests.before)
+  =/  active-request=request-id  id.context.u.active.before
+  =/  active-delivery-id=delivery-id  id.u.active.before
+  =/  queued-request=request-id  id.context.i.requests.before
+  =/  timed=[(list card:agent:gall) lookup-update]
+    (~(fail-request logic [~zod (add ~s1 now) ~zod state.+.second]) active-request |)
+  =/  after-timeout=peer-delivery  (outbound-for ~nec state.+.timed)
+  =/  acknowledged=[(list card:agent:gall) lookup-update]
+    (~(delivery-ack logic [~zod (add ~s2 now) ~zod state.+.timed]) ~nec active-delivery-id ~)
+  =/  after-ack=peer-delivery  (outbound-for ~nec state.+.acknowledged)
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>((pending-count state.+.second))
+    %+  expect-eq  !>(1)
+    !>((lent requests.before))
+    %+  expect-eq  !>(active.before)
+    !>(active.after-timeout)
+    %+  expect-eq  !>(`(unit active-delivery)`[~ [id.i.requests.before [%request queued-request]]])
+    !>(active.after-ack)
+    %+  expect-eq  !>(0)
+    !>((lent requests.after-ack))
+    %+  expect-eq  !>(1)
+    !>((pending-count state.+.acknowledged))
+  ==
+::
+++  test-queued-lookup-timeout-removes-only-queued-delivery
+  =/  state=agent-state  (initial ~zod ~zod)
+  =.  state  (~(set-seeds logic [~zod now ~zod state]) [~nec ~])
+  =/  first=[(list card:agent:gall) lookup-update]
+    (~(start logic [~zod now ~zod state]) 0v32 0x1234)
+  =/  second=[(list card:agent:gall) lookup-update]
+    (~(start logic [~zod now ~zod state.+.first]) 0v33 0x1234)
+  =/  before=peer-delivery  (outbound-for ~nec state.+.second)
+  ?>  ?=(^ active.before)
+  ?>  ?=(^ requests.before)
+  =/  queued-request=request-id  id.context.i.requests.before
+  =/  timed=[(list card:agent:gall) lookup-update]
+    (~(fail-request logic [~zod (add ~s1 now) ~zod state.+.second]) queued-request |)
+  =/  after=peer-delivery  (outbound-for ~nec state.+.timed)
+  ;:  weld
+    %+  expect-eq  !>(active.before)
+    !>(active.after)
+    %+  expect-eq  !>(0)
+    !>((lent requests.after))
+    %+  expect-eq  !>(1)
+    !>((pending-count state.+.timed))
   ==
 ::
 ++  test-incoming-find-node

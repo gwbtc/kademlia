@@ -1,6 +1,6 @@
 ::  Topic-discovery peer protocol, operations, and persistent state.
 ::
-/-  *kademlia, *kademlia-agent, *content-routing, *content-discovery
+/-  *kademlia, *kademlia-agent, *content-routing, *content-discovery, *bounded-poke
 |%
 +$  discovery-version  @tas
 +$  operation-id  @uv
@@ -108,6 +108,7 @@
       peer=node-id
       kind=?
       deadline=@da
+      delivery=delivery-id
   ==
 +$  advertise-batch
   $:  tasks=(set operation-id)
@@ -133,6 +134,7 @@
       batches=(map operation-id advertise-batch)
       task-owner=(map operation-id operation-id)
       completed-public=(map operation-id discovery-result)
+      outbound=delivery-state
   ==
 +$  operation-update
   [completions=(list operation-completion) state=discovery-state]

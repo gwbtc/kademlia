@@ -1,4 +1,4 @@
-/-  *kademlia, *kademlia-agent
+/-  *kademlia, *kademlia-agent, *bounded-poke
 /+  kad=kademlia, *test
 /=  agent  /app/kademlia
 |%
@@ -168,6 +168,22 @@
     !>((lent -.out))
     %+  expect-eq  !>(1)
     !>((lent (~(contacts kad [20 20 3 12 %kademlia-urbit-v1]) routing.saved)))
+  ==
+::
+++  test-delivery-ack-releases-peer-gate
+  =/  bol=bowl:gall  (bowl ~zod ~nec ~2026.8.4)
+  =/  initialized  on-init:~(. agent bol)
+  =/  message=peer-message  [%find-node %kademlia-v1 0v7 0x1234]
+  =/  sent  (on-poke:+.initialized %kademlia-message !>(message))
+  =/  before=agent-state  (get-state on-save:+.sent)
+  =/  acknowledged
+    (on-agent:+.sent /delivery/~nec/0 `sign:agent:gall`[%poke-ack ~])
+  =/  after=agent-state  (get-state on-save:+.acknowledged)
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>(~(wyt by peers.outbound.before))
+    %+  expect-eq  !>(0)
+    !>(~(wyt by peers.outbound.after))
   ==
 ::
 ++  test-oversized-local-lookup-id-nacks

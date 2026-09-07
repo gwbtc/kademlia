@@ -1,6 +1,6 @@
 ::  Gall command, peer protocol, and persistent-state molds.
 ::
-/-  *kademlia
+/-  *kademlia, *bounded-poke
 |%
 +$  protocol-version  @tas
 +$  lookup-id         @uv
@@ -31,6 +31,7 @@
       peer=node-id
       sent=@da
       deadline=@da
+      delivery=delivery-id
   ==
 +$  lookup-result
   [target=node-id contacts=(list node-id)]
@@ -65,6 +66,7 @@
       next-lookup=lookup-id
       refresh-at=(unit @da)
       maintenance=(unit lookup-id)
+      outbound=delivery-state
   ==
 +$  lookup-update
   [completion=(unit lookup-id) state=agent-state]

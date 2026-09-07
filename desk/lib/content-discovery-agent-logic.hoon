@@ -1,7 +1,7 @@
 ::  Pure storage and request state transitions for %content-discovery.
 ::
-/-  *kademlia, *kademlia-agent, *content-discovery, *content-discovery-agent
-/+  kad=kademlia, cd=content-discovery
+/-  *kademlia, *kademlia-agent, *content-discovery, *content-discovery-agent, *bounded-poke
+/+  kad=kademlia, cd=content-discovery, delivery=bounded-poke
 =/  kad-cfg=config  [20 20 3 12 %kademlia-urbit-v1]
 =/  protocol=discovery-version  %content-discovery-v1
 =/  defaults=discovery-config  [20 3 12 ~m5 ~d1 ~h12 8 65.536 64 8 10.000]
@@ -133,7 +133,15 @@
 ::
 ++  init
   ^-  discovery-state
-  [defaults ~ 0 ~ ~ ~ ~ 0 0v1 (add refresh.defaults now) 0v1 ~ ~ ~ ~ ~ ~ ~ ~]
+  [defaults ~ 0 ~ ~ ~ ~ 0 0v1 (add refresh.defaults now) 0v1 ~ ~ ~ ~ ~ ~ ~ ~ ~(init delivery [now *delivery-state])]
+::
+++  reset-state
+  ^-  [(list card:agent:gall) discovery-state]
+  =/  kept=[(list card:agent:gall) delivery-state]
+    ~(reset delivery [now outbound.state])
+  =/  fresh=discovery-state  init
+  =.  outbound.fresh  +.kept
+  [-.kept fresh]
 ::
 ++  config-valid
   |=  cfg=discovery-config
@@ -708,21 +716,21 @@
   =^  request  state  take-discovery-request-id
   =/  deadline=@da  (add request-timeout.config.state now)
   =/  query=?  !=(%publish -.kind.next)
-  =/  pen=pending-discovery-request  [id peer query deadline]
+  =/  message=discovery-message  (message-for request next)
+  =/  ship=@p  (~(node-to-ship kad kad-cfg) peer)
+  =/  note=note:agent:gall
+    [%agent [ship %content-discovery] %poke %content-discovery-message !>(message)]
+  =/  sent=[delivery-id delivery-update]
+    (~(enqueue delivery [now outbound.state]) ship deadline [%request request] note)
+  =.  outbound.state  state.+.sent
+  =/  pen=pending-discovery-request  [id peer query deadline -.sent]
   =.  pending.state  (~(put by pending.state) request pen)
   =.  pending-count.state  +(pending-count.state)
   =.  in-flight.next  +(in-flight.next)
-  =/  message=discovery-message  (message-for request next)
-  =/  ship=@p  (~(node-to-ship kad kad-cfg) peer)
-  =/  poke=card:agent:gall
-    :*  %pass  /request/(scot %uv request)
-        %agent  [ship %content-discovery]
-        %poke  %content-discovery-message  !>(message)
-    ==
   =/  timer=card:agent:gall
     [%pass /timeout/(scot %uv request) %arvo %b %wait deadline]
   =.  active.state  (~(put by active.state) id next)
-  [[poke timer ~] ~ state]
+  [(weld cards.+.sent [timer ~]) ~ state]
 ::
 ::  pump: fairly fill the process-wide request budget from the ready queue.
 ::
@@ -828,6 +836,10 @@
   =/  found=(unit pending-discovery-request)  (~(get by pending.state) request)
   ?~  found  [~ ~ state]
   =/  pen=pending-discovery-request  u.found
+  =/  ship=@p  (~(node-to-ship kad kad-cfg) peer.pen)
+  =/  dropped=delivery-update
+    (~(cancel delivery [now outbound.state]) ship delivery.pen)
+  =.  outbound.state  state.dropped
   =.  pending.state  (~(del by pending.state) request)
   =.  pending-count.state  (dec pending-count.state)
   =/  active=(unit operation)  (~(get by active.state) operation.pen)
@@ -840,7 +852,39 @@
   =/  cancellation=(list card:agent:gall)
     ?:(cancel [[%pass /timeout/(scot %uv request) %arvo %b %rest deadline.pen] ~] ~)
   =/  more=[(list card:agent:gall) operation-update]  pump
-  [(weld cancellation -.more) +.more]
+  [(weld cards.dropped (weld cancellation -.more)) +.more]
+::
+++  send-response
+  |=  [ship=@p request=discovery-request-id message=discovery-message]
+  ^-  [(list card:agent:gall) discovery-state]
+  =/  deadline=@da  (add request-timeout.config.state now)
+  =/  note=note:agent:gall
+    [%agent [ship %content-discovery] %poke %content-discovery-message !>(message)]
+  =/  sent=[delivery-id delivery-update]
+    (~(enqueue delivery [now outbound.state]) ship deadline [%response request] note)
+  =.  outbound.state  state.+.sent
+  [cards.+.sent state]
+::
+++  delivery-ack
+  |=  [peer=@p id=delivery-id error=(unit tang)]
+  ^-  [(list card:agent:gall) operation-update]
+  =/  updated=delivery-update
+    (~(acknowledge delivery [now outbound.state]) peer id error)
+  =.  outbound.state  state.updated
+  ?~  acked.updated  [cards.updated ~ state]
+  ?~  error.u.acked.updated  [cards.updated ~ state]
+  ?.  ?=(%request -.context.u.acked.updated)  [cards.updated ~ state]
+  =/  failed=[(list card:agent:gall) operation-update]
+    (fail-request id.context.u.acked.updated &)
+  [(weld cards.updated -.failed) +.failed]
+::
+++  delivery-expire
+  |=  [peer=@p deadline=@da]
+  ^-  [(list card:agent:gall) operation-update]
+  =/  updated=delivery-update
+    (~(expire delivery [now outbound.state]) peer deadline)
+  =.  outbound.state  state.updated
+  [cards.updated ~ state]
 ::
 ++  get-operation
   |=  id=operation-id

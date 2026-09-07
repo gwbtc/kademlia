@@ -1,4 +1,4 @@
-/-  *kademlia, *content-routing, *content-routing-agent
+/-  *kademlia, *content-routing, *content-routing-agent, *bounded-poke
 /+  logic=content-routing-agent-logic, cr=content-routing, *test
 |%
 ++  now  ~2026.8.10..12.00.00
@@ -207,7 +207,7 @@
 ++  test-response-admission
   =/  state=content-state  initial
   =/  peer=node-id  ~(self-id logic [~nec now ~nec state allow])
-  =/  pen=pending-content-request  [0v9 peer %.y +(now)]
+  =/  pen=pending-content-request  [0v9 peer %.y +(now) 0]
   =.  pending.state  (~(put by pending.state) 0v1 pen)
   =/  correct  [~zod now ~nec state allow]
   =/  wrong  [~zod now ~bud state allow]
@@ -221,7 +221,7 @@
 ++  test-content-request-id-wrap-skips-pending
   =/  state=content-state  initial
   =/  max=content-request-id  ;;(@uv (dec (pow 2 64)))
-  =/  pen=pending-content-request  [0v9 0x1 %.n +(now)]
+  =/  pen=pending-content-request  [0v9 0x1 %.n +(now) 0]
   =.  pending.state  (~(put by pending.state) max pen)
   =.  pending.state  (~(put by pending.state) ;;(@uv 0) pen)
   =.  next-request.state  max
@@ -875,5 +875,25 @@
     !>(id.completion)
     (expect !>(!(~(has in background.state.+.finished) id)))
     (expect !>(!(~(has by completed.state.+.finished) id)))
+  ==
+::
+++  test-responses-share-peer-gate-and-reset-drops-queue
+  =/  state=content-state  initial
+  =/  message=content-message
+    [%stored %content-routing-v1 0v1 [%accepted ~]]
+  =/  first=[(list card:agent:gall) content-state]
+    (~(send-response logic [~zod now ~zod state allow]) ~nec 0v1 message)
+  =/  second=[(list card:agent:gall) content-state]
+    (~(send-response logic [~zod now ~zod +.first allow]) ~nec 0v2 message)
+  =/  before=peer-delivery  (need (~(get by peers.outbound.+.second) ~nec))
+  =/  reset=[(list card:agent:gall) content-state]
+    ~(reset-state logic [~zod now ~zod +.second allow])
+  =/  after=peer-delivery  (need (~(get by peers.outbound.+.reset) ~nec))
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>((lent responses.before))
+    %+  expect-eq  !>(active.before)
+    !>(active.after)
+    (expect !>(?&(?=(~ responses.after) ?=(~ requests.after) ?=(~ wake.after))))
   ==
 --

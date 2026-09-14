@@ -36,10 +36,11 @@ $%  [%scry spar=spar:ames]
 ==
 ```
 
-An `%scry` locator must be an exact Ames remote-scry address, including the
-actual Gall revision. Discovery cannot guess that revision. `%custom` permits
-an application-defined protocol and opaque address, such as the demo's bounded
-chunk transport.
+An `%scry` locator carries an exact Ames remote-scry address. When it targets a
+Gall namespace, the path must include the actual Gall revision; discovery
+cannot guess that revision. The routing layer otherwise treats the path as
+opaque. `%custom` permits an application-defined protocol and opaque address,
+such as the demo's bounded chunk transport.
 
 A pointer target is either:
 
@@ -181,15 +182,19 @@ Local commands are `%publish-pointer`, `%publish-provider`, `%find-pointer`,
 `%reset`.
 
 Applications associate a 64-bit operation ID with `[recipient reply-path]` by
-using `%observe`. Completion targets that callback directly with a typed
-`%content-routing-result`. The reply path is application correlation data, not
-Gall's effect wire. Results can also be read under `%gx` at
-`/operation/<id>`, `/records/<key>`, `/pointer/<key>`, and
-`/providers/<digest>`, appending `/noun` as the requested mark. `/delivery`
-reports current tracked peers, active per-peer poke gates, queued responses,
-queued requests, cumulative queue expirations, and the `overflow-dropped`
-counter. At most 32 live peer-triggered responses are queued
-per peer; expired responses are pruned before excess responses are discarded.
+using `%observe` before starting the operation. Completion targets that
+callback directly with a typed `%content-routing-result`. The reply path is
+application correlation data, not Gall's effect wire. Results can also be read
+under `%gx` at `/operation/<id>`, `/records/<key>`, `/pointer/<key>`, and
+`/providers/<digest>`, appending `/noun` as the requested mark. Configuration
+and delivery state are exposed at `/settings`, `/verbosity`, and `/delivery`.
+The delivery summary reports current tracked peers, active per-peer poke gates,
+queued responses, queued requests, cumulative queue expirations, and the
+`overflow-dropped` counter. At most 32 live peer-triggered responses are queued
+per peer in this agent, in addition to one active poke; expired responses are
+pruned before excess responses are silently discarded. The requesting peer
+then observes its normal timeout. Locally initiated requests have no count cap
+and expire at the same configured request deadline.
 
 ## Relationship to topic discovery
 
@@ -211,5 +216,8 @@ supporting mutable names through pointer records.
   commands, peer protocol, operations, limits, and state.
 - [`desk/lib/content-routing-agent-logic.hoon`](../desk/lib/content-routing-agent-logic.hoon):
   storage, scheduling, refresh, publication, and queries.
+- [`desk/sur/bounded-poke.hoon`](../desk/sur/bounded-poke.hoon) and
+  [`desk/lib/bounded-poke.hoon`](../desk/lib/bounded-poke.hoon): shared
+  persistent per-peer delivery gating, expiry, and response limits.
 - [`desk/app/content-routing.hoon`](../desk/app/content-routing.hoon): Gall,
   Kademlia callbacks, Ames, Behn, Jael, scries, and logging.

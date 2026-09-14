@@ -149,8 +149,11 @@ Diagnostics are exposed under `%gx` at `/summary`, `/settings`, `/table`,
 as the output mark when scrying through Gall. `/delivery` reports current
 tracked peers, active per-peer poke gates, queued responses, queued requests,
 and cumulative queue expirations. Its `overflow-dropped` field counts responses
-discarded after the per-peer queue reaches its limit of 32. Locally
-initiated request queues are limited by expiry rather than count.
+discarded after the per-peer queue reaches its limit of 32. The cap excludes
+the one active poke and is local to `%kademlia`; each higher-layer agent has an
+independent gate. Overflow is silent, so the requesting peer eventually sees
+its ordinary request timeout. Locally initiated request queues are limited by
+that same expiry rather than by count.
 
 ## Configuration and invariants
 
@@ -177,5 +180,8 @@ the cached and actual in-flight count.
   commands, peer messages, callbacks, and persistent state.
 - [`desk/lib/kademlia-agent-logic.hoon`](../desk/lib/kademlia-agent-logic.hoon):
   request scheduling, completions, and refresh policy.
+- [`desk/sur/bounded-poke.hoon`](../desk/sur/bounded-poke.hoon) and
+  [`desk/lib/bounded-poke.hoon`](../desk/lib/bounded-poke.hoon): shared
+  persistent per-peer delivery gating, queue expiry, and response limits.
 - [`desk/app/kademlia.hoon`](../desk/app/kademlia.hoon): Ames, Behn, Gall,
   diagnostics, and logging.

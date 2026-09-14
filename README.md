@@ -17,18 +17,23 @@ libraries and three headless Gall agents:
   `app/content-routing.hoon`: the ordinary-Ames record transport, leased replica
   store, publication/query state machine, Jael-backed signatures, and Gall
   interface layered over node lookup.
-- `sur/content-discovery.hoon`, `lib/content-discovery.hoon`, and
-  `app/content-discovery.hoon`: an open, signed hierarchical topic index whose
-  catalog payloads are addressed through the content-routing layer.
+- `sur/content-discovery.hoon`, `lib/content-discovery.hoon`,
+  `sur/content-discovery-agent.hoon`, `lib/content-discovery-agent-logic.hoon`,
+  and `app/content-discovery.hoon`: an open, signed hierarchical topic index
+  whose catalog payloads can be resolved through the content-routing layer.
 - `app/kademlia.hoon`: a headless Gall agent that runs iterative `FIND_NODE`
   lookups over ordinary Ames pokes, with its pure transitions in
   `lib/kademlia-agent-logic.hoon`.
+- `sur/bounded-poke.hoon` and `lib/bounded-poke.hoon`: the persistent,
+  per-peer outbound-poke gate shared by all three protocol agents.
 - `tests/lib/kademlia.hoon`: unit coverage for the core invariants.
 - `tests/lib/content-routing.hoon`: unit coverage for content-routing records,
   validation, revision conflicts, and provider selection.
-- `tests/lib/content-routing-agent-logic.hoon` and
-  `tests/app/content-routing.hoon`: transport storage, operation, refresh,
+- `tests/lib/content-discovery.hoon` and the content-routing and discovery
+  agent-logic and app tests: record selection, storage, operation, refresh,
   concurrency, callback, and Gall-interface coverage.
+- `tests/lib/bounded-poke.hoon`: queue ordering, expiry, acknowledgement,
+  cancellation, reset, and response-cap coverage.
 
 ## Profiling demo
 
@@ -41,7 +46,7 @@ batch percentiles. The complete demo desk—including this project's Kademlia
 sources and pinned Urbit dependencies—is assembled with:
 
 ```sh
-mortar build -config mortar-demo.yaml
+mortar build --config mortar-demo.yaml
 ```
 
 See [`demo/README.md`](demo/README.md) for the desk, UI, and test workflow.
@@ -54,11 +59,21 @@ returns signed content-routing records rather than application data. Those
 records provide either explicit retrieval locators or a digest used for a
 second provider lookup.
 
-An exact `$spar:ames` is one supported locator. Its path includes the actual
-Gall revision in `/g/x/<revision>/...`; callers must not assume or synthesize
-that revision. Application-defined custom locators are also supported.
+An exact `$spar:ames` is one supported locator. When it targets Gall, its path
+includes the actual revision in `/g/x/<revision>/...`; callers must not assume
+or synthesize that revision. Application-defined custom locators are also
+supported.
 The `%content-routing` agent transports those records over ordinary Ames pokes;
 remote scry remains one possible final retrieval mechanism, not a requirement.
+
+All three agents are installed together, but applications normally use only
+the highest API they need. Content-routing and content-discovery call
+`%kademlia` internally, so an application need not orchestrate their node
+lookups. It may call `%kademlia` directly for raw node lookup, call
+`%content-routing` for pointer/provider resolution, or browse with
+`%content-discovery` and then pass a selected catalog digest to
+`%content-routing` for retrieval locations. Overlay seeds and timing remain
+node-level configuration on `%kademlia`.
 
 ## Content routing
 
@@ -107,9 +122,9 @@ IDs. Indirectly mentioned candidates remain local to the lookup and do not enter
 the routing table until they answer successfully. The lookup retains all valid
 discovered candidates so failed close peers can be replaced by farther ones,
 while its active frontier is always the closest `k` nonfailed candidates.
-Initial routing contacts are collected in linear time, deduplicated in one
-pass, and distance-sorted once rather than inserted into the candidate list one
-at a time.
+Initial routing contacts are produced in exact XOR-distance order by traversing
+the routing prefix tree, sorting only each bounded leaf roster. This avoids
+collecting and globally sorting the entire routing table.
 Lookup responses likewise deduplicate and sort fresh candidates once before a
 linear merge. Dispatch, status settlement, completion, result construction,
 and invariant validation traverse the ordered shortlist without intermediate
@@ -184,6 +199,11 @@ queued requests, and cumulative queue expirations. Its `overflow-dropped`
 counter records responses rejected after a peer already has 32 live responses
 queued. Expired responses are pruned before enforcing the cap. Responses are
 promoted ahead of requests, and both queues use the configured request timeout.
+The cap is per remote peer, separately within each protocol agent, and excludes
+the one currently active poke. An overflowed response is silently discarded;
+the requester observes its normal request timeout. Locally initiated requests
+have no count cap because they are already bounded by application concurrency,
+but they expire from the delivery queue at the same deadline.
 
 Content operation IDs and transport request IDs follow the same 64-bit local
 conflict, internal allocation, and remote rejection rules as Kademlia IDs.
@@ -337,7 +357,7 @@ mortar build --config mortar-aqua-base.yaml
 mortar build --config mortar-aqua-test.yaml
 ```
 
-Mount `dist/` as `%kademlia-mortar`, `dist-pill/` as `%kademlia`, and
+Mount `dist/` as `%kademlia-mortar`, `dist-pill/` as `%kademlia`,
 `dist-aqua-base/` as `%kademlia-aqua-base`, and `dist-aqua-test/` as
 `%kademlia-test`. The Aqua base is a complete Arvo source desk with a minimal
 `/desk/bill`; it omits unrelated background agents whose timers otherwise

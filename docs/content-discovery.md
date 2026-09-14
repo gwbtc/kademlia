@@ -1,7 +1,8 @@
 # Content discovery
 
 `%content-discovery` is a signed, decentralized topic index built on
-`%kademlia` and `%content-routing`. It answers questions such as:
+`%kademlia` and designed to compose with `%content-routing`. It answers
+questions such as:
 
 > Which publishers advertise catalogs at `/software/urbit/hoon`, and which
 > immediate subtopics exist below `/software/urbit`?
@@ -197,14 +198,19 @@ The local commands are `%advertise`, `%browse`, `%observe`, `%forget`,
 `%set-config`, `%set-verbosity`, and `%reset`.
 
 An application allocates a 64-bit operation ID, sends `%observe` with its app
-and reply path, then starts `%advertise` or `%browse`. On completion,
+and reply path before starting `%advertise` or `%browse`. On completion,
 `%content-discovery` pokes it with `%content-discovery-result`. The reply path
 is application data, not Gall's effect wire. Completed results remain readable
-until `%forget` removes them. `/delivery` reports current tracked peers, active
-per-peer poke gates, queued responses, queued requests, cumulative queue
-expirations, and the `overflow-dropped` counter. At most 32 live peer-triggered
-responses are queued per peer; locally initiated requests remain count-unbounded
-and expire normally.
+until `%forget` removes them. Results and stored records can also be read under
+`%gx` at `/operation/<id>` and `/records/<key>`, appending `/noun` as the
+requested mark. Configuration and delivery state are exposed at `/settings`,
+`/verbosity`, and `/delivery`. The delivery summary reports current tracked
+peers, active per-peer poke gates, queued responses, queued requests, cumulative
+queue expirations, and the `overflow-dropped` counter. At most 32 live
+peer-triggered responses are queued per peer in this agent, in addition to one
+active poke. Excess responses are silently discarded, leaving the requester to
+time out. Locally initiated requests remain count-unbounded and expire at the
+same configured request deadline.
 
 The peer protocol uses `%store`, `%stored`, `%find-topic`, and `%topic-records`
 over Ames. Packed payloads have explicit atom-size and record-count bounds.
@@ -241,5 +247,8 @@ Implementation files:
   protocol, commands, operations, configuration, and state.
 - [`desk/lib/content-discovery-agent-logic.hoon`](../desk/lib/content-discovery-agent-logic.hoon):
   replication, storage, scheduling, refresh, and results.
+- [`desk/sur/bounded-poke.hoon`](../desk/sur/bounded-poke.hoon) and
+  [`desk/lib/bounded-poke.hoon`](../desk/lib/bounded-poke.hoon): shared
+  persistent per-peer delivery gating, expiry, and response limits.
 - [`desk/app/content-discovery.hoon`](../desk/app/content-discovery.hoon): Gall,
   Ames, Behn, Jael, callbacks, and logging.

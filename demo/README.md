@@ -40,7 +40,7 @@ reporting success.
 From the repository root:
 
 ```sh
-mortar build -config mortar-demo.yaml
+mortar build --config mortar-demo.yaml
 ```
 
 The complete desk is written to `demo/dist`. Mount or copy that directory into

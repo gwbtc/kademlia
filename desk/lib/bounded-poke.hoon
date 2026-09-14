@@ -1,6 +1,7 @@
 ::  A persistent, per-peer gate for remote Gall pokes.
 ::
 /-  *bounded-poke
+=/  max-queued-responses=@ud  32
 |_  [now=@da state=delivery-state]
 ::
 ++  init
@@ -144,10 +145,24 @@
       [`[id context] responses.peer-state requests.peer-state wake.peer-state]
     =.  state  (put-peer peer next)
     [id [[(poke-card item) ~] ~ ~ state]]
-  =?  responses.peer-state  ?=(%response -.context)
-    [item responses.peer-state]
-  =?  requests.peer-state  ?=(%request -.context)
-    [item requests.peer-state]
+  ?:  ?=(%response -.context)
+    =/  pruned=[kept=(list queued-delivery) expired=(list delivery-context)]
+      (prune responses.peer-state)
+    =.  responses.peer-state  kept.pruned
+    =/  expired=(list delivery-context)  expired.pruned
+    =.  expired-total.state  (add expired-total.state (lent expired))
+    ?:  (gte (lent responses.peer-state) max-queued-responses)
+      =/  scheduled=[(list card:agent:gall) peer-delivery]
+        (schedule peer peer-state |)
+      =.  state  (put-peer peer +.scheduled)
+      =.  overflow-dropped.state  +(overflow-dropped.state)
+      [id [-.scheduled expired ~ state]]
+    =.  responses.peer-state  [item responses.peer-state]
+    =/  scheduled=[(list card:agent:gall) peer-delivery]
+      (schedule peer peer-state |)
+    =.  state  (put-peer peer +.scheduled)
+    [id [-.scheduled expired ~ state]]
+  =.  requests.peer-state  [item requests.peer-state]
   =/  scheduled=[(list card:agent:gall) peer-delivery]
     (schedule peer peer-state |)
   =/  cards=(list card:agent:gall)  -.scheduled

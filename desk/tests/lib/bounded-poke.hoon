@@ -91,6 +91,56 @@
   %+  expect-eq  !>(`(unit active-delivery)`[~ [-.first [%request 0v1]]])
   !>(active.got)
 ::
+++  test-response-queue-is-capped-at-thirty-two
+  =/  first=[delivery-id delivery-update]
+    (~(enqueue delivery [now initial]) ~nec (add ~m1 now) [%request 0v1] (note ~nec 1))
+  =/  filled=delivery-state
+    =/  left=@ud  32
+    =/  state=delivery-state  state.+.first
+    |-
+    ?:  =(0 left)  state
+    =/  id=@uv  ;;(@uv left)
+    =/  sent=[delivery-id delivery-update]
+      (~(enqueue delivery [now state]) ~nec (add ~m1 now) [%response id] (note ~nec left))
+    $(left (dec left), state state.+.sent)
+  =/  overflow=[delivery-id delivery-update]
+    (~(enqueue delivery [now filled]) ~nec (add ~m1 now) [%response 0v99] (note ~nec 99))
+  =/  summary=delivery-summary
+    ~(summary delivery [now state.+.overflow])
+  ;:  weld
+    %+  expect-eq  !>(`delivery-summary`[1 1 32 0 0 1])
+    !>(summary)
+    %+  expect-eq  !>(0)
+    !>((lent cards.+.overflow))
+    %+  expect-eq  !>(0)
+    !>((lent expired.+.overflow))
+  ==
+::
+++  test-response-cap-prunes-expired-before-dropping
+  =/  first=[delivery-id delivery-update]
+    (~(enqueue delivery [now initial]) ~nec (add ~m1 now) [%request 0v1] (note ~nec 1))
+  =/  deadline=@da  (add ~s1 now)
+  =/  filled=delivery-state
+    =/  left=@ud  32
+    =/  state=delivery-state  state.+.first
+    |-
+    ?:  =(0 left)  state
+    =/  id=@uv  ;;(@uv left)
+    =/  sent=[delivery-id delivery-update]
+      (~(enqueue delivery [now state]) ~nec deadline [%response id] (note ~nec left))
+    $(left (dec left), state state.+.sent)
+  =/  later=@da  (add ~s2 now)
+  =/  replacement=[delivery-id delivery-update]
+    (~(enqueue delivery [later filled]) ~nec (add ~m1 later) [%response 0v99] (note ~nec 99))
+  =/  summary=delivery-summary
+    ~(summary delivery [later state.+.replacement])
+  ;:  weld
+    %+  expect-eq  !>(`delivery-summary`[1 1 1 0 32 0])
+    !>(summary)
+    %+  expect-eq  !>(32)
+    !>((lent expired.+.replacement))
+  ==
+::
 ++  test-stale-ack-is-a-no-op
   =/  first=[delivery-id delivery-update]
     (~(enqueue delivery [now initial]) ~nec (add ~m1 now) [%request 0v1] (note ~nec 1))

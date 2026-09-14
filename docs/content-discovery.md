@@ -202,7 +202,9 @@ and reply path, then starts `%advertise` or `%browse`. On completion,
 is application data, not Gall's effect wire. Completed results remain readable
 until `%forget` removes them. `/delivery` reports current tracked peers, active
 per-peer poke gates, queued responses, queued requests, cumulative queue
-expirations, and the reserved `overflow-dropped` counter.
+expirations, and the `overflow-dropped` counter. At most 32 live peer-triggered
+responses are queued per peer; locally initiated requests remain count-unbounded
+and expire normally.
 
 The peer protocol uses `%store`, `%stored`, `%find-topic`, and `%topic-records`
 over Ames. Packed payloads have explicit atom-size and record-count bounds.

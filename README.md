@@ -181,9 +181,9 @@ rejected, or timed out.
 Remote protocol pokes pass through a persistent per-peer delivery gate. The
 `/delivery` Gall scry reports tracked peers, active gates, queued responses,
 queued requests, and cumulative queue expirations. Its `overflow-dropped`
-counter is reserved for the queue-cap policy and remains zero until that policy
-is enabled. Responses are promoted ahead of requests, and both queues use the
-configured request timeout.
+counter records responses rejected after a peer already has 32 live responses
+queued. Expired responses are pruned before enforcing the cap. Responses are
+promoted ahead of requests, and both queues use the configured request timeout.
 
 Content operation IDs and transport request IDs follow the same 64-bit local
 conflict, internal allocation, and remote rejection rules as Kademlia IDs.

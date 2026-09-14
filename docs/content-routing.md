@@ -187,8 +187,9 @@ Gall's effect wire. Results can also be read under `%gx` at
 `/operation/<id>`, `/records/<key>`, `/pointer/<key>`, and
 `/providers/<digest>`, appending `/noun` as the requested mark. `/delivery`
 reports current tracked peers, active per-peer poke gates, queued responses,
-queued requests, cumulative queue expirations, and the reserved
-`overflow-dropped` counter.
+queued requests, cumulative queue expirations, and the `overflow-dropped`
+counter. At most 32 live peer-triggered responses are queued
+per peer; expired responses are pruned before excess responses are discarded.
 
 ## Relationship to topic discovery
 

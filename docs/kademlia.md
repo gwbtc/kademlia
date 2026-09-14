@@ -148,8 +148,9 @@ Diagnostics are exposed under `%gx` at `/summary`, `/settings`, `/table`,
 `/seeds`, `/verbosity`, `/delivery`, and `/lookup/<id>`, with `/noun` appended
 as the output mark when scrying through Gall. `/delivery` reports current
 tracked peers, active per-peer poke gates, queued responses, queued requests,
-and cumulative queue expirations. Its `overflow-dropped` field is reserved for
-the queue-cap policy and remains zero until that policy is enabled.
+and cumulative queue expirations. Its `overflow-dropped` field counts responses
+discarded after the per-peer queue reaches its limit of 32. Locally
+initiated request queues are limited by expiry rather than count.
 
 ## Configuration and invariants
 

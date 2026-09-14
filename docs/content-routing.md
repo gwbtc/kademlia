@@ -185,7 +185,10 @@ using `%observe`. Completion targets that callback directly with a typed
 `%content-routing-result`. The reply path is application correlation data, not
 Gall's effect wire. Results can also be read under `%gx` at
 `/operation/<id>`, `/records/<key>`, `/pointer/<key>`, and
-`/providers/<digest>`, appending `/noun` as the requested mark.
+`/providers/<digest>`, appending `/noun` as the requested mark. `/delivery`
+reports current tracked peers, active per-peer poke gates, queued responses,
+queued requests, cumulative queue expirations, and the reserved
+`overflow-dropped` counter.
 
 ## Relationship to topic discovery
 

@@ -22,6 +22,9 @@
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
   =/  out  on-init:~(. agent bol)
   =/  saved=agent-state  (get-state on-save:+.out)
+  =/  delivery-peek=(unit (unit cage))  (on-peek:+.out /x/delivery)
+  =/  delivery=delivery-summary
+    !<(delivery-summary q:(need (need delivery-peek)))
   ;:  weld
     %+  expect-eq  !>(3)
     !>((lent -.out))
@@ -33,6 +36,8 @@
     !>(refresh-interval.settings.saved)
     %+  expect-eq  !>(`(unit @da)`[~ (add ~h1 now.bol)])
     !>(refresh-at.saved)
+    %+  expect-eq  !>(*delivery-summary)
+    !>(delivery)
   ==
 ::
 ++  test-load-recreates-refresh-wake

@@ -40,10 +40,16 @@
     (~(enqueue delivery [now state.+.first]) ~nec (add ~m1 now) [%request 0v2] (note ~nec 2))
   =/  third=[delivery-id delivery-update]
     (~(enqueue delivery [now state.+.second]) ~nec (add ~m1 now) [%response 0v9] (note ~nec 9))
+  =/  before=delivery-summary
+    ~(summary delivery [now state.+.third])
   =/  acked=delivery-update
     (~(acknowledge delivery [now state.+.third]) ~nec -.first ~)
   =/  got=peer-delivery  (peer-state ~nec state.acked)
+  =/  after=delivery-summary
+    ~(summary delivery [now state.acked])
   ;:  weld
+    %+  expect-eq  !>(`delivery-summary`[1 1 1 1 0 0])
+    !>(before)
     %+  expect-eq  !>(`(unit delivery-ack)`[~ [[%request 0v1] ~]])
     !>(acked.acked)
     %+  expect-eq  !>(`(unit active-delivery)`[~ [-.third [%response 0v9]]])
@@ -51,6 +57,8 @@
     %+  expect-eq  !>(1)
     !>((lent requests.got))
     (expect !>(?=(~ responses.got)))
+    %+  expect-eq  !>(`delivery-summary`[1 1 0 1 0 0])
+    !>(after)
   ==
 ::
 ++  test-queued-deliveries-expire-while-active-remains
@@ -62,12 +70,16 @@
   =/  expired=delivery-update
     (~(expire delivery [deadline state.+.second]) ~nec deadline)
   =/  got=peer-delivery  (peer-state ~nec state.expired)
+  =/  summary=delivery-summary
+    ~(summary delivery [deadline state.expired])
   ;:  weld
     %+  expect-eq  !>(~[[%request 0v2]])
     !>(expired.expired)
     %+  expect-eq  !>(`(unit active-delivery)`[~ [-.first [%request 0v1]]])
     !>(active.got)
     (expect !>(?&(?=(~ requests.got) ?=(~ wake.got))))
+    %+  expect-eq  !>(`delivery-summary`[1 1 0 0 1 0])
+    !>(summary)
   ==
 ::
 ++  test-cancel-never-releases-active-delivery
@@ -103,11 +115,15 @@
   =/  reset=[(list card:agent:gall) delivery-state]
     ~(reset delivery [now state.+.third])
   =/  got=peer-delivery  (peer-state ~nec +.reset)
+  =/  summary=delivery-summary
+    ~(summary delivery [now +.reset])
   ;:  weld
     %+  expect-eq  !>(`(unit active-delivery)`[~ [-.first [%request 0v1]]])
     !>(active.got)
     (expect !>(?&(?=(~ responses.got) ?=(~ requests.got) ?=(~ wake.got))))
     %+  expect-eq  !>(1)
     !>((lent -.reset))
+    %+  expect-eq  !>(`delivery-summary`[1 1 0 0 0 0])
+    !>(summary)
   ==
 --

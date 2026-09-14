@@ -150,11 +150,13 @@ so callback delivery performs one map lookup rather than scanning every
 registered callback after each response or timeout. Commands are accepted only
 from the local ship. Read-only
 diagnostics are available through `/summary`, `/settings`, `/table`, `/seeds`,
-`/verbosity`, and `/lookup/<id>` Gall scries using the `%noun` output mark. For example:
+`/delivery`, `/verbosity`, and `/lookup/<id>` Gall scries using the `%noun`
+output mark. For example:
 
 ```hoon
 .^(* %gx /=kademlia=/summary/noun)
 .^(* %gx /=kademlia=/lookup/0v1/noun)
+.^(* %gx /=kademlia=/delivery/noun)
 ```
 
 See [`docs/kademlia.md`](docs/kademlia.md) for the complete identity model,
@@ -175,6 +177,13 @@ the agent. A persistent round-robin ready queue shares that global budget among
 active operations. Each RPC has a five-minute Behn timeout. Publication
 completes only after every selected replica has been accounted for as accepted,
 rejected, or timed out.
+
+Remote protocol pokes pass through a persistent per-peer delivery gate. The
+`/delivery` Gall scry reports tracked peers, active gates, queued responses,
+queued requests, and cumulative queue expirations. Its `overflow-dropped`
+counter is reserved for the queue-cap policy and remains zero until that policy
+is enabled. Responses are promoted ahead of requests, and both queues use the
+configured request timeout.
 
 Content operation IDs and transport request IDs follow the same 64-bit local
 conflict, internal allocation, and remote rejection rules as Kademlia IDs.

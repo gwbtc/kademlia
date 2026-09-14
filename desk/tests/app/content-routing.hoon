@@ -1,4 +1,4 @@
-/-  *kademlia, *kademlia-agent, *content-routing, *content-routing-agent
+/-  *kademlia, *kademlia-agent, *content-routing, *content-routing-agent, *bounded-poke
 /+  kad=kademlia, cr=content-routing, *test
 /=  agent  /app/content-routing
 |%
@@ -26,6 +26,9 @@
   =/  saved=content-state  (get-state on-save:+.out)
   =/  peek=(unit (unit cage))  (on-peek:+.out /x/settings)
   =/  got=content-config  !<(content-config q:(need (need peek)))
+  =/  delivery-peek=(unit (unit cage))  (on-peek:+.out /x/delivery)
+  =/  delivery=delivery-summary
+    !<(delivery-summary q:(need (need delivery-peek)))
   ;:  weld
     %+  expect-eq  !>(3)
     !>((lent -.out))
@@ -33,6 +36,8 @@
     !>(got)
     %+  expect-eq  !>((add ~h12 now))
     !>(refresh-at.saved)
+    %+  expect-eq  !>(*delivery-summary)
+    !>(delivery)
   ==
 ::
 ++  test-query-callback-completes

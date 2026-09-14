@@ -145,8 +145,11 @@ application with `%kademlia-result`. The reply path is application correlation
 data rather than Gall's effect wire.
 
 Diagnostics are exposed under `%gx` at `/summary`, `/settings`, `/table`,
-`/seeds`, `/verbosity`, and `/lookup/<id>`, with `/noun` appended as the output
-mark when scrying through Gall.
+`/seeds`, `/verbosity`, `/delivery`, and `/lookup/<id>`, with `/noun` appended
+as the output mark when scrying through Gall. `/delivery` reports current
+tracked peers, active per-peer poke gates, queued responses, queued requests,
+and cumulative queue expirations. Its `overflow-dropped` field is reserved for
+the queue-cap policy and remains zero until that policy is enabled.
 
 ## Configuration and invariants
 

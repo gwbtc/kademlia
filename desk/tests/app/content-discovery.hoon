@@ -1,4 +1,4 @@
-/-  *kademlia, *kademlia-agent, *content-routing, *content-discovery, *content-discovery-agent
+/-  *kademlia, *kademlia-agent, *content-routing, *content-discovery, *content-discovery-agent, *bounded-poke
 /+  discovery=content-discovery, *test
 /=  agent  /app/content-discovery
 |%
@@ -24,11 +24,16 @@
   =/  state=discovery-state  (get-state on-save:+.out)
   =/  peek=(unit (unit cage))  (on-peek:+.out /x/settings)
   =/  got=discovery-config  !<(discovery-config q:(need (need peek)))
+  =/  delivery-peek=(unit (unit cage))  (on-peek:+.out /x/delivery)
+  =/  delivery=delivery-summary
+    !<(delivery-summary q:(need (need delivery-peek)))
   ;:  weld
     %+  expect-eq  !>(config.state)
     !>(got)
     %+  expect-eq  !>(0)
     !>((lent ~(tap by active.state)))
+    %+  expect-eq  !>(*delivery-summary)
+    !>(delivery)
   ==
 ::
 ++  test-browse-completes-and-calls-back

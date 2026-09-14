@@ -22,7 +22,19 @@
       wake=(unit @da)
   ==
 +$  delivery-state
-  [next-id=delivery-id peers=(map @p peer-delivery)]
+  $:  next-id=delivery-id
+      peers=(map @p peer-delivery)
+      expired-total=@ud
+      overflow-dropped=@ud
+  ==
++$  delivery-summary
+  $:  peers=@ud
+      active=@ud
+      queued-responses=@ud
+      queued-requests=@ud
+      expired=@ud
+      overflow-dropped=@ud
+  ==
 +$  delivery-ack
   [context=delivery-context error=(unit tang)]
 +$  delivery-update

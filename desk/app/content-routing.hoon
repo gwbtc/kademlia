@@ -2,6 +2,7 @@
 ::
 /-  *kademlia, *kademlia-agent, *content-routing, *content-routing-agent
 /+  logic=content-routing-agent-logic, kad=kademlia, cr=content-routing
+/+  delivery=bounded-poke
 /+  default-agent, dbug, verb
 |%
 +$  card  card:agent:gall
@@ -338,6 +339,7 @@
   ?+    path  (on-peek:def path)
       [%x ~]             [~ ~]
       [%x %settings ~]   ``noun+!>(config.state)
+      [%x %delivery ~]   ``noun+!>(~(summary delivery [now.bowl outbound.state]))
       [%x %verbosity ~]  ``noun+!>(verbosity)
       [%x %operation ~]  [~ ~]
       [%x %operation @ ~]

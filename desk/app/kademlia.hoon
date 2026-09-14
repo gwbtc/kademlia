@@ -1,7 +1,8 @@
 ::  Minimal ordinary-Ames Kademlia peer-discovery agent.
 ::
 /-  *kademlia-agent
-/+  logic=kademlia-agent-logic, default-agent, dbug, verb
+/+  logic=kademlia-agent-logic, delivery=bounded-poke
+/+  default-agent, dbug, verb
 |%
 +$  card  card:agent:gall
 --
@@ -171,6 +172,7 @@
       [%x %table ~]     ``noun+!>(routing.state)
       [%x %seeds ~]     ``noun+!>(~(seed-list logic engine))
       [%x %settings ~]  ``noun+!>(settings.state)
+      [%x %delivery ~]  ``noun+!>(~(summary delivery [now.bowl outbound.state]))
       [%x %verbosity ~]  ``noun+!>(verbosity)
       [%x %lookup ~]    [~ ~]
       [%x %lookup @ ~]

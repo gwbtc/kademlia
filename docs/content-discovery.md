@@ -200,7 +200,9 @@ An application allocates a 64-bit operation ID, sends `%observe` with its app
 and reply path, then starts `%advertise` or `%browse`. On completion,
 `%content-discovery` pokes it with `%content-discovery-result`. The reply path
 is application data, not Gall's effect wire. Completed results remain readable
-until `%forget` removes them.
+until `%forget` removes them. `/delivery` reports current tracked peers, active
+per-peer poke gates, queued responses, queued requests, cumulative queue
+expirations, and the reserved `overflow-dropped` counter.
 
 The peer protocol uses `%store`, `%stored`, `%find-topic`, and `%topic-records`
 over Ames. Packed payloads have explicit atom-size and record-count bounds.

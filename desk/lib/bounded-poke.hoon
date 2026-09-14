@@ -5,7 +5,26 @@
 ::
 ++  init
   ^-  delivery-state
-  [0 ~]
+  [0 ~ 0 0]
+::
+::  summary: count live delivery state without materializing the peer map.
+::
+++  summary
+  ^-  delivery-summary
+  =/  walk
+    |=  [entries=(map @p peer-delivery) out=delivery-summary]
+    ^-  delivery-summary
+    ?~  entries  out
+    =.  out  $(entries l.entries, out out)
+    =/  peer-state=peer-delivery  q.n.entries
+    =.  peers.out  +(peers.out)
+    =?  active.out  ?=(^ active.peer-state)  +(active.out)
+    =.  queued-responses.out
+      (add queued-responses.out (lent responses.peer-state))
+    =.  queued-requests.out
+      (add queued-requests.out (lent requests.peer-state))
+    $(entries r.entries, out out)
+  (walk peers.state [0 0 0 0 expired-total.state overflow-dropped.state])
 ::
 ++  delivery-wire
   |=  [peer=@p id=delivery-id]
@@ -179,6 +198,7 @@
   =/  cards=(list card:agent:gall)  -.promoted
   =/  expired=(list delivery-context)  +<.promoted
   =.  state  (put-peer peer +>.promoted)
+  =.  expired-total.state  (add expired-total.state (lent expired))
   [cards expired `acked state]
 ::
 ::  cancel: remove a delivery only while it remains in the local queue.
@@ -217,6 +237,7 @@
     (weld +.responses-pruned +.requests-pruned)
   =^  cards  peer-state  (schedule peer peer-state &)
   =.  state  (put-peer peer peer-state)
+  =.  expired-total.state  (add expired-total.state (lent expired))
   [cards expired ~ state]
 ::
 ::  reset: retain active Gall bookkeeping but discard every local queue.

@@ -3,12 +3,14 @@
 |%
 ++  test-command-constructors
   =/  value=(cask)  [%noun 42]
-  =/  put=content-store-command  (put:client 0v1 value [~ ~])
+  =/  put=content-store-command  (put:client 0v1 value [~ ~] `~h6)
   =/  get=content-store-command  (get-content:client 0v2 0v42)
   =/  name=content-store-command  (get-name:client 0v3 ~zod %demo %latest)
   =/  search=content-store-command  (search:client 0v4 ~[%software %urbit])
   ;:  weld
-    (expect !>(?=(%put -.put)))
+    %+  expect-eq
+      !>(`content-store-command`[%put 0v1 value [~ ~] `~h6])
+    !>(put)
     (expect !>(?=(%get -.get)))
     (expect !>(?=(%get -.name)))
     (expect !>(?=(%search -.search)))

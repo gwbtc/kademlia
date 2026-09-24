@@ -241,11 +241,17 @@
   state
 ::
 ++  start-put
-  |=  [=bowl:gall id=content-store-id value=(cask) options=publication-options]
+  |=  $:  =bowl:gall
+          id=content-store-id
+          value=(cask)
+          options=publication-options
+          lifetime=(unit @dr)
+      ==
   ^-  action
   =/  bytes=@ud  (met 3 (jam value))
   ?.  ?&  !=(%$ p.value)
           (valid-options options)
+          ?~(lifetime & (gth u.lifetime 0))
       ==
     (fail our.bowl id %invalid)
   ?.  (lte bytes max-content-bytes.config.state)
@@ -274,7 +280,9 @@
   =/  provider-allocation=allocation  take-content-id
   =.  state  next.provider-allocation
   =/  provider-id=@uv  id.provider-allocation
-  =/  expires=@da  (add now.bowl publication-lifetime.config.state)
+  =/  duration=@dr
+    ?~(lifetime publication-lifetime.config.state u.lifetime)
+  =/  expires=@da  (add now.bowl duration)
   =/  previous-revision=@ud
     (~(gut by provider-revisions.state) [content 0])
   =/  provider-revision=@ud  +(previous-revision)
@@ -400,7 +408,7 @@
         ?>  (valid-id id.command)
         ?>  !(operation-conflict id.command)
         =/  action=action
-          (start-put bowl id.command value.command options.command)
+          (start-put bowl id.command value.command options.command lifetime.command)
         [cards.action this(state next.action)]
       %get
         ?>  (valid-id id.command)

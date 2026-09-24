@@ -26,9 +26,13 @@
   ==
 ::
 ++  put
-  |=  [id=content-store-id value=(cask) options=publication-options]
+  |=  $:  id=content-store-id
+          value=(cask)
+          options=publication-options
+          lifetime=(unit @dr)
+      ==
   ^-  content-store-command
-  [%put id value options]
+  [%put id value options lifetime]
 ::  Publish only by immutable digest.
 ++  unnamed
   ^-  publication-options

@@ -55,7 +55,7 @@
   =/  initialized  on-init:~(. agent bowl)
   =/  value=(cask)  [%noun 42]
   =/  content=digest  (digest-cask:cr value)
-  =/  put=content-store-command  [%put 0v1 value [~ ~]]
+  =/  put=content-store-command  [%put 0v1 value [~ ~] ~]
   =/  started
     (on-poke:+.initialized %content-store-command !>(put))
   =/  started-state=content-store-state  (get-state on-save:+.started)
@@ -93,7 +93,7 @@
   =/  content=digest  (digest-cask:cr value)
   =/  first
     %+  on-poke:+.initialized  %content-store-command
-    !>(`content-store-command`[%put 0v1 value [~ ~]])
+    !>(`content-store-command`[%put 0v1 value [~ ~] ~])
   =/  first-publication=publication-result:cra
     (accepted-publication (provider-key:cr content))
   =/  first-notice=operation-notice:cra
@@ -102,7 +102,7 @@
     (on-poke:+.first %content-routing-result !>(first-notice))
   =/  second
     %+  on-poke:+.completed  %content-store-command
-    !>(`content-store-command`[%put 0v2 value [~ ~]])
+    !>(`content-store-command`[%put 0v2 value [~ ~] ~])
   =/  state=content-store-state  (get-state on-save:+.second)
   ;:  weld
     %+  expect-eq  !>(4)
@@ -162,10 +162,21 @@
     !>(`content-store-command`[%set-config [~s1 ~d1 1]])
   =/  failed
     %+  on-poke:+.configured  %content-store-command
-    !>(`content-store-command`[%put 0v10 [%noun 42] [~ ~]])
+    !>(`content-store-command`[%put 0v10 [%noun 42] [~ ~] ~])
   =/  state=content-store-state  (get-state on-save:+.failed)
   =/  result=content-store-result
     (need (~(get by completed.state) 0v10))
   %+  expect-eq  !>(`content-store-result`[%failed %too-large])
+  !>(result)
+::
+++  test-zero-publication-lifetime-is-invalid
+  =/  initialized  on-init:~(. agent bowl)
+  =/  failed
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%put 0v11 [%noun 42] [~ ~] `~s0])
+  =/  state=content-store-state  (get-state on-save:+.failed)
+  =/  result=content-store-result
+    (need (~(get by completed.state) 0v11))
+  %+  expect-eq  !>(`content-store-result`[%failed %invalid])
   !>(result)
 --

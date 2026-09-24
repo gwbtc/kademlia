@@ -28,7 +28,7 @@ the value. It also enforces `max-content-bytes` before accepting the result.
 Commands use caller-selected 64-bit IDs:
 
 ```hoon
-$%  [%put id value=(cask) options=publication-options]
+$%  [%put id value=(cask) options=publication-options lifetime=(unit @dr)]
     [%get id query=content-store-query]
     [%search id topic=topic-path]
     [%observe id recipient=@tas reply-path=/]
@@ -50,11 +50,19 @@ and topic publication reports. A publication with no accepting replica becomes
 a typed failure.
 
 Provider revisions are maintained per digest and increment on each repeated
-`%put`, avoiding same-revision conflicts when a locator is renewed. Provider
-records use `publication-lifetime` as their signed expiry. The current façade
-does not schedule automatic renewal: an application which needs a continuously
-advertised value must repeat `%put` before that expiry. The retained remote-scry
-page itself remains available independently of record discovery.
+`%put`, avoiding same-revision conflicts when a locator is renewed. `lifetime`
+selects the signed expiry of the provider record and any topic advertisement.
+Use `~` to use the configured `publication-lifetime`, or supply a positive
+`@dr` override such as `` `~d7 ``. There is no protocol-imposed maximum. A zero
+override is rejected as `%invalid`. Named pointers remain non-expiring and are
+independent of this lease.
+
+The façade does not schedule automatic renewal: an application which needs a
+continuously advertised value must repeat `%put` before its chosen expiry. A
+replica will retain the signed record only while its own lease policy and that
+expiry permit, so abandoned publications eventually disappear from discovery.
+The retained remote-scry page itself remains available independently of record
+discovery.
 
 `%get` accepts either an immutable digest or a mutable name:
 

@@ -32,6 +32,7 @@
           id=content-store-id
           value=(cask)
           options=publication-options
+          lifetime=(unit @dr)
       ==
       [%get id=content-store-id query=content-store-query]
       [%search id=content-store-id topic=topic-path:cd]

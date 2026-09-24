@@ -33,7 +33,7 @@
   %+  start-operation  ~wes
   :*  0v1
       [%put content 1 & &]
-      [%put 0v1 value options]
+      [%put 0v1 value options `~h6]
   ==
 ;<  ~  bind:m  (await-operation ~wes 0v1)
 ::

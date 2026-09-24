@@ -9,11 +9,13 @@ local kademlia:
   include:
     - app/content-routing.hoon
     - app/content-discovery.hoon
+    - app/content-store.hoon
     - app/kademlia.hoon
     - lib/content-routing-agent-logic.hoon
     - lib/content-routing.hoon
     - lib/content-discovery-agent-logic.hoon
     - lib/content-discovery.hoon
+    - lib/content-store-client.hoon
     - lib/feistel.hoon
     - lib/kademlia-agent-logic.hoon
     - lib/kademlia.hoon
@@ -23,6 +25,8 @@ local kademlia:
     - mar/content-discovery/command.hoon
     - mar/content-discovery/message.hoon
     - mar/content-discovery/result.hoon
+    - mar/content-store/command.hoon
+    - mar/content-store/result.hoon
     - mar/kademlia/command.hoon
     - mar/kademlia/message.hoon
     - mar/kademlia/result.hoon
@@ -30,6 +34,7 @@ local kademlia:
     - sur/content-routing-agent.hoon
     - sur/content-discovery.hoon
     - sur/content-discovery-agent.hoon
+    - sur/content-store.hoon
     - sur/kademlia.hoon
     - sur/kademlia-agent.hoon
   priority: 100

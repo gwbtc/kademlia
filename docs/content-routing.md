@@ -152,6 +152,12 @@ The result includes selected records plus responder and timeout sets. Query
 completion does not fetch content and does not assert that a returned locator
 is currently reachable.
 
+Applications which only need exact remote-scry publication and verified cask
+retrieval can use the optional `%content-store` façade instead. It owns the
+page, coordinates these publication and query callbacks, and returns the final
+typed value. Direct use of `%content-routing` remains appropriate for custom
+locators and transports.
+
 ## Ames protocol and resource limits
 
 Peers exchange:
@@ -205,6 +211,9 @@ catalog may itself contain digests for independently routed resources.
 
 This composition preserves referential transparency where desired while still
 supporting mutable names through pointer records.
+
+`%content-store` also exposes this composition as a single `%put` or `%get`
+operation; see [`docs/content-store.md`](content-store.md).
 
 ## Source map
 

@@ -1,7 +1,7 @@
 # Kademlia for Urbit
 
 This desk contains a Kademlia-style overlay for Urbit, including pure routing
-libraries and three headless Gall agents:
+libraries, three protocol agents, and an optional unified façade:
 
 - `lib/feistel.hoon`: the supplied Feistel permutation over the complete
   128-bit Ames ship-ID and Kademlia node-ID domain.
@@ -24,6 +24,11 @@ libraries and three headless Gall agents:
 - `app/kademlia.hoon`: a headless Gall agent that runs iterative `FIND_NODE`
   lookups over ordinary Ames pokes, with its pure transitions in
   `lib/kademlia-agent-logic.hoon`.
+- `sur/content-store.hoon`, `lib/content-store-client.hoon`, and
+  `app/content-store.hoon`: an application-facing façade which publishes typed
+  casks through exact remote-scry pages, advertises them through content
+  routing and optional names/topics, retrieves and verifies them, and exposes
+  one typed callback API.
 - `sur/bounded-poke.hoon` and `lib/bounded-poke.hoon`: the persistent,
   per-peer outbound-poke gate shared by all three protocol agents.
 - `tests/lib/kademlia.hoon`: unit coverage for the core invariants.
@@ -34,6 +39,8 @@ libraries and three headless Gall agents:
   concurrency, callback, and Gall-interface coverage.
 - `tests/lib/bounded-poke.hoon`: queue ordering, expiry, acknowledgement,
   cancellation, reset, and response-cap coverage.
+- `tests/app/content-store.hoon` and `tests/lib/content-store-client.hoon`:
+  façade orchestration, callback, page-reuse, revision, and client-card tests.
 
 ## Profiling demo
 
@@ -66,14 +73,17 @@ supported.
 The `%content-routing` agent transports those records over ordinary Ames pokes;
 remote scry remains one possible final retrieval mechanism, not a requirement.
 
-All three agents are installed together, but applications normally use only
-the highest API they need. Content-routing and content-discovery call
-`%kademlia` internally, so an application need not orchestrate their node
-lookups. It may call `%kademlia` directly for raw node lookup, call
-`%content-routing` for pointer/provider resolution, or browse with
-`%content-discovery` and then pass a selected catalog digest to
-`%content-routing` for retrieval locations. Overlay seeds and timing remain
-node-level configuration on `%kademlia`.
+All four agents are installed together, but applications normally use only the
+highest API they need. `%content-store` provides the simple end-to-end API.
+The lower APIs remain available when an application needs custom transport,
+record policy, or raw routing control. Content-routing and content-discovery
+call `%kademlia` internally, so an application need not orchestrate their node
+lookups. Overlay seeds and timing remain node-level configuration on
+`%kademlia`.
+
+See [`docs/content-store.md`](docs/content-store.md) for the façade API and the
+publication, retrieval, name-resolution, topic-search, callback, and remote-
+scry flows.
 
 ## Content routing
 

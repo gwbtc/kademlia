@@ -11,8 +11,10 @@ local aqua-test:
 local kademlia-test:
   path: ./desk
   include:
+    - lib/content-store-client.hoon
     - mar/content-discovery/result.hoon
     - mar/content-routing/result.hoon
+    - mar/content-store/result.hoon
     - mar/kademlia/result.hoon
     - sur
     - sys.kelvin

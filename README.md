@@ -399,6 +399,15 @@ parent edges and the exact leaf catalog without host-side polling:
 -kademlia-mortar!content-discovery-network-test
 ```
 
+`content-store-network-test` exercises the unified façade across two ships. It
+publishes one cask from `~wes` with a provider record, mutable name, and topic
+advertisement; `~bud` then retrieves it by digest and name through exact remote
+scry and discovers its catalog through the topic API:
+
+```hoon
+-kademlia-mortar!content-store-network-test
+```
+
 `kademlia-demo-network-test` additionally verifies complete resource retrieval
 over both the custom chunk protocol and an exact-revision Ames remote scry,
 then advertises and browses a topic through the demo API:

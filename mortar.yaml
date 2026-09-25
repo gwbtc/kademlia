@@ -8,6 +8,7 @@ local kademlia-demo:
     - mar/kademlia-demo
     - sur/kademlia-demo.hoon
     - ted/kademlia-demo-network-test.hoon
+    - tests
   priority: 120
 
 local kademlia:

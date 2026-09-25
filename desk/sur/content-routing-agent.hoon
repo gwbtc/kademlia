@@ -48,7 +48,7 @@
       $:  %publish-pointer
           id=operation-id
           namespace=@tas
-          name=*
+          name=path
           revision=@ud
           expires=(unit @da)
           target=target
@@ -60,7 +60,7 @@
           expires=@da
           locations=locators
       ==
-      [%find-pointer id=operation-id namespace=@tas publisher=node-id name=*]
+      [%find-pointer id=operation-id namespace=@tas publisher=node-id name=path]
       [%find-providers id=operation-id content=digest]
       [%observe id=operation-id recipient=@tas reply-path=path]
       [%forget id=operation-id]

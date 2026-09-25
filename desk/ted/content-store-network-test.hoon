@@ -22,7 +22,7 @@
 =/  value=(cask)  [%noun 42]
 =/  content=digest  (digest-cask:cr value)
 =/  options=publication-options
-  :*  `[namespace=%example name=%latest revision=1]
+  :*  `[namespace=%example name=~[%latest] revision=1]
       `[topic=~[%software %urbit] format=%content-store-test-v1 entries=1 revision=1]
   ==
 ::
@@ -48,7 +48,7 @@
   %+  start-operation  ~bud
   :*  0v2
       [%get content value]
-      [%get 0v2 [%name ~wes %example %latest]]
+      [%get 0v2 [%name ~wes %example ~[%latest]]]
   ==
 ;<  ~  bind:m  (await-operation ~bud 0v2)
 ;<  ~  bind:m

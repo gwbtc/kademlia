@@ -191,7 +191,7 @@
   state
 ::
 ++  start-pointer-query
-  |=  [our=@p run=run-id publisher=@p namespace=@tas name=@t]
+  |=  [our=@p run=run-id publisher=@p namespace=@tas name=path]
   ^-  action
   =/  allocated=allocation  allocate-content
   =.  state  next.allocated
@@ -404,7 +404,7 @@
           run=run-id
           content=digest
           transport=transport
-          name=(unit [namespace=@tas name=@t revision=@ud])
+          name=(unit [namespace=@tas name=path revision=@ud])
       ==
   ^-  action
   =/  res=(unit resource)  (~(get by resources.state) content)

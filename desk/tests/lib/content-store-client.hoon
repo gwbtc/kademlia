@@ -5,7 +5,7 @@
   =/  value=(cask)  [%noun 42]
   =/  put=content-store-command  (put:client 0v1 value [~ ~] `~h6)
   =/  get=content-store-command  (get-content:client 0v2 0v42)
-  =/  name=content-store-command  (get-name:client 0v3 ~zod %demo %latest)
+  =/  name=content-store-command  (get-name:client 0v3 ~zod %demo ~[%latest])
   =/  search=content-store-command  (search:client 0v4 ~[%software %urbit])
   ;:  weld
     %+  expect-eq
@@ -24,13 +24,13 @@
   !>((lent cards))
 ::
 ++  test-publication-option-constructors
-  =/  name=named-publication  [%demo %latest 7]
+  =/  name=named-publication  [%demo ~[%latest] 7]
   =/  topic=topic-publication  [~[%software %urbit] %catalog 12 3]
   ;:  weld
     %+  expect-eq  !>(`publication-options`[~ ~])
     !>(unnamed:client)
     %+  expect-eq  !>(`publication-options`[`name ~])
-    !>((with-name:client %demo %latest 7))
+    !>((with-name:client %demo ~[%latest] 7))
     %+  expect-eq  !>(`publication-options`[~ `topic])
     !>((with-topic:client ~[%software %urbit] %catalog 12 3))
     %+  expect-eq  !>(`publication-options`[`name `topic])

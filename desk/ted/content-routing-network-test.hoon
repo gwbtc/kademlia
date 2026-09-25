@@ -25,13 +25,13 @@
 =/  location=locator  [%scry [~wes /example/content]]
 =/  target=target  [%content content]
 ;<  ~  bind:m
-  (start-content ~wes 0v1 [%publication 2] [%publish-pointer 0v1 %example %latest 1 ~ target])
+  (start-content ~wes 0v1 [%publication 2] [%publish-pointer 0v1 %example ~[%latest] 1 ~ target])
 ;<  ~  bind:m  (await-operation ~wes 0v1)
 ;<  ~  bind:m
   (start-content ~wes 0v2 [%publication 2] [%publish-provider 0v2 content 1 ~2100.1.1 [location ~]])
 ;<  ~  bind:m  (await-operation ~wes 0v2)
 ;<  ~  bind:m
-  (start-content ~bud 0v1 [%pointer wes-id 1 target] [%find-pointer 0v1 %example wes-id %latest])
+  (start-content ~bud 0v1 [%pointer wes-id 1 target] [%find-pointer 0v1 %example wes-id ~[%latest]])
 ;<  ~  bind:m  (await-operation ~bud 0v1)
 ;<  ~  bind:m
   (start-content ~bud 0v2 [%provider wes-id content location] [%find-providers 0v2 content])

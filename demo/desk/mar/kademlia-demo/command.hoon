@@ -40,14 +40,14 @@
             %custom  %custom
             %scry    %scry
           ==
-        =/  named=(unit [namespace=@tas name=@t revision=@ud])
+        =/  named=(unit [namespace=@tas name=path revision=@ud])
           =/  raw=(unit ^json)  (~(get by object) 'name')
           ?~  raw  ~
           ?@  u.raw  ~
           ?.  ?=([%o *] u.raw)  ~
           =/  value=(map @t ^json)  p.u.raw
           `[ `@tas`(atom-field value 'namespace' %tas)
-             (string-field value 'name')
+             (name-field value 'name')
              (atom-field value 'revision' %ud)
            ]
         [%publish run (atom-field object 'content' %uv) transport named]
@@ -60,7 +60,7 @@
             :*  %name
                 `@p`(atom-field object 'publisher' %p)
                 `@tas`(atom-field object 'namespace' %tas)
-                (string-field object 'name')
+                (name-field object 'name')
             ==
         ==
       %advertise-topic
@@ -135,4 +135,18 @@
   |=  item=^json
   ?>  ?=([%s *] item)
   (need (slaw %tas p.item))
+::
+::  Accept the path-segment array used by the current UI.  A single string is
+::  retained as a transition convenience for already-built demo frontends.
+++  name-field
+  |=  [object=(map @t ^json) key=@t]
+  ^-  path
+  =/  value=^json  (json-field object key)
+  ?-  -.value
+    %a  (topic-field object key)
+    %s  ~[`@tas`(need (slaw %tas p.value))]
+    %n  !!
+    %b  !!
+    %o  !!
+  ==
 --

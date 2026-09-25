@@ -89,7 +89,7 @@ scry flows.
 
 Content routing is layered above the generic node lookup.  A mutable application
 name derives a 128-bit pointer key from its namespace, publisher node ID, and an
-opaque name noun.  A valid signed pointer selects either a `%direct` list of
+ordinary Hoon `path`.  A valid signed pointer selects either a `%direct` list of
 retrieval locators or a `%content` digest whose current providers must be found
 under a second derived Kademlia key:
 

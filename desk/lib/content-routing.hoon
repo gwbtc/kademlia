@@ -35,7 +35,7 @@
 ::  pointer-key: derive a publisher-scoped 128-bit mutable-name key.
 ::
 ++  pointer-key
-  |=  [namespace=@tas publisher=node-id name=*]
+  |=  [namespace=@tas publisher=node-id name=path]
   ^-  key
   (end 7 (shax (jam [%kad-content-pointer-key-v1 namespace publisher name])))
 ::

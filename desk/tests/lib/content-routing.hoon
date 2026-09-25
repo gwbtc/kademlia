@@ -33,14 +33,16 @@
 ::
 ++  test-key-derivation
   =/  publisher=node-id  0x1234
-  =/  a=key  (pointer-key:content-routing %app publisher %name)
-  =/  b=key  (pointer-key:content-routing %other publisher %name)
+  =/  a=key  (pointer-key:content-routing %app publisher ~[%name])
+  =/  b=key  (pointer-key:content-routing %other publisher ~[%name])
+  =/  c=key  (pointer-key:content-routing %app publisher ~[%name %child])
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
   =/  providers=key  (provider-key:content-routing dig)
   ;:  weld
     (expect !>((identity-valid:content-routing a)))
     (expect !>((identity-valid:content-routing providers)))
     (expect !>(!=(a b)))
+    (expect !>(!=(a c)))
     (expect !>(!=(a providers)))
   ==
 ::

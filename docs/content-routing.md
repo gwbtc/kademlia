@@ -66,17 +66,19 @@ $:  namespace=@tas
 ==
 ```
 
-Its 128-bit Kademlia key is derived from namespace, publisher, and the opaque
-name noun:
+Its 128-bit Kademlia key is derived from namespace, publisher, and the name
+`path`:
 
 ```hoon
 (end 7 (shax (jam [%kad-content-pointer-key-v1 namespace publisher name])))
 ```
 
 Including the publisher means two identities can use the same namespace and
-name without collision. The name is not placed in the record; callers who know
-it derive the same key. Pointer expiry is optional, allowing either permanent
-or time-bounded mutable names.
+name without collision. Names such as `/releases/latest` are already composed
+of path segments and need no opaque noun encoding in paths or JSON APIs. The
+name is not placed in the record; callers who know it derive the same key.
+Pointer expiry is optional, allowing either permanent or time-bounded mutable
+names.
 
 Pointers are signed over a domain-separated digest. Selection authenticates
 the expected namespace, key, publisher, freshness, and signature. The greatest

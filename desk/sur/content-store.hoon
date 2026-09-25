@@ -12,7 +12,7 @@
   ==
 +$  named-publication
   $:  namespace=@tas
-      name=*
+      name=path
       revision=@ud
   ==
 +$  topic-publication
@@ -25,7 +25,7 @@
   [name=(unit named-publication) topic=(unit topic-publication)]
 +$  content-store-query
   $%  [%content digest=digest]
-      [%name publisher=@p namespace=@tas name=*]
+      [%name publisher=@p namespace=@tas name=path]
   ==
 +$  content-store-command
   $%  $:  %put

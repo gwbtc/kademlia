@@ -68,8 +68,13 @@ discovery.
 
 ```hoon
 [%content digest]
-[%name publisher=@p namespace=@tas name=*]
+[%name publisher=@p namespace=@tas name=path]
 ```
+
+For example, `[%name ~sampel-palnet %releases /packages/kademlia/latest]`
+addresses a readable hierarchical name. Its path segments can be appended
+directly to an HTTP or scry path when an application exposes a textual API;
+content-routing hashes the canonical Hoon path internally for Kademlia lookup.
 
 A name query first selects its signed pointer. A `%content` target then performs
 a provider query; a verifiable `%direct` target may proceed immediately. The

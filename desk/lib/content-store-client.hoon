@@ -39,7 +39,7 @@
   [~ ~]
 ::  Also publish a mutable, publisher-scoped name.
 ++  with-name
-  |=  [namespace=@tas name=* revision=@ud]
+  |=  [namespace=@tas name=path revision=@ud]
   ^-  publication-options
   [`[namespace name revision] ~]
 ::  Also advertise the value as a catalog at a topic.
@@ -59,7 +59,7 @@
   [%get id [%content content]]
 ::
 ++  get-name
-  |=  [id=content-store-id publisher=@p namespace=@tas name=*]
+  |=  [id=content-store-id publisher=@p namespace=@tas name=path]
   ^-  content-store-command
   [%get id [%name publisher namespace name]]
 ::

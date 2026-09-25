@@ -179,7 +179,7 @@
     %-  expect-fail
     |.  %+  on-poke:+.initialized
           %content-routing-command
-        !>(`content-command`[%find-pointer 0v1 %test ;;(@ux (pow 2 128)) 0])
+        !>(`content-command`[%find-pointer 0v1 %test ;;(@ux (pow 2 128)) ~])
     %-  expect-fail
     |.  %+  on-poke:+.initialized
           %content-routing-command

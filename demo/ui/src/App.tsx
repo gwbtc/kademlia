@@ -165,7 +165,7 @@ export default function App() {
       action: 'publish',
       content: digest,
       transport: publishTransport,
-      name: publishName ? { namespace, name: resourceName, revision: 1 } : null
+      name: publishName ? { namespace, name: nameSegments(), revision: 1 } : null
     });
   }
 
@@ -177,7 +177,11 @@ export default function App() {
 
   async function submitFetchName(event: FormEvent) {
     event.preventDefault();
-    await start('fetch by name', { action: 'fetch-name', publisher, namespace, name: resourceName });
+    await start('fetch by name', { action: 'fetch-name', publisher, namespace, name: nameSegments() });
+  }
+
+  function nameSegments(): string[] {
+    return resourceName.split('/').map((segment) => segment.trim()).filter(Boolean);
   }
 
   function topicSegments(): string[] {

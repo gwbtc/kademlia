@@ -18,6 +18,23 @@
   ^-  ?
   (lte (met 0 value) 128)
 ::
+::  name-valid: bound publisher-scoped mutable paths before key derivation.
+::
+++  name-valid
+  |=  name=path
+  ^-  ?
+  ?~  name  |
+  =/  remaining=path  name
+  =/  count=@ud  0
+  |-
+  ?~  remaining  (lte count 16)
+  ?:  (gte count 16)  |
+  ?.  ?&  !=(%$ i.remaining)
+          (lte (met 3 i.remaining) 64)
+      ==
+    |
+  $(remaining t.remaining, count +(count))
+::
 ::  digest-cask: commit to both the mark and noun of a cask.
 ::
 ++  digest-cask
@@ -37,6 +54,8 @@
 ++  pointer-key
   |=  [namespace=@tas publisher=node-id name=path]
   ^-  key
+  ?>  !=(%$ namespace)
+  ?>  (name-valid name)
   (end 7 (shax (jam [%kad-content-pointer-key-v1 namespace publisher name])))
 ::
 ::  provider-key: derive the 128-bit lookup key for one content digest.

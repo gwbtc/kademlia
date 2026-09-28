@@ -50,7 +50,12 @@
 ++  valid-options
   |=  options=publication-options
   ^-  ?
-  ?.  ?~(name.options & !=(%$ namespace.u.name.options))  |
+  ?.  ?~  name.options
+        &
+      ?&  !=(%$ namespace.u.name.options)
+          (name-valid:cr name.u.name.options)
+      ==
+    |
   ?~  topic.options  &
   ?&  (topic-valid:discovery topic.u.topic.options)
       !=(%$ format.u.topic.options)
@@ -331,6 +336,7 @@
     %name
       ?.  ?&  (lte (met 0 publisher.query) 128)
               !=(%$ namespace.query)
+              (name-valid:cr name.query)
           ==
         (fail our.bowl id %invalid)
       (begin-pointer-query our.bowl id query)

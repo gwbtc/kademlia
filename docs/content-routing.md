@@ -80,6 +80,11 @@ name is not placed in the record; callers who know it derive the same key.
 Pointer expiry is optional, allowing either permanent or time-bounded mutable
 names.
 
+A mutable name must contain between one and sixteen path segments. Every segment
+must be nonempty and no more than 64 bytes. Publishers and readers must supply
+the same canonical path; invalid names are rejected before Kademlia key
+derivation.
+
 Pointers are signed over a domain-separated digest. Selection authenticates
 the expected namespace, key, publisher, freshness, and signature. The greatest
 revision wins. Different bodies signed by that publisher at the greatest

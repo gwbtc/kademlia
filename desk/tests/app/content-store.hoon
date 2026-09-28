@@ -179,4 +179,27 @@
     (need (~(get by completed.state) 0v11))
   %+  expect-eq  !>(`content-store-result`[%failed %invalid])
   !>(result)
+::
+++  test-invalid-mutable-name-is-rejected
+  =/  initialized  on-init:~(. agent bowl)
+  =/  invalid=publication-options
+    [`[namespace=%demo name=~ revision=1] ~]
+  =/  put
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%put 0v12 [%noun 42] invalid ~])
+  =/  put-state=content-store-state  (get-state on-save:+.put)
+  =/  put-result=content-store-result
+    (need (~(get by completed.put-state) 0v12))
+  =/  get
+    %+  on-poke:+.put  %content-store-command
+    !>(`content-store-command`[%get 0v13 [%name ~zod %demo ~]])
+  =/  get-state=content-store-state  (get-state on-save:+.get)
+  =/  get-result=content-store-result
+    (need (~(get by completed.get-state) 0v13))
+  ;:  weld
+    %+  expect-eq  !>(`content-store-result`[%failed %invalid])
+    !>(put-result)
+    %+  expect-eq  !>(`content-store-result`[%failed %invalid])
+    !>(get-result)
+  ==
 --

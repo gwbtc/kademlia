@@ -199,6 +199,8 @@
         (weld delivery-cards [~(refresh-card logic engine) ~])
       %publish-pointer
         ?>  (~(valid-id logic engine) id.command)
+        ?>  !=(%$ namespace.command)
+        ?>  (name-valid:cr name.command)
         ?>  (target-valid:cr target.command)
         =/  publisher=node-id  ~(self-id logic engine)
         =/  key=key  (pointer-key:cr namespace.command publisher name.command)
@@ -220,6 +222,8 @@
         [cards this]
       %find-pointer
         ?>  (~(valid-id logic engine) id.command)
+        ?>  !=(%$ namespace.command)
+        ?>  (name-valid:cr name.command)
         ?>  (identity-valid:cr publisher.command)
         =/  key=key  (pointer-key:cr namespace.command publisher.command name.command)
         =/  ignored  (log bowl %info [%operation-start id.command %find-pointer key])

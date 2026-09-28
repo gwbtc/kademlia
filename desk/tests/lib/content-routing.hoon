@@ -46,6 +46,21 @@
     (expect !>(!=(a providers)))
   ==
 ::
+++  test-mutable-name-validation
+  =/  sixteen=path
+    ~[%a %b %c %d %e %f %g %h %i %j %k %l %m %n %o %p]
+  =/  seventeen=path
+    ~[%a %b %c %d %e %f %g %h %i %j %k %l %m %n %o %p %q]
+  =/  long=@ta  (fil 3 65 'a')
+  ;:  weld
+    (expect !>((name-valid:content-routing ~[%packages %kademlia %latest])))
+    (expect !>((name-valid:content-routing sixteen)))
+    (expect !>(!(name-valid:content-routing ~)))
+    (expect !>(!(name-valid:content-routing seventeen)))
+    (expect !>(!(name-valid:content-routing ~[%packages %$ %latest])))
+    (expect !>(!(name-valid:content-routing [long ~])))
+  ==
+::
 ++  test-locators
   =/  scry=locator  [%scry [~zod /g/x/1/example]]
   =/  application=locator  (custom [%cid 0x1234])

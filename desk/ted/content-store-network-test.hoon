@@ -38,27 +38,38 @@
   ==
 ;<  ~  bind:m  (await-operation ~wes 0v1)
 ::
-::  These reads originate on ~bud.  The digest read proves provider discovery
-::  plus exact-revision remote scry; the name read also proves pointer
-::  resolution.  The search proves that the facade delegates topic browsing.
+::  Pinning from ~bud proves provider discovery, exact-revision remote scry,
+::  local page publication, and a second provider announcement in one
+::  operation.  The subsequent digest read is local; the name read proves
+::  pointer resolution, and search proves topic browsing.
 ::
 ;<  ~  bind:m
-  (start-operation ~bud 0v1 [%get content value] [%get 0v1 [%content content]])
+  %+  start-operation  ~bud
+  :*  0v1
+      [%pin content 1 &]
+      [%pin 0v1 content `~h2]
+  ==
 ;<  ~  bind:m  (await-operation ~bud 0v1)
 ;<  ~  bind:m
-  %+  start-operation  ~bud
-  :*  0v2
-      [%get content value]
-      [%get 0v2 [%name ~wes %example name]]
-  ==
+  (start-operation ~bud 0v2 [%get content value] [%get 0v2 [%content content]])
 ;<  ~  bind:m  (await-operation ~bud 0v2)
 ;<  ~  bind:m
   %+  start-operation  ~bud
   :*  0v3
-      [%search ~[%software %urbit] 1 ~]
-      [%search 0v3 ~[%software %urbit]]
+      [%get content value]
+      [%get 0v3 [%name ~wes %example name]]
   ==
 ;<  ~  bind:m  (await-operation ~bud 0v3)
+;<  ~  bind:m
+  %+  start-operation  ~bud
+  :*  0v4
+      [%search ~[%software %urbit] 1 ~]
+      [%search 0v4 ~[%software %urbit]]
+  ==
+;<  ~  bind:m  (await-operation ~bud 0v4)
+;<  ~  bind:m
+  (start-operation ~bud 0v5 [%unpin content] [%unpin 0v5 content])
+;<  ~  bind:m  (await-operation ~bud 0v5)
 ;<  ~  bind:m  end
 (pure:m !>(~))
 ::

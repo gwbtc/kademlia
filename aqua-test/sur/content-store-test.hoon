@@ -10,6 +10,12 @@
           pointer-revision=(unit @ud)
           topic=?
       ==
+      $:  %pin
+          content=digest
+          min-accepted=@ud
+          fetched=?
+      ==
+      [%unpin content=digest]
       [%get content=digest value=(cask)]
       $:  %search
           topic=topic-path:cd

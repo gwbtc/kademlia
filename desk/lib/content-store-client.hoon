@@ -33,6 +33,16 @@
       ==
   ^-  content-store-command
   [%put id value options lifetime]
+::  Retrieve immutable content if necessary and advertise a local provider.
+++  pin
+  |=  [id=content-store-id content=digest lifetime=(unit @dr)]
+  ^-  content-store-command
+  [%pin id content lifetime]
+::  Stop retaining pin intent; existing provider records expire naturally.
+++  unpin
+  |=  [id=content-store-id content=digest]
+  ^-  content-store-command
+  [%unpin id content]
 ::  Publish only by immutable digest.
 ++  unnamed
   ^-  publication-options

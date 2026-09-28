@@ -42,6 +42,8 @@
           options=publication-options
           lifetime=(unit @dr)
       ==
+      [%pin id=content-store-id content=digest lifetime=(unit @dr)]
+      [%unpin id=content-store-id content=digest]
       [%get id=content-store-id query=content-store-query]
       [%search id=content-store-id topic=topic-path:cd]
       [%observe id=content-store-id recipient=@tas reply-path=path]
@@ -65,10 +67,20 @@
       value=(cask)
       source=(unit locator)
   ==
++$  pin-result
+  $:  content=digest
+      locator=locator
+      revision=@ud
+      expires=@da
+      publication=publication-result:cra
+      fetched=?
+  ==
 +$  search-result
   [value=browse-result:cda]
 +$  content-store-result
   $%  [%put value=put-result]
+      [%pin value=pin-result]
+      [%unpin content=digest]
       [%get value=get-result]
       [%search value=search-result]
       [%failed reason=content-store-failure]
@@ -79,6 +91,14 @@
   [reply-path=path result=content-store-result]
 +$  published-page
   [spur=path locator=locator]
++$  local-publication
+  $:  locator=locator
+      revision=@ud
+      expires=@da
+      pinned=?
+      originated=?
+      publication=publication-result:cra
+  ==
 ::
 ::  Internal operation phases.  Lower-layer operation IDs are encoded in
 ::  callback paths, so no separate correlation map is required.
@@ -91,15 +111,37 @@
       pointer=(unit publication-result:cra)
       pointer-revision=(unit @ud)
       pointer-expires=(unit @da)
+      provider-revision=@ud
+      provider-expires=@da
       topic-done=?
       topic=(unit advertisement-result:cda)
       failure=(unit content-store-failure)
   ==
++$  retrieval-purpose
+  $%  [%get ~]
+      [%pin lifetime=(unit @dr)]
+  ==
++$  provider-query-operation
+  [content=digest purpose=retrieval-purpose]
++$  scry-operation
+  $:  content=digest
+      source=locator
+      deadline=@da
+      purpose=retrieval-purpose
+  ==
++$  pin-operation
+  $:  content=digest
+      locator=locator
+      revision=@ud
+      expires=@da
+      fetched=?
+  ==
 +$  content-store-operation
   $%  [%put value=put-operation]
+      [%pin value=pin-operation]
       [%pointer query=content-store-query]
-      [%providers content=digest]
-      [%scry content=digest source=locator deadline=@da]
+      [%providers value=provider-query-operation]
+      [%scry value=scry-operation]
       [%search topic=topic-path:cd]
   ==
 +$  content-store-view
@@ -110,6 +152,7 @@
   $:  config=content-store-config
       values=(map digest (cask))
       pages=(map digest published-page)
+      publications=(map digest local-publication)
       provider-revisions=(map digest @ud)
       pointer-revisions=(map name-key @ud)
       active=(map content-store-id content-store-operation)

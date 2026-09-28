@@ -10,6 +10,8 @@
 +$  allocation  [id=@uv next=content-store-state]
 +$  revision-allocation
   [valid=? revision=(unit @ud) next=content-store-state]
++$  page-allocation
+  [page=published-page cards=(list card) next=content-store-state]
 --
 ::
 %+  verb  |
@@ -236,23 +238,34 @@
   `i.locs
 ::
 ++  begin-provider-query
-  |=  [our=@p parent=content-store-id content=digest]
+  |=  $:  our=@p
+          parent=content-store-id
+          content=digest
+          purpose=retrieval-purpose
+      ==
   ^-  action
   =/  allocation=allocation  take-content-id
   =.  state  next.allocation
   =/  lower=@uv  id.allocation
-  =.  active.state  (~(put by active.state) parent [%providers content])
-  :-  :~  (content-poke our parent lower [%observe lower %content-store /get/providers/(scot %uv parent)/(scot %uv lower)])
+  =.  active.state
+    (~(put by active.state) parent [%providers content purpose])
+  :-  :~  (content-poke our parent lower [%observe lower %content-store /retrieve/providers/(scot %uv parent)/(scot %uv lower)])
           (content-poke our parent lower [%find-providers lower content])
       ==
   state
 ::
 ++  begin-scry
-  |=  [=bowl:gall id=content-store-id content=digest source=locator]
+  |=  $:  =bowl:gall
+          id=content-store-id
+          content=digest
+          source=locator
+          purpose=retrieval-purpose
+      ==
   ^-  action
   ?.  ?=(%scry -.source)  (fail our.bowl id %unsupported-locator)
   =/  deadline=@da  (add now.bowl request-timeout.config.state)
-  =.  active.state  (~(put by active.state) id [%scry content source deadline])
+  =.  active.state
+    (~(put by active.state) id [%scry content source deadline purpose])
   :-  :~  (keen-card id spar.source)
           (wait-card id deadline)
       ==
@@ -270,6 +283,78 @@
   =.  active.state  (~(put by active.state) parent [%pointer query])
   :-  :~  (content-poke our parent lower [%observe lower %content-store /get/pointer/(scot %uv parent)/(scot %uv lower)])
           (content-poke our parent lower [%find-pointer lower namespace.query publisher name.query])
+      ==
+  state
+::
+++  ensure-page
+  |=  $:  =bowl:gall
+          id=content-store-id
+          content=digest
+          value=(cask)
+      ==
+  ^-  page-allocation
+  =/  existing=(unit published-page)  (~(get by pages.state) content)
+  ?^  existing  [u.existing ~ state]
+  =/  spur=path
+    /content/(scot %uv content)/(scot %da now.bowl)/(scot %uv id)
+  =/  exact=path
+    /g/x/1/content-store//1/content/(scot %uv content)/(scot %da now.bowl)/(scot %uv id)
+  =/  locator=locator  [%scry [our.bowl exact]]
+  =.  pages.state  (~(put by pages.state) content [spur locator])
+  [[spur locator] ~[[%pass /publish/(scot %uv id) %grow spur value]] state]
+::
+++  record-publication
+  |=  $:  content=digest
+          locator=locator
+          revision=@ud
+          expires=@da
+          pinned=?
+          originated=?
+          publication=publication-result:cra
+      ==
+  ^-  content-store-state
+  =/  existing=(unit local-publication)
+    (~(get by publications.state) content)
+  =/  was-pinned=?  ?~(existing | pinned.u.existing)
+  =/  was-originated=?  ?~(existing | originated.u.existing)
+  =/  value=local-publication
+    :*  locator  revision  expires
+        ?|(pinned was-pinned)
+        ?|(originated was-originated)
+        publication
+    ==
+  =.  publications.state  (~(put by publications.state) content value)
+  state
+::
+++  begin-pin-publication
+  |=  $:  =bowl:gall
+          id=content-store-id
+          content=digest
+          fetched=?
+          lifetime=(unit @dr)
+      ==
+  ^-  action
+  =/  value=(unit (cask))  (~(get by values.state) content)
+  ?~  value  (fail our.bowl id %provider-not-found)
+  =/  allocated=page-allocation
+    (ensure-page bowl id content u.value)
+  =.  state  next.allocated
+  =/  duration=@dr
+    ?~(lifetime publication-lifetime.config.state u.lifetime)
+  =/  expires=@da  (add now.bowl duration)
+  =/  previous=@ud  (~(gut by provider-revisions.state) [content 0])
+  =/  revision=@ud  +(previous)
+  =.  provider-revisions.state
+    (~(put by provider-revisions.state) content revision)
+  =/  lower-allocation=allocation  take-content-id
+  =.  state  next.lower-allocation
+  =/  lower=@uv  id.lower-allocation
+  =/  locator=locator  locator.page.allocated
+  =.  active.state
+    (~(put by active.state) id [%pin content locator revision expires fetched])
+  :-  %+  weld  cards.allocated
+      :~  (content-poke our.bowl id lower [%observe lower %content-store /pin/provider/(scot %uv id)/(scot %uv lower)])
+          (content-poke our.bowl id lower [%publish-provider lower content revision expires ~[locator]])
       ==
   state
 ::
@@ -300,34 +385,11 @@
     ?~  lifetime.u.name.options  ~
     `(add now.bowl u.lifetime.u.name.options)
   =/  content=digest  (digest-cask:cr value)
-  =/  existing=(unit published-page)  (~(get by pages.state) content)
-  =/  allocated=[page=published-page cards=(list card) next=content-store-state]
-    ?^  existing  [u.existing ~ state]
-    =/  spur=path
-      /content/(scot %uv content)/(scot %da now.bowl)/(scot %uv id)
-    =/  exact=path
-      /g/x/1/content-store//1/content/(scot %uv content)/(scot %da now.bowl)/(scot %uv id)
-    =/  locator=locator  [%scry [our.bowl exact]]
-    =.  pages.state  (~(put by pages.state) content [spur locator])
-    :*  [spur locator]
-        ~[[%pass /publish/(scot %uv id) %grow spur value]]
-        state
-    ==
+  =/  allocated=page-allocation  (ensure-page bowl id content value)
   =/  page=published-page  page.allocated
   =/  publication=(list card)  cards.allocated
   =.  state  next.allocated
   =.  values.state  (~(put by values.state) content value)
-  =/  put=put-operation
-    :*  content  locator.page
-        |  ~
-        ?=(~ name.options)  ~  pointer-revision  pointer-expires
-        ?=(~ topic.options)  ~
-        ~
-    ==
-  =.  active.state  (~(put by active.state) id [%put put])
-  =/  provider-allocation=allocation  take-content-id
-  =.  state  next.provider-allocation
-  =/  provider-id=@uv  id.provider-allocation
   =/  duration=@dr
     ?~(lifetime publication-lifetime.config.state u.lifetime)
   =/  expires=@da  (add now.bowl duration)
@@ -336,6 +398,18 @@
   =/  provider-revision=@ud  +(previous-revision)
   =.  provider-revisions.state
     (~(put by provider-revisions.state) content provider-revision)
+  =/  put=put-operation
+    :*  content  locator.page
+        |  ~
+        ?=(~ name.options)  ~  pointer-revision  pointer-expires
+        provider-revision  expires
+        ?=(~ topic.options)  ~
+        ~
+    ==
+  =.  active.state  (~(put by active.state) id [%put put])
+  =/  provider-allocation=allocation  take-content-id
+  =.  state  next.provider-allocation
+  =/  provider-id=@uv  id.provider-allocation
   =/  cards=(list card)
     %+  weld  publication
     :~  (content-poke our.bowl id provider-id [%observe provider-id %content-store /put/provider/(scot %uv id)/(scot %uv provider-id)])
@@ -372,7 +446,8 @@
     %content
       ?.  (digest-valid:cr digest.query)  (fail our.bowl id %invalid)
       =/  local=(unit (cask))  (~(get by values.state) digest.query)
-      ?~  local  (begin-provider-query our.bowl id digest.query)
+      ?~  local
+        (begin-provider-query our.bowl id digest.query [%get ~])
       =/  page=(unit published-page)  (~(get by pages.state) digest.query)
       =/  source=(unit locator)  ?~(page ~ `locator.u.page)
       (finish our.bowl id [%get digest.query u.local source])
@@ -384,6 +459,35 @@
         (fail our.bowl id %invalid)
       (begin-pointer-query our.bowl id query)
   ==
+::
+++  start-pin
+  |=  $:  =bowl:gall
+          id=content-store-id
+          content=digest
+          lifetime=(unit @dr)
+      ==
+  ^-  action
+  ?.  ?&  (digest-valid:cr content)
+          ?~(lifetime & (gth u.lifetime 0))
+      ==
+    (fail our.bowl id %invalid)
+  =/  local=(unit (cask))  (~(get by values.state) content)
+  ?~  local
+    (begin-provider-query our.bowl id content [%pin lifetime])
+  (begin-pin-publication bowl id content | lifetime)
+::
+++  start-unpin
+  |=  [our=@p id=content-store-id content=digest]
+  ^-  action
+  ?.  (digest-valid:cr content)  (fail our id %invalid)
+  =/  existing=(unit local-publication)
+    (~(get by publications.state) content)
+  =.  state
+    ?~  existing  state
+    =/  value=local-publication  u.existing(pinned |)
+    =.  publications.state  (~(put by publications.state) content value)
+    state
+  (finish our id [%unpin content])
 ::
 ++  start-search
   |=  [=bowl:gall id=content-store-id topic=topic-path:cd]
@@ -404,6 +508,12 @@
   ?|  (~(has by active.state) id)
       (~(has by completed.state) id)
   ==
+::
+++  pinned-contents
+  ^-  (set digest)
+  %-  ~(rep by publications.state)
+  |=  [[content=digest status=local-publication] out=(set digest)]
+  ?:(pinned.status (~(put in out) content) out)
 --
 ::
 ^-  agent:gall
@@ -412,7 +522,7 @@
     def   ~(. (default-agent this %|) bowl)
 ::
 ++  on-init
-  =.  state  [defaults ~ ~ ~ ~ ~ ~ ~ 0v1 0v1]
+  =.  state  [defaults ~ ~ ~ ~ ~ ~ ~ ~ 0v1 0v1]
   `this
 ::
 ++  on-save  !>(`content-store-saved-state`[state verbosity])
@@ -459,6 +569,17 @@
         =/  action=action
           (start-put bowl id.command value.command options.command lifetime.command)
         [cards.action this(state next.action)]
+      %pin
+        ?>  (valid-id id.command)
+        ?>  !(operation-conflict id.command)
+        =/  action=action
+          (start-pin bowl id.command content.command lifetime.command)
+        [cards.action this(state next.action)]
+      %unpin
+        ?>  (valid-id id.command)
+        ?>  !(operation-conflict id.command)
+        =/  action=action  (start-unpin our.bowl id.command content.command)
+        [cards.action this(state next.action)]
       %get
         ?>  (valid-id id.command)
         ?>  !(operation-conflict id.command)
@@ -495,6 +616,16 @@
         ?.  ?=(%published -.result.notice)  `%dependency-failed
         ?.  (publication-ok result.notice)  `%provider-publication-failed
         ~
+      =.  state
+        ?.  ?&  ?=(%published -.result.notice)
+                (publication-ok result.notice)
+            ==
+          state
+        %-  record-publication
+        :*  content.put  locator.put
+            provider-revision.put  provider-expires.put
+            |  &  value.result.notice
+        ==
       =/  settled=action  (settle-put our.bowl u.parent put)
       [(weld [forget ~] cards.settled) this(state next.settled)]
     ::
@@ -546,7 +677,7 @@
           ?-  -.target
             %content
               =/  begun=action
-                (begin-provider-query our.bowl u.parent digest.target)
+                (begin-provider-query our.bowl u.parent digest.target [%get ~])
               [(weld [forget ~] cards.begun) this(state next.begun)]
             %direct
               ?~  digest.target
@@ -559,12 +690,12 @@
                   (fail our.bowl u.parent %unsupported-locator)
                 [(weld [forget ~] cards.failed) this(state next.failed)]
               =/  begun=action
-                (begin-scry bowl u.parent u.digest.target u.source)
+                (begin-scry bowl u.parent u.digest.target u.source [%get ~])
               [(weld [forget ~] cards.begun) this(state next.begun)]
           ==
       ==
     ::
-        [%get %providers @ @ ~]
+        [%retrieve %providers @ @ ~]
       =/  parent=(unit @uv)  (slaw %uv i.t.t.path)
       =/  lower=(unit @uv)  (slaw %uv i.t.t.t.path)
       ?~  parent  `this
@@ -585,9 +716,40 @@
       ?~  source
         =/  failed=action  (fail our.bowl u.parent %unsupported-locator)
         [(weld [forget ~] cards.failed) this(state next.failed)]
+      =/  query=provider-query-operation  value.u.op
       =/  begun=action
-        (begin-scry bowl u.parent content.u.op u.source)
+        (begin-scry bowl u.parent content.query u.source purpose.query)
       [(weld [forget ~] cards.begun) this(state next.begun)]
+    ::
+        [%pin %provider @ @ ~]
+      =/  parent=(unit @uv)  (slaw %uv i.t.t.path)
+      =/  lower=(unit @uv)  (slaw %uv i.t.t.t.path)
+      ?~  parent  `this
+      ?~  lower  `this
+      =/  forget=card  (forget-content our.bowl u.parent u.lower)
+      =/  op=(unit content-store-operation)
+        (~(get by active.state) u.parent)
+      ?~  op  [[forget ~] this]
+      ?.  ?=(%pin -.u.op)  [[forget ~] this]
+      =/  pin=pin-operation  value.u.op
+      ?.  ?&  ?=(%published -.result.notice)
+              (publication-ok result.notice)
+          ==
+        =/  reason=content-store-failure
+          ?:(?=(%published -.result.notice) %provider-publication-failed %dependency-failed)
+        =/  failed=action  (fail our.bowl u.parent reason)
+        [(weld [forget ~] cards.failed) this(state next.failed)]
+      =.  state
+        %-  record-publication
+        :*  content.pin  locator.pin  revision.pin  expires.pin
+            &  |  value.result.notice
+        ==
+      =/  result=pin-result
+        :*  content.pin  locator.pin  revision.pin  expires.pin
+            value.result.notice  fetched.pin
+        ==
+      =/  finished=action  (finish our.bowl u.parent [%pin result])
+      [(weld [forget ~] cards.finished) this(state next.finished)]
     ==
   ::
       %content-discovery-result
@@ -660,11 +822,12 @@
       (~(get by active.state) u.id)
     ?~  op  `this
     ?.  ?=(%scry -.u.op)  `this
-    =/  source=locator  source.u.op
+    =/  scry=scry-operation  value.u.op
+    =/  source=locator  source.scry
     ?.  ?=(%scry -.source)  `this
     =/  sage=sage:mess:ames  sage.sign-arvo
     =/  cleanup=(list card)
-      ~[(rest-card u.id deadline.u.op) (yawn-card u.id p.sage)]
+      ~[(rest-card u.id deadline.scry) (yawn-card u.id p.sage)]
     ?~  q.sage
       =/  failed=action  (fail our.bowl u.id %remote-scry-empty)
       [(weld cleanup cards.failed) this(state next.failed)]
@@ -673,13 +836,20 @@
     ?.  (lte (met 3 (jam value)) max-content-bytes.config.state)
       =/  failed=action  (fail our.bowl u.id %remote-scry-too-large)
       [(weld cleanup cards.failed) this(state next.failed)]
-    ?.  (verify-cask:cr content.u.op value)
+    ?.  (verify-cask:cr content.scry value)
       =/  failed=action  (fail our.bowl u.id %digest-mismatch)
       [(weld cleanup cards.failed) this(state next.failed)]
-    =.  values.state  (~(put by values.state) content.u.op value)
-    =/  finished=action
-      (finish our.bowl u.id [%get content.u.op value `source])
-    [(weld cleanup cards.finished) this(state next.finished)]
+    =.  values.state  (~(put by values.state) content.scry value)
+    ?-  -.purpose.scry
+      %get
+        =/  finished=action
+          (finish our.bowl u.id [%get content.scry value `source])
+        [(weld cleanup cards.finished) this(state next.finished)]
+      %pin
+        =/  begun=action
+          (begin-pin-publication bowl u.id content.scry & lifetime.purpose.scry)
+        [(weld cleanup cards.begun) this(state next.begun)]
+    ==
   ?:  ?=([%scry-timeout @ @ ~] wire)
     ?.  ?=(%wake +<.sign-arvo)  (on-arvo:def wire sign-arvo)
     =/  id=(unit @uv)  (slaw %uv i.t.wire)
@@ -690,8 +860,9 @@
       (~(get by active.state) u.id)
     ?~  op  `this
     ?.  ?=(%scry -.u.op)  `this
-    ?.  =(deadline.u.op u.deadline)  `this
-    =/  source=locator  source.u.op
+    =/  scry=scry-operation  value.u.op
+    ?.  =(deadline.scry u.deadline)  `this
+    =/  source=locator  source.scry
     ?.  ?=(%scry -.source)  `this
     =/  failed=action  (fail our.bowl u.id %request-timeout)
     [[(yawn-card u.id spar.source) cards.failed] this(state next.failed)]
@@ -704,6 +875,15 @@
       [%x ~]  [~ ~]
       [%x %settings ~]  ``noun+!>(config.state)
       [%x %verbosity ~]  ``noun+!>(verbosity)
+      [%x %publications ~]  ``noun+!>(publications.state)
+      [%x %pins ~]  ``noun+!>(pinned-contents)
+      [%x %provider @ ~]
+    =/  content=(unit @uv)  (slaw %uv i.t.t.path)
+    ?~  content  ~
+    =/  publication=(unit local-publication)
+      (~(get by publications.state) u.content)
+    ?~  publication  ~
+    ``noun+!>(u.publication)
       [%x %operation @ ~]
     =/  id=(unit @uv)  (slaw %uv i.t.t.path)
     ?~  id  ~

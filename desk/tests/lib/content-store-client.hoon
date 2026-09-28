@@ -7,6 +7,8 @@
   =/  get=content-store-command  (get-content:client 0v2 0v42)
   =/  name=content-store-command  (get-name:client 0v3 ~zod %demo ~[%latest])
   =/  search=content-store-command  (search:client 0v4 ~[%software %urbit])
+  =/  pin=content-store-command  (pin:client 0v5 0v42 `~d7)
+  =/  unpin=content-store-command  (unpin:client 0v6 0v42)
   ;:  weld
     %+  expect-eq
       !>(`content-store-command`[%put 0v1 value [~ ~] `~h6])
@@ -14,6 +16,12 @@
     (expect !>(?=(%get -.get)))
     (expect !>(?=(%get -.name)))
     (expect !>(?=(%search -.search)))
+    %+  expect-eq
+      !>(`content-store-command`[%pin 0v5 0v42 `~d7])
+    !>(pin)
+    %+  expect-eq
+      !>(`content-store-command`[%unpin 0v6 0v42])
+    !>(unpin)
   ==
 ::
 ++  test-start-orders-two-cards

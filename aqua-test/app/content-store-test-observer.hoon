@@ -33,6 +33,17 @@
         |
       ?~  topic.result  &
       (advertisement-accepted u.topic.result min-accepted.expected)
+    %pin
+      ?.  ?=(%pin -.actual)  |
+      =/  result=pin-result  value.actual
+      ?&  =(content.expected content.result)
+          =(fetched.expected fetched.result)
+          (gth expires.result 0)
+          (publication-accepted publication.result min-accepted.expected)
+      ==
+    %unpin
+      ?.  ?=(%unpin -.actual)  |
+      =(content.expected content.actual)
     %get
       ?.  ?=(%get -.actual)  |
       =/  result=get-result  value.actual

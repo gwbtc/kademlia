@@ -29,6 +29,8 @@ Commands use caller-selected 64-bit IDs:
 
 ```hoon
 $%  [%put id value=(cask) options=publication-options lifetime=(unit @dr)]
+    [%pin id content=digest lifetime=(unit @dr)]
+    [%unpin id content=digest]
     [%get id query=content-store-query]
     [%search id topic=topic-path]
     [%observe id recipient=@tas reply-path=/]
@@ -102,6 +104,22 @@ expiry permit, so abandoned publications eventually disappear from discovery.
 The retained remote-scry page itself remains available independently of record
 discovery.
 
+`%pin` preserves and advertises immutable content without creating a mutable
+pointer or topic advertisement. It uses an already cached cask when possible;
+otherwise it performs provider discovery, retrieves the cask, verifies its
+digest, publishes a local remote-scry page, and announces this ship as a new
+provider. Repeating `%pin` reuses the page and increments the provider revision.
+Its lifetime follows `%put`: `~` selects `publication-lifetime.config`, a
+positive duration overrides it, and zero is `%invalid`. The successful result
+contains the resolved absolute `expires=@da` and a `fetched` flag indicating
+whether network retrieval was required.
+
+`%unpin` clears local retention intent. It does not send a network withdrawal,
+delete the cached cask, or remove an exact remote-scry revision; the last signed
+provider record expires naturally. Automatic renewal and cache eviction are
+not currently performed, so a client that wants continuous discoverability
+must repeat `%pin` before expiry.
+
 `%get` accepts either an immutable digest or a mutable name:
 
 ```hoon
@@ -160,6 +178,9 @@ The Gall `%gx` namespace exposes:
 /x/settings/noun
 /x/verbosity/noun
 /x/operation/<id>/noun
+/x/publications/noun
+/x/provider/<digest>/noun
+/x/pins/noun
 /x/publication/<digest>/noun
 /x/content/<digest>/<value-mark>
 ```
@@ -167,6 +188,14 @@ The Gall `%gx` namespace exposes:
 `/x/operation/<id>` returns either `%running` or `%complete`. Content uses its
 original mark rather than `%noun`, allowing a caller to request the typed page.
 The advertised remote path is the corresponding revision-qualified `%gx` path.
+
+`/x/publications` returns the local map of successful provider publications;
+`/x/provider/<digest>` returns one entry, and `/x/pins` returns the set of
+digests whose pin intent is active. Each publication records its resolved
+locator, provider revision, exact expiry, accepted publication result, and
+whether it was pinned or originated through `%put`. These are local management
+views, not live queries of the DHT. The older `/x/publication/<digest>` view
+continues to return the local remote-scry page descriptor.
 
 ## Failure and consistency model
 

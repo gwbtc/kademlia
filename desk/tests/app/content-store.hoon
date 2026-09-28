@@ -66,6 +66,8 @@
   =/  published
     (on-poke:+.started %content-routing-result !>(notice))
   =/  published-state=content-store-state  (get-state on-save:+.published)
+  =/  local-publication=local-publication
+    (need (~(get by publications.published-state) content))
   =/  result=content-store-result
     (need (~(get by completed.published-state) 0v1))
   =/  got
@@ -83,6 +85,10 @@
     !>((need (~(get by provider-revisions.started-state) content)))
     (expect !>(?=(%put -.result)))
     (expect !>(?=(%get -.get-result)))
+    %+  expect-eq  !>(&)
+    !>(originated.local-publication)
+    %+  expect-eq  !>(|)
+    !>(pinned.local-publication)
     %+  expect-eq  !>(value)
     !>((get-value get-result))
   ==
@@ -238,6 +244,81 @@
     %+  expect-eq  !>(1)
     !>((need (~(get by pointer-revisions.final) [%demo ~[%latest]])))
   ==
+::
+++  test-pin-local-content-and-unpin
+  =/  initialized  on-init:~(. agent bowl)
+  =/  value=(cask)  [%noun 42]
+  =/  content=digest  (digest-cask:cr value)
+  =/  initial=content-store-state  (get-state on-save:+.initialized)
+  =.  values.initial  (~(put by values.initial) content value)
+  =/  loaded
+    (on-load:~(. agent bowl) !>(`content-store-saved-state`[initial %off]))
+  =/  started
+    %+  on-poke:+.loaded  %content-store-command
+    !>(`content-store-command`[%pin 0v30 content ~])
+  =/  started-state=content-store-state  (get-state on-save:+.started)
+  =/  operation=content-store-operation
+    (need (~(get by active.started-state) 0v30))
+  ?>  ?=(%pin -.operation)
+  =/  pin=pin-operation  value.operation
+  =/  publication=publication-result:cra
+    (accepted-publication (provider-key:cr content))
+  =/  notice=operation-notice:cra
+    [/pin/provider/0v30/0v1 [%published publication]]
+  =/  completed
+    (on-poke:+.started %content-routing-result !>(notice))
+  =/  completed-state=content-store-state  (get-state on-save:+.completed)
+  =/  result=content-store-result
+    (need (~(get by completed.completed-state) 0v30))
+  ?>  ?=(%pin -.result)
+  =/  status=local-publication
+    (need (~(get by publications.completed-state) content))
+  =/  pins=(set digest)
+    !<((set digest) q:(need (need (on-peek:+.completed /x/pins))))
+  =/  provider-path=path  /x/provider/(scot %uv content)
+  =/  provider-view=local-publication
+    !<(local-publication q:(need (need (on-peek:+.completed provider-path))))
+  =/  publication-view=(map digest local-publication)
+    !<((map digest local-publication) q:(need (need (on-peek:+.completed /x/publications))))
+  =/  unpinned
+    %+  on-poke:+.completed  %content-store-command
+    !>(`content-store-command`[%unpin 0v31 content])
+  =/  final=content-store-state  (get-state on-save:+.unpinned)
+  =/  final-status=local-publication
+    (need (~(get by publications.final) content))
+  ;:  weld
+    %+  expect-eq  !>((add now ~d1))
+    !>(expires.pin)
+    %+  expect-eq  !>(|)
+    !>(fetched.pin)
+    %+  expect-eq
+      !>(`pin-result`[content locator.pin 1 (add now ~d1) publication |])
+    !>(value.result)
+    %+  expect-eq  !>(&)
+    !>(pinned.status)
+    %+  expect-eq  !>(|)
+    !>(originated.status)
+    %+  expect-eq  !>(1)
+    !>((lent ~(tap in pins)))
+    %+  expect-eq  !>(status)
+    !>(provider-view)
+    %+  expect-eq  !>(status)
+    !>((need (~(get by publication-view) content)))
+    %+  expect-eq  !>(|)
+    !>(pinned.final-status)
+    %+  expect-eq  !>(`content-store-result`[%unpin content])
+    !>((need (~(get by completed.final) 0v31)))
+  ==
+::
+++  test-zero-pin-lifetime-is-invalid
+  =/  initialized  on-init:~(. agent bowl)
+  =/  content=digest  (digest-cask:cr [%noun 42])
+  =/  failed
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%pin 0v32 content `~s0])
+  =/  state=content-store-state  (get-state on-save:+.failed)
+  %+  expect-eq  !>(`content-store-result`[%failed %invalid])
+  !>((need (~(get by completed.state) 0v32)))
 ::
 ++  test-search-completes-through-discovery-callback
   =/  initialized  on-init:~(. agent bowl)

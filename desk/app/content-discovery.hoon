@@ -37,13 +37,13 @@
     .^(@ud %j /(scot %p our.bowl)/life/(scot %da now.bowl)/(scot %p our.bowl))
   =/  secret=ring
     .^(ring %j /(scot %p our.bowl)/vein/(scot %da now.bowl)/(scot %ud life))
-  =/  cub  (nol:nu:crub:crypto secret)
+  =/  cub  (nol:nu:cric:crypto secret)
   [life (sigh:as:cub message)]
 ::
 ++  fake-public
   |=  ship=@p
   ^-  pass
-  =/  cub  (pit:nu:crub:crypto 512 ship)
+  =/  cub  (pit:nu:cric:crypto 512 ship %b ~)
   pub:ex:cub
 ::
 ++  normalize-public
@@ -82,11 +82,11 @@
   ?~  public
     =/  ignored  (log bowl %debug [%record-verification-failed ship life.sig %no-public-key])
     |
-  ?.  =(1 crypto-suite.u.public)
+  ?.  ?=(?(%1 %2) crypto-suite.u.public)
     =/  ignored
       (log bowl %debug [%record-verification-failed ship life.sig %unsupported-suite])
     |
-  =/  them  (com:nu:crub:crypto pass.u.public)
+  =/  them  (com:nu:cric:crypto pass.u.public)
   =/  valid  (safe:as:them value.sig message)
   ?.  valid
     =/  ignored  (log bowl %debug [%record-verification-failed ship life.sig %bad-signature])

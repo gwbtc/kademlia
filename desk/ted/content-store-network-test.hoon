@@ -23,7 +23,7 @@
 =/  content=digest  (digest-cask:cr value)
 =/  name=path  ~[%packages %kademlia %latest]
 =/  options=publication-options
-  :*  `[namespace=%example name=name revision=[%auto ~]]
+  :*  `[namespace=%example name=name revision=[%auto ~] lifetime=`~h6]
       `[topic=~[%software %urbit] format=%content-store-test-v1 entries=1 revision=1]
   ==
 ::

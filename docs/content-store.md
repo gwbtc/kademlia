@@ -48,7 +48,11 @@ A named publication supplies a revision policy rather than a caller-managed
 revision by default:
 
 ```hoon
-[namespace=@tas name=path revision=name-revision-policy]
+[ namespace=@tas
+  name=path
+  revision=name-revision-policy
+  lifetime=(unit @dr)
+]
 
 $%  [%auto ~]
     [%set value=@ud]
@@ -58,16 +62,16 @@ $%  [%auto ~]
 
 The operation completes only after every requested lower-layer publication has
 completed. Its result includes the digest, locator, and the provider, pointer,
-allocated pointer revision, and topic publication reports. A publication with
-no accepting replica becomes a typed failure.
+allocated pointer revision, exact pointer expiry, and topic publication
+reports. A publication with no accepting replica becomes a typed failure.
 
 Provider revisions are maintained per digest and increment on each repeated
 `%put`, avoiding same-revision conflicts when a locator is renewed. `lifetime`
 selects the signed expiry of the provider record and any topic advertisement.
 Use `~` to use the configured `publication-lifetime`, or supply a positive
 `@dr` override such as `` `~d7 ``. There is no protocol-imposed maximum. A zero
-override is rejected as `%invalid`. Named pointers remain non-expiring and are
-independent of this lease.
+override is rejected as `%invalid`. Named-pointer expiry is independent of this
+lease and is selected separately in the named-publication options below.
 
 Mutable-name revisions are maintained persistently per `[namespace name]`.
 The normal publication option uses `[%auto ~]`, which atomically allocates one
@@ -82,6 +86,14 @@ same-revision conflict; callers using it own that risk. `[%cas expected value]`
 requires the stored counter to equal `expected` and `value` to be greater. A
 mismatch returns `%revision-conflict` without starting the publication. The
 selected revision is returned as `pointer-revision` in the `%put` result.
+
+`named-publication.lifetime` controls the pointer independently of the `%put`
+lifetime used by provider and topic records. `~` expresses permanent publisher
+intent and produces a signed pointer with `expires=~`. A positive relative
+duration such as `` `~d7 `` is converted to an exact signed expiry when the
+operation is accepted. Zero is rejected as `%invalid`; there is currently no
+protocol-level maximum. The exact expiry is returned as `pointer-expires` in
+the `%put` result.
 
 The façade does not schedule automatic renewal: an application which needs a
 continuously advertised value must repeat `%put` before its chosen expiry. A

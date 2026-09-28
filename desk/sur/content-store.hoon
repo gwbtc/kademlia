@@ -21,6 +21,7 @@
   $:  namespace=@tas
       name=path
       revision=name-revision-policy
+      lifetime=(unit @dr)
   ==
 +$  topic-publication
   $:  topic=topic-path:cd
@@ -56,6 +57,7 @@
       provider=publication-result:cra
       pointer=(unit publication-result:cra)
       pointer-revision=(unit @ud)
+      pointer-expires=(unit @da)
       topic=(unit advertisement-result:cda)
   ==
 +$  get-result
@@ -88,6 +90,7 @@
       pointer-done=?
       pointer=(unit publication-result:cra)
       pointer-revision=(unit @ud)
+      pointer-expires=(unit @da)
       topic-done=?
       topic=(unit advertisement-result:cda)
       failure=(unit content-store-failure)

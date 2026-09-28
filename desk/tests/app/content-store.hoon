@@ -118,7 +118,7 @@
   =/  value=(cask)  [%noun 42]
   =/  key=name-key  [%demo ~[%latest]]
   =/  automatic=publication-options
-    [`[%demo ~[%latest] [%auto ~]] ~]
+    [`[%demo ~[%latest] [%auto ~] ~] ~]
   =/  first
     %+  on-poke:+.initialized  %content-store-command
     !>(`content-store-command`[%put 0v20 value automatic ~])
@@ -134,7 +134,7 @@
     (need (~(get by active.second-state) 0v21))
   ?>  ?=(%put -.second-op)
   =/  compare=publication-options
-    [`[%demo ~[%latest] [%cas 2 7]] ~]
+    [`[%demo ~[%latest] [%cas 2 7] ~] ~]
   =/  compared
     %+  on-poke:+.second  %content-store-command
     !>(`content-store-command`[%put 0v22 value compare ~])
@@ -143,7 +143,7 @@
     (need (~(get by active.compared-state) 0v22))
   ?>  ?=(%put -.compared-op)
   =/  stale=publication-options
-    [`[%demo ~[%latest] [%cas 2 8]] ~]
+    [`[%demo ~[%latest] [%cas 2 8] ~] ~]
   =/  rejected
     %+  on-poke:+.compared  %content-store-command
     !>(`content-store-command`[%put 0v23 value stale ~])
@@ -153,6 +153,8 @@
   ;:  weld
     %+  expect-eq  !>(1)
     !>((need pointer-revision.value.first-op))
+    %+  expect-eq  !>(`(unit @da)`~)
+    !>(pointer-expires.value.first-op)
     %+  expect-eq  !>(2)
     !>((need pointer-revision.value.second-op))
     %+  expect-eq  !>(7)
@@ -167,12 +169,12 @@
   =/  initialized  on-init:~(. agent bowl)
   =/  value=(cask)  [%noun 42]
   =/  explicit=publication-options
-    [`[%demo ~[%latest] [%set 12]] ~]
+    [`[%demo ~[%latest] [%set 12] ~] ~]
   =/  first
     %+  on-poke:+.initialized  %content-store-command
     !>(`content-store-command`[%put 0v24 value explicit ~])
   =/  automatic=publication-options
-    [`[%demo ~[%latest] [%auto ~]] ~]
+    [`[%demo ~[%latest] [%auto ~] ~] ~]
   =/  second
     %+  on-poke:+.first  %content-store-command
     !>(`content-store-command`[%put 0v25 value automatic ~])
@@ -190,7 +192,7 @@
   =/  initialized  on-init:~(. agent bowl)
   =/  value=(cask)  [%noun 42]
   =/  automatic=publication-options
-    [`[%demo ~[%latest] [%auto ~]] ~]
+    [`[%demo ~[%latest] [%auto ~] ~] ~]
   =/  first
     %+  on-poke:+.initialized  %content-store-command
     !>(`content-store-command`[%put 0v26 value automatic ~])
@@ -206,6 +208,35 @@
     !>((need pointer-revision.value.op))
     %+  expect-eq  !>(2)
     !>((need (~(get by pointer-revisions.state) [%demo ~[%latest]])))
+  ==
+::
+++  test-pointer-relative-lifetime-and-zero-rejection
+  =/  initialized  on-init:~(. agent bowl)
+  =/  value=(cask)  [%noun 42]
+  =/  expiring=publication-options
+    [`[%demo ~[%latest] [%auto ~] `~h6] ~]
+  =/  started
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%put 0v28 value expiring ~])
+  =/  started-state=content-store-state  (get-state on-save:+.started)
+  =/  op=content-store-operation
+    (need (~(get by active.started-state) 0v28))
+  ?>  ?=(%put -.op)
+  =/  invalid=publication-options
+    [`[%demo ~[%latest] [%auto ~] `~s0] ~]
+  =/  rejected
+    %+  on-poke:+.started  %content-store-command
+    !>(`content-store-command`[%put 0v29 value invalid ~])
+  =/  final=content-store-state  (get-state on-save:+.rejected)
+  =/  failure=content-store-result
+    (need (~(get by completed.final) 0v29))
+  ;:  weld
+    %+  expect-eq  !>((add now ~h6))
+    !>((need pointer-expires.value.op))
+    %+  expect-eq  !>(`content-store-result`[%failed %invalid])
+    !>(failure)
+    %+  expect-eq  !>(1)
+    !>((need (~(get by pointer-revisions.final) [%demo ~[%latest]])))
   ==
 ::
 ++  test-search-completes-through-discovery-callback
@@ -278,7 +309,7 @@
 ++  test-invalid-mutable-name-is-rejected
   =/  initialized  on-init:~(. agent bowl)
   =/  invalid=publication-options
-    [`[namespace=%demo name=~ revision=[%auto ~]] ~]
+    [`[namespace=%demo name=~ revision=[%auto ~] lifetime=~] ~]
   =/  put
     %+  on-poke:+.initialized  %content-store-command
     !>(`content-store-command`[%put 0v12 [%noun 42] invalid ~])

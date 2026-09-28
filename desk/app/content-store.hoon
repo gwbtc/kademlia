@@ -56,6 +56,9 @@
         &
       ?&  !=(%$ namespace.u.name.options)
           (name-valid:cr name.u.name.options)
+          ?~  lifetime.u.name.options
+            &
+          (gth u.lifetime.u.name.options 0)
       ==
     |
   ?~  topic.options  &
@@ -204,6 +207,7 @@
         (need provider.put)
         pointer.put
         pointer-revision.put
+        pointer-expires.put
         topic.put
     ==
   (finish our id [%put result])
@@ -291,6 +295,10 @@
     (fail our.bowl id %revision-conflict)
   =.  state  next.pointer-allocation
   =/  pointer-revision=(unit @ud)  revision.pointer-allocation
+  =/  pointer-expires=(unit @da)
+    ?~  name.options  ~
+    ?~  lifetime.u.name.options  ~
+    `(add now.bowl u.lifetime.u.name.options)
   =/  content=digest  (digest-cask:cr value)
   =/  existing=(unit published-page)  (~(get by pages.state) content)
   =/  allocated=[page=published-page cards=(list card) next=content-store-state]
@@ -312,7 +320,7 @@
   =/  put=put-operation
     :*  content  locator.page
         |  ~
-        ?=(~ name.options)  ~  pointer-revision
+        ?=(~ name.options)  ~  pointer-revision  pointer-expires
         ?=(~ topic.options)  ~
         ~
     ==
@@ -340,7 +348,7 @@
     =/  pointer-id=@uv  id.pointer-allocation
     :-  %+  weld  cards
         :~  (content-poke our.bowl id pointer-id [%observe pointer-id %content-store /put/pointer/(scot %uv id)/(scot %uv pointer-id)])
-            (content-poke our.bowl id pointer-id [%publish-pointer pointer-id namespace.u.name.options name.u.name.options (need pointer-revision) ~ [%content content]])
+            (content-poke our.bowl id pointer-id [%publish-pointer pointer-id namespace.u.name.options name.u.name.options (need pointer-revision) pointer-expires [%content content]])
         ==
     state
   =.  cards  cards.with-pointer

@@ -10,10 +10,17 @@
       publication-lifetime=@dr
       max-content-bytes=@ud
   ==
++$  name-key
+  [namespace=@tas name=path]
++$  name-revision-policy
+  $%  [%auto ~]
+      [%set value=@ud]
+      [%cas expected=@ud value=@ud]
+  ==
 +$  named-publication
   $:  namespace=@tas
       name=path
-      revision=@ud
+      revision=name-revision-policy
   ==
 +$  topic-publication
   $:  topic=topic-path:cd
@@ -42,12 +49,13 @@
       [%set-verbosity level=content-store-verbosity]
   ==
 +$  content-store-failure
-  ?(%invalid %too-large %pointer-not-found %pointer-conflict %unverifiable-direct %provider-not-found %unsupported-locator %remote-scry-empty %remote-scry-too-large %digest-mismatch %request-timeout %provider-publication-failed %pointer-publication-failed %topic-publication-failed %dependency-failed)
+  ?(%invalid %too-large %revision-conflict %pointer-not-found %pointer-conflict %unverifiable-direct %provider-not-found %unsupported-locator %remote-scry-empty %remote-scry-too-large %digest-mismatch %request-timeout %provider-publication-failed %pointer-publication-failed %topic-publication-failed %dependency-failed)
 +$  put-result
   $:  content=digest
       locator=locator
       provider=publication-result:cra
       pointer=(unit publication-result:cra)
+      pointer-revision=(unit @ud)
       topic=(unit advertisement-result:cda)
   ==
 +$  get-result
@@ -79,6 +87,7 @@
       provider=(unit publication-result:cra)
       pointer-done=?
       pointer=(unit publication-result:cra)
+      pointer-revision=(unit @ud)
       topic-done=?
       topic=(unit advertisement-result:cda)
       failure=(unit content-store-failure)
@@ -99,6 +108,7 @@
       values=(map digest (cask))
       pages=(map digest published-page)
       provider-revisions=(map digest @ud)
+      pointer-revisions=(map name-key @ud)
       active=(map content-store-id content-store-operation)
       completed=(map content-store-id content-store-result)
       callbacks=(map content-store-id content-store-callback)

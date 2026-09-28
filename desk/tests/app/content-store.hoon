@@ -113,6 +113,101 @@
     !>((need (~(get by provider-revisions.state) content)))
   ==
 ::
+++  test-pointer-revision-allocation-and-cas
+  =/  initialized  on-init:~(. agent bowl)
+  =/  value=(cask)  [%noun 42]
+  =/  key=name-key  [%demo ~[%latest]]
+  =/  automatic=publication-options
+    [`[%demo ~[%latest] [%auto ~]] ~]
+  =/  first
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%put 0v20 value automatic ~])
+  =/  first-state=content-store-state  (get-state on-save:+.first)
+  =/  first-op=content-store-operation
+    (need (~(get by active.first-state) 0v20))
+  ?>  ?=(%put -.first-op)
+  =/  second
+    %+  on-poke:+.first  %content-store-command
+    !>(`content-store-command`[%put 0v21 value automatic ~])
+  =/  second-state=content-store-state  (get-state on-save:+.second)
+  =/  second-op=content-store-operation
+    (need (~(get by active.second-state) 0v21))
+  ?>  ?=(%put -.second-op)
+  =/  compare=publication-options
+    [`[%demo ~[%latest] [%cas 2 7]] ~]
+  =/  compared
+    %+  on-poke:+.second  %content-store-command
+    !>(`content-store-command`[%put 0v22 value compare ~])
+  =/  compared-state=content-store-state  (get-state on-save:+.compared)
+  =/  compared-op=content-store-operation
+    (need (~(get by active.compared-state) 0v22))
+  ?>  ?=(%put -.compared-op)
+  =/  stale=publication-options
+    [`[%demo ~[%latest] [%cas 2 8]] ~]
+  =/  rejected
+    %+  on-poke:+.compared  %content-store-command
+    !>(`content-store-command`[%put 0v23 value stale ~])
+  =/  final=content-store-state  (get-state on-save:+.rejected)
+  =/  failure=content-store-result
+    (need (~(get by completed.final) 0v23))
+  ;:  weld
+    %+  expect-eq  !>(1)
+    !>((need pointer-revision.value.first-op))
+    %+  expect-eq  !>(2)
+    !>((need pointer-revision.value.second-op))
+    %+  expect-eq  !>(7)
+    !>((need pointer-revision.value.compared-op))
+    %+  expect-eq  !>(7)
+    !>((need (~(get by pointer-revisions.final) key)))
+    %+  expect-eq  !>(`content-store-result`[%failed %revision-conflict])
+    !>(failure)
+  ==
+::
+++  test-explicit-pointer-revision-seeds-automatic-counter
+  =/  initialized  on-init:~(. agent bowl)
+  =/  value=(cask)  [%noun 42]
+  =/  explicit=publication-options
+    [`[%demo ~[%latest] [%set 12]] ~]
+  =/  first
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%put 0v24 value explicit ~])
+  =/  automatic=publication-options
+    [`[%demo ~[%latest] [%auto ~]] ~]
+  =/  second
+    %+  on-poke:+.first  %content-store-command
+    !>(`content-store-command`[%put 0v25 value automatic ~])
+  =/  state=content-store-state  (get-state on-save:+.second)
+  =/  op=content-store-operation  (need (~(get by active.state) 0v25))
+  ?>  ?=(%put -.op)
+  ;:  weld
+    %+  expect-eq  !>(13)
+    !>((need pointer-revision.value.op))
+    %+  expect-eq  !>(13)
+    !>((need (~(get by pointer-revisions.state) [%demo ~[%latest]])))
+  ==
+::
+++  test-pointer-revision-counter-survives-load
+  =/  initialized  on-init:~(. agent bowl)
+  =/  value=(cask)  [%noun 42]
+  =/  automatic=publication-options
+    [`[%demo ~[%latest] [%auto ~]] ~]
+  =/  first
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%put 0v26 value automatic ~])
+  =/  loaded  (on-load:~(. agent bowl) on-save:+.first)
+  =/  second
+    %+  on-poke:+.loaded  %content-store-command
+    !>(`content-store-command`[%put 0v27 value automatic ~])
+  =/  state=content-store-state  (get-state on-save:+.second)
+  =/  op=content-store-operation  (need (~(get by active.state) 0v27))
+  ?>  ?=(%put -.op)
+  ;:  weld
+    %+  expect-eq  !>(2)
+    !>((need pointer-revision.value.op))
+    %+  expect-eq  !>(2)
+    !>((need (~(get by pointer-revisions.state) [%demo ~[%latest]])))
+  ==
+::
 ++  test-search-completes-through-discovery-callback
   =/  initialized  on-init:~(. agent bowl)
   =/  topic=topic-path:cd  ~[%software]
@@ -183,7 +278,7 @@
 ++  test-invalid-mutable-name-is-rejected
   =/  initialized  on-init:~(. agent bowl)
   =/  invalid=publication-options
-    [`[namespace=%demo name=~ revision=1] ~]
+    [`[namespace=%demo name=~ revision=[%auto ~]] ~]
   =/  put
     %+  on-poke:+.initialized  %content-store-command
     !>(`content-store-command`[%put 0v12 [%noun 42] invalid ~])

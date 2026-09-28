@@ -23,7 +23,7 @@
 =/  content=digest  (digest-cask:cr value)
 =/  name=path  ~[%packages %kademlia %latest]
 =/  options=publication-options
-  :*  `[namespace=%example name=name revision=1]
+  :*  `[namespace=%example name=name revision=[%auto ~]]
       `[topic=~[%software %urbit] format=%content-store-test-v1 entries=1 revision=1]
   ==
 ::
@@ -33,7 +33,7 @@
 ;<  ~  bind:m
   %+  start-operation  ~wes
   :*  0v1
-      [%put content 1 & &]
+      [%put content 1 & `1 &]
       [%put 0v1 value options `~h6]
   ==
 ;<  ~  bind:m  (await-operation ~wes 0v1)

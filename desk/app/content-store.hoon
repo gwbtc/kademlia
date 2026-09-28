@@ -8,6 +8,8 @@
 +$  card  card:agent:gall
 +$  action  [cards=(list card) next=content-store-state]
 +$  allocation  [id=@uv next=content-store-state]
++$  revision-allocation
+  [valid=? revision=(unit @ud) next=content-store-state]
 --
 ::
 %+  verb  |
@@ -77,6 +79,27 @@
   =/  id=@uv  (end 6 next-discovery.state)
   =.  next-discovery.state  (bump-id id)
   [id state]
+::
+++  take-pointer-revision
+  |=  named=(unit named-publication)
+  ^-  revision-allocation
+  ?~  named  [& ~ state]
+  =/  key=name-key  [namespace.u.named name.u.named]
+  =/  current=@ud  (~(gut by pointer-revisions.state) [key 0])
+  =/  revision=(unit @ud)
+    ?-  -.revision.u.named
+      %auto  `+(current)
+      %set   `value.revision.u.named
+      %cas
+        ?.  =(expected.revision.u.named current)  ~
+        ?.  (gth value.revision.u.named current)  ~
+        `value.revision.u.named
+    ==
+  ?~  revision  [| ~ state]
+  =/  high=@ud  (max current u.revision)
+  =.  pointer-revisions.state
+    (~(put by pointer-revisions.state) key high)
+  [& `u.revision state]
 ::
 ++  local-poke
   |=  [our=@p app=@tas =mark payload=vase =wire]
@@ -180,6 +203,7 @@
         locator.put
         (need provider.put)
         pointer.put
+        pointer-revision.put
         topic.put
     ==
   (finish our id [%put result])
@@ -261,6 +285,12 @@
     (fail our.bowl id %invalid)
   ?.  (lte bytes max-content-bytes.config.state)
     (fail our.bowl id %too-large)
+  =/  pointer-allocation=revision-allocation
+    (take-pointer-revision name.options)
+  ?.  valid.pointer-allocation
+    (fail our.bowl id %revision-conflict)
+  =.  state  next.pointer-allocation
+  =/  pointer-revision=(unit @ud)  revision.pointer-allocation
   =/  content=digest  (digest-cask:cr value)
   =/  existing=(unit published-page)  (~(get by pages.state) content)
   =/  allocated=[page=published-page cards=(list card) next=content-store-state]
@@ -280,7 +310,12 @@
   =.  state  next.allocated
   =.  values.state  (~(put by values.state) content value)
   =/  put=put-operation
-    [content locator.page | ~ ?=(~ name.options) ~ ?=(~ topic.options) ~ ~]
+    :*  content  locator.page
+        |  ~
+        ?=(~ name.options)  ~  pointer-revision
+        ?=(~ topic.options)  ~
+        ~
+    ==
   =.  active.state  (~(put by active.state) id [%put put])
   =/  provider-allocation=allocation  take-content-id
   =.  state  next.provider-allocation
@@ -305,7 +340,7 @@
     =/  pointer-id=@uv  id.pointer-allocation
     :-  %+  weld  cards
         :~  (content-poke our.bowl id pointer-id [%observe pointer-id %content-store /put/pointer/(scot %uv id)/(scot %uv pointer-id)])
-            (content-poke our.bowl id pointer-id [%publish-pointer pointer-id namespace.u.name.options name.u.name.options revision.u.name.options ~ [%content content]])
+            (content-poke our.bowl id pointer-id [%publish-pointer pointer-id namespace.u.name.options name.u.name.options (need pointer-revision) ~ [%content content]])
         ==
     state
   =.  cards  cards.with-pointer
@@ -369,7 +404,7 @@
     def   ~(. (default-agent this %|) bowl)
 ::
 ++  on-init
-  =.  state  [defaults ~ ~ ~ ~ ~ ~ 0v1 0v1]
+  =.  state  [defaults ~ ~ ~ ~ ~ ~ ~ 0v1 0v1]
   `this
 ::
 ++  on-save  !>(`content-store-saved-state`[state verbosity])

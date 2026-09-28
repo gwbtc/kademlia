@@ -24,13 +24,19 @@
   !>((lent cards))
 ::
 ++  test-publication-option-constructors
-  =/  name=named-publication  [%demo ~[%latest] 7]
+  =/  name=named-publication  [%demo ~[%latest] [%set 7]]
   =/  topic=topic-publication  [~[%software %urbit] %catalog 12 3]
   ;:  weld
     %+  expect-eq  !>(`publication-options`[~ ~])
     !>(unnamed:client)
     %+  expect-eq  !>(`publication-options`[`name ~])
-    !>((with-name:client %demo ~[%latest] 7))
+    !>((with-name-at:client %demo ~[%latest] 7))
+    %+  expect-eq
+      !>(`publication-options`[`[%demo ~[%latest] [%auto ~]] ~])
+    !>((with-name:client %demo ~[%latest]))
+    %+  expect-eq
+      !>(`publication-options`[`[%demo ~[%latest] [%cas 7 9]] ~])
+    !>((with-name-cas:client %demo ~[%latest] 7 9))
     %+  expect-eq  !>(`publication-options`[~ `topic])
     !>((with-topic:client ~[%software %urbit] %catalog 12 3))
     %+  expect-eq  !>(`publication-options`[`name `topic])

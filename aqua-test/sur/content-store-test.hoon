@@ -7,6 +7,7 @@
           content=digest
           min-accepted=@ud
           pointer=?
+          pointer-revision=(unit @ud)
           topic=?
       ==
       [%get content=digest value=(cask)]

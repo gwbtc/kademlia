@@ -39,9 +39,19 @@
   [~ ~]
 ::  Also publish a mutable, publisher-scoped name.
 ++  with-name
+  |=  [namespace=@tas name=path]
+  ^-  publication-options
+  [`[namespace name [%auto ~]] ~]
+::  Publish a mutable name at an explicit revision for import or recovery.
+++  with-name-at
   |=  [namespace=@tas name=path revision=@ud]
   ^-  publication-options
-  [`[namespace name revision] ~]
+  [`[namespace name [%set revision]] ~]
+::  Publish only if the local name counter has the expected revision.
+++  with-name-cas
+  |=  [namespace=@tas name=path expected=@ud revision=@ud]
+  ^-  publication-options
+  [`[namespace name [%cas expected revision]] ~]
 ::  Also advertise the value as a catalog at a topic.
 ++  with-topic
   |=  [topic=topic-path:cd format=@tas entries=@ud revision=@ud]

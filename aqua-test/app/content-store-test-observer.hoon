@@ -27,6 +27,7 @@
       ?.  =(content.expected content.result)  |
       ?.  (publication-accepted provider.result min-accepted.expected)  |
       ?.  =(pointer.expected ?=(^ pointer.result))  |
+      ?.  =(pointer-revision.expected pointer-revision.result)  |
       ?.  =(topic.expected ?=(^ topic.result))  |
       ?.  ?~(pointer.result & (publication-accepted u.pointer.result min-accepted.expected))
         |

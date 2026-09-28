@@ -44,10 +44,22 @@ may additionally publish:
 - a mutable, publisher-scoped name through a pointer record; and
 - a catalog advertisement at a hierarchical topic.
 
+A named publication supplies a revision policy rather than a caller-managed
+revision by default:
+
+```hoon
+[namespace=@tas name=path revision=name-revision-policy]
+
+$%  [%auto ~]
+    [%set value=@ud]
+    [%cas expected=@ud value=@ud]
+==
+```
+
 The operation completes only after every requested lower-layer publication has
 completed. Its result includes the digest, locator, and the provider, pointer,
-and topic publication reports. A publication with no accepting replica becomes
-a typed failure.
+allocated pointer revision, and topic publication reports. A publication with
+no accepting replica becomes a typed failure.
 
 Provider revisions are maintained per digest and increment on each repeated
 `%put`, avoiding same-revision conflicts when a locator is renewed. `lifetime`
@@ -56,6 +68,20 @@ Use `~` to use the configured `publication-lifetime`, or supply a positive
 `@dr` override such as `` `~d7 ``. There is no protocol-imposed maximum. A zero
 override is rejected as `%invalid`. Named pointers remain non-expiring and are
 independent of this lease.
+
+Mutable-name revisions are maintained persistently per `[namespace name]`.
+The normal publication option uses `[%auto ~]`, which atomically allocates one
+more than the local counter when `%put` is accepted. Concurrent local puts
+therefore cannot reuse a revision. Failed replication may leave a harmless gap
+in the sequence.
+
+For imports and recovery, `[%set revision]` publishes an explicit revision and
+advances the stored counter when that revision is greater. It deliberately
+permits an older or equal revision, which may be ignored by readers or create a
+same-revision conflict; callers using it own that risk. `[%cas expected value]`
+requires the stored counter to equal `expected` and `value` to be greater. A
+mismatch returns `%revision-conflict` without starting the publication. The
+selected revision is returned as `pointer-revision` in the `%put` result.
 
 The façade does not schedule automatic renewal: an application which needs a
 continuously advertised value must repeat `%put` before its chosen expiry. A

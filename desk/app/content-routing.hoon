@@ -226,6 +226,34 @@
         ?>  (name-valid:cr name.command)
         ?>  (identity-valid:cr publisher.command)
         =/  key=key  (pointer-key:cr namespace.command publisher.command name.command)
+        =/  local=records  (records-for bowl state [%pointer key])
+        =/  pointers=pointers
+          %+  turn  local
+          |=  rec=record
+          ?>  ?=(%pointer -.rec)
+          value.rec
+        =/  selection=pointer-selection
+          %-  select-pointer:cr
+          :*  now.bowl
+              namespace.command
+              key
+              publisher.command
+              verify
+              pointers
+          ==
+        ?.  ?=(%none -.selection)
+          =/  responders=(set node-id)
+            (~(put in *(set node-id)) ~(self-id logic engine))
+          =/  result=operation-result
+            [%pointer selection responders ~]
+          =.  completed.state
+            (~(put by completed.state) id.command result)
+          =/  callback=(unit operation-callback)
+            (~(get by callbacks.state) id.command)
+          ?~  callback  `this
+          =.  callbacks.state
+            (~(del by callbacks.state) id.command)
+          [[(operation-notice-card our.bowl id.command u.callback result) ~] this]
         =/  ignored  (log bowl %info [%operation-start id.command %find-pointer key])
         =^  cards  state
           %+  ~(start-find-pointer logic engine)
@@ -235,6 +263,27 @@
       %find-providers
         ?>  (~(valid-id logic engine) id.command)
         ?>  (digest-valid:cr content.command)
+        =/  local=records  (records-for bowl state [%providers content.command])
+        =/  providers=providers
+          %+  turn  local
+          |=  rec=record
+          ?>  ?=(%provider -.rec)
+          value.rec
+        =/  selection=provider-selection
+          (select-providers:cr now.bowl content.command verify providers)
+        ?.  ?=(~ records.selection)
+          =/  responders=(set node-id)
+            (~(put in *(set node-id)) ~(self-id logic engine))
+          =/  result=operation-result
+            [%providers selection responders ~]
+          =.  completed.state
+            (~(put by completed.state) id.command result)
+          =/  callback=(unit operation-callback)
+            (~(get by callbacks.state) id.command)
+          ?~  callback  `this
+          =.  callbacks.state
+            (~(del by callbacks.state) id.command)
+          [[(operation-notice-card our.bowl id.command u.callback result) ~] this]
         =/  ignored  (log bowl %info [%operation-start id.command %find-providers content.command])
         =^  cards  state  (~(start-find-providers logic engine) id.command content.command)
         [cards this]

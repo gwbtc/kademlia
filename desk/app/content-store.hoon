@@ -676,9 +676,9 @@
           =/  target=target  target.body.record.selection
           ?-  -.target
             %content
-              =/  begun=action
-                (begin-provider-query our.bowl u.parent digest.target [%get ~])
-              [(weld [forget ~] cards.begun) this(state next.begun)]
+              =/  resumed=action
+                (start-get bowl u.parent [%content digest.target])
+              [(weld [forget ~] cards.resumed) this(state next.resumed)]
             %direct
               ?~  digest.target
                 =/  failed=action

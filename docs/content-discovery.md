@@ -1,7 +1,8 @@
 # Content discovery
 
-`%content-discovery` is a signed, decentralized topic index built on
-`%kademlia` and designed to compose with `%content-routing`. It answers
+`content-discovery-agent` is a signed, decentralized topic index, shipped as an
+agent wrapper. Stack it above `kademlia-agent`. It composes with
+`content-routing-agent`. It answers
 questions such as:
 
 > Which publishers advertise catalogs at `/software/urbit/hoon`, and which
@@ -199,10 +200,11 @@ The local commands are `%advertise`, `%browse`, `%observe`, `%forget`,
 
 An application allocates a 64-bit operation ID, sends `%observe` with its app
 and reply path before starting `%advertise` or `%browse`. On completion,
-`%content-discovery` pokes it with `%content-discovery-result`. The reply path
-is application data, not Gall's effect wire. Completed results remain readable
+the wrapper pokes it with `%content-discovery-result`; when the recipient is
+the wrapped agent, the wrapper calls its `+on-poke` directly. The reply path
+is application data, not Gall's effect wire; it must not start with `/~`. Completed results remain readable
 until `%forget` removes them. Results and stored records can also be read under
-`%gx` at `/operation/<id>` and `/records/<key>`, appending `/noun` as the
+`%gx` below `/~/content-discovery` at `/operation/<id>` and `/records/<key>`, appending `/noun` as the
 requested mark. Configuration and delivery state are exposed at `/settings`,
 `/verbosity`, and `/delivery`. The delivery summary reports current tracked
 peers, active per-peer poke gates, queued responses, queued requests, cumulative
@@ -250,5 +252,7 @@ Implementation files:
 - [`desk/sur/bounded-poke.hoon`](../desk/sur/bounded-poke.hoon) and
   [`desk/lib/bounded-poke.hoon`](../desk/lib/bounded-poke.hoon): shared
   persistent per-peer delivery gating, expiry, and response limits.
-- [`desk/app/content-discovery.hoon`](../desk/app/content-discovery.hoon): Gall,
-  Ames, Behn, Jael, callbacks, and logging.
+- [`desk/lib/content-discovery-agent.hoon`](../desk/lib/content-discovery-agent.hoon):
+  the agent wrapper: Gall, Ames, Behn, callbacks, and logging.
+- [`desk/lib/record-crypto.hoon`](../desk/lib/record-crypto.hoon): Jael-backed
+  signing and verification.

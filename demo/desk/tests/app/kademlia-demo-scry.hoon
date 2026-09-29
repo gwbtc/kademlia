@@ -24,7 +24,10 @@
 ::
 ++  get-state
   |=  saved=vase
-  !<(demo-state saved)
+  =+  !<([* routing=vase] saved)
+  =+  !<([* kademlia=vase] routing)
+  =+  !<([* inner=vase] kademlia)
+  !<(demo-state inner)
 ::
 ++  test-scry-publication-grows-an-exact-resource
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.21)

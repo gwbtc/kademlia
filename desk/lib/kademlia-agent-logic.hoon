@@ -12,6 +12,7 @@
 |_  $:  our=@p
         now=@da
         src=@p
+        dap=term
         state=agent-state
     ==
 ++  self-id
@@ -121,7 +122,7 @@
   =/  ship=@p  (~(node-to-ship kad cfg) peer)
   =/  message=peer-message  [%find-node protocol request target.lup]
   =/  note=note:agent:gall
-    [%agent [ship %kademlia] %poke %kademlia-message !>(message)]
+    [%agent [ship dap] %poke %kademlia-message !>(message)]
   =/  enqueued=[delivery-id delivery-update]
     (~(enqueue delivery [now outbound.state]) ship deadline [%request request] note)
   =.  outbound.state  state.+.enqueued
@@ -225,7 +226,7 @@
   =/  message=peer-message  [%nodes protocol request count.payload packed.payload]
   =/  deadline=@da  (add request-timeout.settings.state now)
   =/  note=note:agent:gall
-    [%agent [src %kademlia] %poke %kademlia-message !>(message)]
+    [%agent [src dap] %poke %kademlia-message !>(message)]
   =/  enqueued=[delivery-id delivery-update]
     (~(enqueue delivery [now outbound.state]) src deadline [%response request] note)
   =.  outbound.state  state.+.enqueued

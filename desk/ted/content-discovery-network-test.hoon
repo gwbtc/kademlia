@@ -55,12 +55,12 @@
 ++  poke-kademlia
   |=  [who=@p =command]
   =/  m  (strand ,~)
-  (dojo who ":kademlia &kademlia-command {<command>}")
+  (dojo who ":kademlia-example &kademlia-command {<command>}")
 ::
 ++  poke-discovery
   |=  [who=@p command=discovery-command]
   =/  m  (strand ,~)
-  (dojo who ":content-discovery &content-discovery-command {<command>}")
+  (dojo who ":kademlia-example &content-discovery-command {<command>}")
 ::
 ++  poke-observer
   |=  [who=@p command=discovery-observer-command]

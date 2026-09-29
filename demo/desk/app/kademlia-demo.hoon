@@ -5,12 +5,16 @@
 /-  *kademlia-demo
 /+  kad=kademlia, cr=content-routing, demo=kademlia-demo
 /+  default-agent, dbug, verb
+/+  kademlia-agent, content-routing-agent, content-discovery-agent
 |%
 +$  card  card:agent:gall
 --
 ::
 %+  verb  |
 %-  agent:dbug
+%-  agent:content-discovery-agent
+%-  agent:content-routing-agent
+%-  agent:kademlia-agent
 =/  cfg=config:kad  [20 20 3 12 %kademlia-urbit-v1]
 =/  defaults=demo-config  [32.768 4 ~m2 8.388.608 4]
 =|  state=demo-state
@@ -90,17 +94,17 @@
 ++  content-poke
   |=  [our=@p id=@uv run=run-id command=content-command]
   ^-  card
-  (local-poke our %content-routing %content-routing-command !>(command) /content/(scot %uv id)/[run])
+  (local-poke our %kademlia-demo %content-routing-command !>(command) /content/(scot %uv id)/[run])
 ::
 ++  discovery-poke
   |=  [our=@p id=@uv run=run-id command=discovery-command:cda]
   ^-  card
-  (local-poke our %content-discovery %content-discovery-command !>(command) /discovery/(scot %uv id)/[run])
+  (local-poke our %kademlia-demo %content-discovery-command !>(command) /discovery/(scot %uv id)/[run])
 ::
 ++  kademlia-poke
   |=  [our=@p tag=@tas command=command]
   ^-  card
-  (local-poke our %kademlia %kademlia-command !>(command) /kademlia/[tag])
+  (local-poke our %kademlia-demo %kademlia-command !>(command) /kademlia/[tag])
 ::
 ++  send-peer
   |=  [ship=@p message=transfer-message]
@@ -570,8 +574,8 @@
         =.  state  [defaults ~ ~ ~ 0v1 0v1 0v1 ~ ~]
         =/  cards=(list card)
           :~  (kademlia-poke our.bowl %reset [%reset ~])
-              (local-poke our.bowl %content-routing %content-routing-command !>(`content-command`[%reset ~]) /content/reset)
-              (local-poke our.bowl %content-discovery %content-discovery-command !>(`discovery-command:cda`[%reset ~]) /discovery/reset)
+              (local-poke our.bowl %kademlia-demo %content-routing-command !>(`content-command`[%reset ~]) /content/reset)
+              (local-poke our.bowl %kademlia-demo %content-discovery-command !>(`discovery-command:cda`[%reset ~]) /discovery/reset)
               (fact (snapshot-json bowl))
           ==
         [(weld cancel (weld culls cards)) this]

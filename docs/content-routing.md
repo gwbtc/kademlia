@@ -1,7 +1,7 @@
 # Content routing layer
 
-`%content-routing` is a signed record-discovery protocol layered above
-Kademlia. It maps mutable names and immutable content digests to retrieval
+`content-routing-agent` is a signed record-discovery protocol layered above
+Kademlia, shipped as an agent wrapper. Stack it above `kademlia-agent`. It maps mutable names and immutable content digests to retrieval
 information. It never transports application payloads: it returns signed
 pointers and provider locators, after which the application performs the
 actual fetch.
@@ -129,7 +129,7 @@ Applications publish with `%publish-pointer` or `%publish-provider`. The agent:
 
 1. validates and signs the local record;
 2. stores it as an origin for refresh;
-3. asks `%kademlia` for nodes nearest the derived record key;
+3. asks the kademlia wrapper below it for nodes nearest the derived record key;
 4. sends bounded `%store` requests under a fair global scheduler; and
 5. reports accepted, rejected, and timed-out replicas.
 
@@ -177,15 +177,18 @@ prune plus deterministic earliest-expiry eviction only under capacity pressure.
 
 ## Gall API
 
-Local commands are `%publish-pointer`, `%publish-provider`, `%find-pointer`,
+The wrapped agent sends `%content-routing-command` by poking itself. Local
+commands are `%publish-pointer`, `%publish-provider`, `%find-pointer`,
 `%find-providers`, `%observe`, `%forget`, `%set-config`, `%set-verbosity`, and
 `%reset`.
 
 Applications associate a 64-bit operation ID with `[recipient reply-path]` by
 using `%observe` before starting the operation. Completion targets that
-callback directly with a typed `%content-routing-result`. The reply path is
-application correlation data, not Gall's effect wire. Results can also be read
-under `%gx` at `/operation/<id>`, `/records/<key>`, `/pointer/<key>`, and
+callback directly with a typed `%content-routing-result`. When the recipient is
+the wrapped agent, the wrapper calls its `+on-poke` directly. The reply path is
+application correlation data, not Gall's effect wire; it must not start with
+`/~`. Results can also be read
+under `%gx` below `/~/content-routing` at `/operation/<id>`, `/records/<key>`, `/pointer/<key>`, and
 `/providers/<digest>`, appending `/noun` as the requested mark. Configuration
 and delivery state are exposed at `/settings`, `/verbosity`, and `/delivery`.
 The delivery summary reports current tracked peers, active per-peer poke gates,
@@ -219,5 +222,7 @@ supporting mutable names through pointer records.
 - [`desk/sur/bounded-poke.hoon`](../desk/sur/bounded-poke.hoon) and
   [`desk/lib/bounded-poke.hoon`](../desk/lib/bounded-poke.hoon): shared
   persistent per-peer delivery gating, expiry, and response limits.
-- [`desk/app/content-routing.hoon`](../desk/app/content-routing.hoon): Gall,
-  Kademlia callbacks, Ames, Behn, Jael, scries, and logging.
+- [`desk/lib/content-routing-agent.hoon`](../desk/lib/content-routing-agent.hoon):
+  the agent wrapper: Gall, Kademlia lookups, Ames, Behn, scries, and logging.
+- [`desk/lib/record-crypto.hoon`](../desk/lib/record-crypto.hoon): Jael-backed
+  signing and verification.

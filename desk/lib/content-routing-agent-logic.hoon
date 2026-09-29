@@ -12,6 +12,7 @@
 |_  $:  our=@p
         now=@da
         src=@p
+        dap=term
         state=content-state
         verify=verifier
     ==
@@ -481,9 +482,9 @@
   |=  [id=operation-id target=key]
   ^-  card:agent:gall
   =/  command=command
-    [%find-for target %content-routing /operation/(scot %uv id)]
+    [%find-for target dap /operation/(scot %uv id)]
   :*  %pass  /lookup/(scot %uv id)
-      %agent  [our %kademlia]
+      %agent  [our dap]
       %poke  %kademlia-command  !>(command)
   ==
 ::
@@ -728,7 +729,7 @@
   =/  message=content-message  (message-for request next)
   =/  ship=@p  (~(node-to-ship kad kad-cfg) peer)
   =/  note=note:agent:gall
-    [%agent [ship %content-routing] %poke %content-routing-message !>(message)]
+    [%agent [ship dap] %poke %content-routing-message !>(message)]
   =/  sent=[delivery-id delivery-update]
     (~(enqueue delivery [now outbound.state]) ship deadline [%request request] note)
   =.  outbound.state  state.+.sent
@@ -870,7 +871,7 @@
   ^-  [(list card:agent:gall) content-state]
   =/  deadline=@da  (add request-timeout.config.state now)
   =/  note=note:agent:gall
-    [%agent [ship %content-routing] %poke %content-routing-message !>(message)]
+    [%agent [ship dap] %poke %content-routing-message !>(message)]
   =/  sent=[delivery-id delivery-update]
     (~(enqueue delivery [now outbound.state]) ship deadline [%response request] note)
   =.  outbound.state  state.+.sent

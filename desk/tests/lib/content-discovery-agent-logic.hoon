@@ -7,7 +7,7 @@
   &
 ++  initial
   ^-  discovery-state
-  ~(init logic [~zod now ~zod *discovery-state allow])
+  ~(init logic [~zod now ~zod %test *discovery-state allow])
 ::
 ++  catalog-record-for
   |=  [publisher=node-id revision=@ud digest=@uvI]
@@ -40,7 +40,7 @@
 ::
 ++  test-record-wire-round-trip
   =/  state=discovery-state  initial
-  =/  engine  [~zod now ~zod state allow]
+  =/  engine  [~zod now ~zod %test state allow]
   =/  rec=record  (catalog-record-for 0x12 1 0v42)
   =/  payload=@  (~(pack-record logic engine) rec)
   =/  decoded=sized-record  (need (~(unpack-record logic engine) payload))
@@ -57,13 +57,13 @@
   =/  high=record  (catalog-record-for 0x12 2 0v2)
   =/  conflict=record  (catalog-record-for 0x12 2 0v3)
   =/  one=[store-status discovery-state]
-    (~(put-replica logic [~zod now ~zod state allow]) low)
+    (~(put-replica logic [~zod now ~zod %test state allow]) low)
   =/  two=[store-status discovery-state]
-    (~(put-replica logic [~zod now ~zod +.one allow]) high)
+    (~(put-replica logic [~zod now ~zod %test +.one allow]) high)
   =/  three=[store-status discovery-state]
-    (~(put-replica logic [~zod now ~zod +.two allow]) conflict)
+    (~(put-replica logic [~zod now ~zod %test +.two allow]) conflict)
   =/  key=key  (record-key:discovery high)
-  =/  values=records  (~(values-for logic [~zod now ~zod +.three allow]) key)
+  =/  values=records  (~(values-for logic [~zod now ~zod %test +.three allow]) key)
   ;:  weld
     %+  expect-eq  !>(`store-status`[%accepted ~])
     !>(-.one)
@@ -81,9 +81,9 @@
   =/  one=record  (edge-record-for 0x12 ~[%software %urbit %hoon] 1)
   =/  two=record  (edge-record-for 0x13 ~[%software %urbit %vere] 1)
   =/  first=[store-status discovery-state]
-    (~(put-replica logic [~zod now ~zod state allow]) one)
+    (~(put-replica logic [~zod now ~zod %test state allow]) one)
   =/  second=[store-status discovery-state]
-    (~(put-replica logic [~zod now ~zod +.first allow]) two)
+    (~(put-replica logic [~zod now ~zod %test +.first allow]) two)
   ;:  weld
     %+  expect-eq  !>(`store-status`[%accepted ~])
     !>(-.first)
@@ -97,9 +97,9 @@
   =/  one=record  (edge-record-for 0x12 ~[%software %urbit %hoon] 1)
   =/  two=record  (edge-record-for 0x12 ~[%software %urbit %vere] 1)
   =/  first=[store-status discovery-state]
-    (~(put-replica logic [~zod now ~zod state allow]) one)
+    (~(put-replica logic [~zod now ~zod %test state allow]) one)
   =/  second=[store-status discovery-state]
-    (~(put-replica logic [~zod now ~zod +.first allow]) two)
+    (~(put-replica logic [~zod now ~zod %test +.first allow]) two)
   ;:  weld
     %+  expect-eq  !>(`store-status`[%accepted ~])
     !>(-.first)
@@ -111,12 +111,12 @@
   =/  state=discovery-state  initial
   =/  one=record  (edge-record-for 0x12 ~[%software %urbit %hoon] 1)
   =/  two=record  (edge-record-for 0x12 ~[%software %urbit %vere] 1)
-  =.  state  (~(put-origin logic [~zod now ~zod state allow]) one)
-  =.  state  (~(put-origin logic [~zod now ~zod state allow]) two)
+  =.  state  (~(put-origin logic [~zod now ~zod %test state allow]) one)
+  =.  state  (~(put-origin logic [~zod now ~zod %test state allow]) two)
   =/  key=key  (record-key:discovery one)
   ;:  weld
     %+  expect-eq  !>(2)
-    !>((lent (~(values-for logic [~zod now ~zod state allow]) key)))
+    !>((lent (~(values-for logic [~zod now ~zod %test state allow]) key)))
     %+  expect-eq  !>(2)
     !>((lent ~(tap by origins.state)))
   ==
@@ -126,10 +126,10 @@
   =.  config.state  config.state(max-records-per-publisher 1)
   =/  one=record  (edge-record-for 0x12 ~[%software %urbit %hoon] 1)
   =/  two=record  (edge-record-for 0x12 ~[%software %urbit %vere] 1)
-  =.  state  (~(put-origin logic [~zod now ~zod state allow]) one)
+  =.  state  (~(put-origin logic [~zod now ~zod %test state allow]) one)
   =/  attempt
     %-  mule
-    |.  (~(put-origin logic [~zod now ~zod state allow]) two)
+    |.  (~(put-origin logic [~zod now ~zod %test state allow]) two)
   ;:  weld
     (expect !>(?=(%| -.attempt)))
     %+  expect-eq  !>(1)
@@ -141,9 +141,9 @@
   =/  message=discovery-message
     [%stored %content-discovery-v1 0v1 [%accepted ~]]
   =/  first=[(list card:agent:gall) discovery-state]
-    (~(send-response logic [~zod now ~zod state allow]) ~nec 0v1 message)
+    (~(send-response logic [~zod now ~zod %test state allow]) ~nec 0v1 message)
   =/  second=[(list card:agent:gall) discovery-state]
-    (~(send-response logic [~zod now ~zod +.first allow]) ~nec 0v2 message)
+    (~(send-response logic [~zod now ~zod %test +.first allow]) ~nec 0v2 message)
   =/  peer=peer-delivery  (need (~(get by peers.outbound.+.second) ~nec))
   ;:  weld
     (expect !>(?=(^ active.peer)))

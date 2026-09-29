@@ -1,6 +1,7 @@
 # Kademlia layer
 
-`%kademlia` is the peer-discovery and iterative node-lookup layer. It maintains
+`kademlia-agent` is the peer-discovery and iterative node-lookup layer, shipped
+as an agent wrapper (`%-  agent:kademlia-agent  your-agent`). It maintains
 a bounded routing table, maps Urbit ships into a 128-bit XOR metric, and finds
 the live nodes nearest an arbitrary 128-bit target. It knows nothing about
 content, topics, or application records; higher layers use its results to pick
@@ -131,7 +132,8 @@ bucket, and split children inherit their parent's timestamp.
 
 ## Gall API
 
-Local `%kademlia-command` operations include:
+The wrapped agent sends commands by poking itself. Local `%kademlia-command`
+operations include:
 
 - `%set-seeds` for bootstrap ships;
 - `%set-request-timeout` and `%set-refresh-interval`;
@@ -141,17 +143,22 @@ Local `%kademlia-command` operations include:
 
 `%find-for` stores `[recipient reply-path]` against the lookup ID. Completion
 uses the exact completed ID for one callback-map lookup, then pokes the target
-application with `%kademlia-result`. The reply path is application correlation
-data rather than Gall's effect wire.
+application with `%kademlia-result`. When the recipient is the wrapped agent,
+the wrapper calls its `+on-poke` directly. The reply path is application
+correlation data rather than Gall's effect wire; it must not start with `/~`.
 
-Diagnostics are exposed under `%gx` at `/summary`, `/settings`, `/table`,
+Peer messages go to `[ship dap.bowl]`, so peers must run the wrapper under the
+same agent name. The wrapper keeps its wires under `/~/kademlia`.
+
+Diagnostics are exposed under `%gx` below `/~/kademlia` at `/summary`,
+`/settings`, `/table`,
 `/seeds`, `/verbosity`, `/delivery`, and `/lookup/<id>`, with `/noun` appended
 as the output mark when scrying through Gall. `/delivery` reports current
 tracked peers, active per-peer poke gates, queued responses, queued requests,
 and cumulative queue expirations. Its `overflow-dropped` field counts responses
 discarded after the per-peer queue reaches its limit of 32. The cap excludes
-the one active poke and is local to `%kademlia`; each higher-layer agent has an
-independent gate. Overflow is silent, so the requesting peer eventually sees
+the one active poke and is local to this wrapper; each higher-layer wrapper has
+an independent gate. Overflow is silent, so the requesting peer eventually sees
 its ordinary request timeout. Locally initiated request queues are limited by
 that same expiry rather than by count.
 
@@ -183,5 +190,5 @@ the cached and actual in-flight count.
 - [`desk/sur/bounded-poke.hoon`](../desk/sur/bounded-poke.hoon) and
   [`desk/lib/bounded-poke.hoon`](../desk/lib/bounded-poke.hoon): shared
   persistent per-peer delivery gating, queue expiry, and response limits.
-- [`desk/app/kademlia.hoon`](../desk/app/kademlia.hoon): Ames, Behn, Gall,
-  diagnostics, and logging.
+- [`desk/lib/kademlia-agent.hoon`](../desk/lib/kademlia-agent.hoon): the agent
+  wrapper: Ames, Behn, Gall, diagnostics, and logging.

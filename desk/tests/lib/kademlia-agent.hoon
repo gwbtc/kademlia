@@ -1,7 +1,57 @@
 /-  *kademlia, *kademlia-agent, *bounded-poke
-/+  kad=kademlia, *test
-/=  agent  /app/kademlia
+/+  kad=kademlia, *test, default-agent
+/+  kademlia-agent
 |%
+++  agent  (agent:kademlia-agent stub)
+::
+::  stub: wrapped agent.  it swallows lookup commands, emits the cards
+::  poked at it as %test-cards, and saves the result marks it was poked with.
+::
+++  stub
+  =|  got=(list mark)
+  ^-  agent:gall
+  |_  =bowl:gall
+  +*  this  .
+      def   ~(. (default-agent this %|) bowl)
+  ++  on-init   `this
+  ++  on-save   !>(got)
+  ++  on-load   |=(vase `this)
+  ++  on-watch  on-watch:def
+  ++  on-leave  on-leave:def
+  ++  on-peek   on-peek:def
+  ++  on-agent  on-agent:def
+  ++  on-arvo   on-arvo:def
+  ++  on-fail   on-fail:def
+  ++  on-poke
+    |=  [=mark =vase]
+    ^-  (quip card:agent:gall _this)
+    ?+  mark  [~ this(got [mark got])]
+      %kademlia-command  `this
+      %test-cards        [!<((list card:agent:gall) vase) this]
+    ==
+  --
+::
+++  get-saved
+  |=  saved=vase
+  ^-  kademlia-saved-state
+  =+  !<([[%kademlia app=kademlia-saved-state] *] saved)
+  app
+::
+++  put-saved
+  |=  app=kademlia-saved-state
+  ^-  vase
+  !>([[%kademlia app] !>(~)])
+::
+++  result
+  |=  notice=lookup-notice
+  ^-  vase
+  !>  ^-  (list card:agent:gall)
+  :_  ~
+  :*  %pass  /callback  %agent  [~zod %kademlia]
+      %poke  %kademlia-result
+      !>(notice(reply-path [%~.~ %kademlia reply-path.notice]))
+  ==
+::
 ++  bowl
   |=  [our=@p src=@p now=@da]
   ^-  bowl:gall
@@ -15,18 +65,17 @@
 ++  get-state
   |=  saved=vase
   ^-  agent-state
-  =/  app=kademlia-saved-state  !<(kademlia-saved-state saved)
-  state.app
+  state:(get-saved saved)
 ::
 ++  test-init
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
   =/  out  on-init:~(. agent bol)
   =/  saved=agent-state  (get-state on-save:+.out)
-  =/  delivery-peek=(unit (unit cage))  (on-peek:+.out /x/delivery)
+  =/  delivery-peek=(unit (unit cage))  (on-peek:+.out /x/~/kademlia/delivery)
   =/  delivery=delivery-summary
     !<(delivery-summary q:(need (need delivery-peek)))
   ;:  weld
-    %+  expect-eq  !>(3)
+    %+  expect-eq  !>(1)
     !>((lent -.out))
     %+  expect-eq  !>(0v1)
     !>(next-request.saved)
@@ -43,11 +92,11 @@
 ++  test-load-recreates-refresh-wake
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
   =/  initialized  on-init:~(. agent bol)
-  =/  saved=kademlia-saved-state  !<(kademlia-saved-state on-save:+.initialized)
-  =/  loaded  (on-load:~(. agent bol) !>(saved))
+  =/  saved=kademlia-saved-state  (get-saved on-save:+.initialized)
+  =/  loaded  (on-load:~(. agent bol) (put-saved saved))
   =/  restored=agent-state  (get-state on-save:+.loaded)
   ;:  weld
-    %+  expect-eq  !>(3)
+    %+  expect-eq  !>(1)
     !>((lent -.loaded))
     %+  expect-eq  !>(state.saved)
     !>(restored)
@@ -59,7 +108,7 @@
   =/  command=command  [%set-request-timeout ~m1]
   =/  out  (on-poke:+.initialized %kademlia-command !>(command))
   =/  saved=agent-state  (get-state on-save:+.out)
-  =/  peek=(unit (unit cage))  (on-peek:+.out /x/settings)
+  =/  peek=(unit (unit cage))  (on-peek:+.out /x/~/kademlia/settings)
   =/  result=cage  (need (need peek))
   =/  got=settings  !<(settings q.result)
   ;:  weld
@@ -73,14 +122,14 @@
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
   =/  initialized  on-init:~(. agent bol)
   =/  initial=kademlia-saved-state
-    !<(kademlia-saved-state on-save:+.initialized)
+    (get-saved on-save:+.initialized)
   =/  command=command  [%set-verbosity %debug]
   =/  changed  (on-poke:+.initialized %kademlia-command !>(command))
-  =/  saved=kademlia-saved-state  !<(kademlia-saved-state on-save:+.changed)
-  =/  peek=(unit (unit cage))  (on-peek:+.changed /x/verbosity)
+  =/  saved=kademlia-saved-state  (get-saved on-save:+.changed)
+  =/  peek=(unit (unit cage))  (on-peek:+.changed /x/~/kademlia/verbosity)
   =/  got=verbosity  !<(verbosity q:(need (need peek)))
-  =/  loaded  (on-load:~(. agent bol) !>(saved))
-  =/  restored=kademlia-saved-state  !<(kademlia-saved-state on-save:+.loaded)
+  =/  loaded  (on-load:~(. agent bol) (put-saved saved))
+  =/  restored=kademlia-saved-state  (get-saved on-save:+.loaded)
   ;:  weld
     %+  expect-eq  !>(%off)
     !>(verbosity.initial)
@@ -96,7 +145,7 @@
   =/  command=command  [%set-refresh-interval ~m30]
   =/  out  (on-poke:+.initialized %kademlia-command !>(command))
   =/  saved=agent-state  (get-state on-save:+.out)
-  =/  peek=(unit (unit cage))  (on-peek:+.out /x/settings)
+  =/  peek=(unit (unit cage))  (on-peek:+.out /x/~/kademlia/settings)
   =/  result=cage  (need (need peek))
   =/  got=settings  !<(settings q.result)
   ;:  weld
@@ -112,7 +161,7 @@
   =/  command=command  [%set-seeds [~nec ~nec ~zod ~]]
   =/  out  (on-poke:+.initialized %kademlia-command !>(command))
   =/  saved=agent-state  (get-state on-save:+.out)
-  =/  peek=(unit (unit cage))  (on-peek:+.out /x/seeds)
+  =/  peek=(unit (unit cage))  (on-peek:+.out /x/~/kademlia/seeds)
   =/  result=cage  (need (need peek))
   =/  seeds=(list node-id)  !<((list node-id) q.result)
   ;:  weld
@@ -134,13 +183,13 @@
   =/  initialized  on-init:~(. agent bol)
   =/  command=command  [%find 0v22 0x1234]
   =/  out  (on-poke:+.initialized %kademlia-command !>(command))
-  =/  path=path  /x/lookup/(scot %uv 0v22)
+  =/  path=path  /x/~/kademlia/lookup/(scot %uv 0v22)
   =/  peek=(unit (unit cage))  (on-peek:+.out path)
   =/  result=cage  (need (need peek))
   =/  view=lookup-view  !<(lookup-view q.result)
   ?>  ?=(%complete -.view)
   ;:  weld
-    %+  expect-eq  !>(2)
+    %+  expect-eq  !>(0)
     !>((lent -.out))
     %+  expect-eq  !>(0x1234)
     !>(target.result.view)
@@ -151,14 +200,14 @@
 ++  test-lookup-prefix-scry
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
   =/  initialized  on-init:~(. agent bol)
-  =/  peek=(unit (unit cage))  (on-peek:+.initialized /x/lookup)
+  =/  peek=(unit (unit cage))  (on-peek:+.initialized /x/~/kademlia/lookup)
   %+  expect-eq  !>(`(unit (unit cage))`[~ ~])
   !>(peek)
 ::
 ++  test-root-prefix-scry
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.4)
   =/  initialized  on-init:~(. agent bol)
-  =/  peek=(unit (unit cage))  (on-peek:+.initialized /x)
+  =/  peek=(unit (unit cage))  (on-peek:+.initialized /x/~/kademlia)
   %+  expect-eq  !>(`(unit (unit cage))`[~ ~])
   !>(peek)
 ::
@@ -169,7 +218,7 @@
   =/  out  (on-poke:+.initialized %kademlia-message !>(message))
   =/  saved=agent-state  (get-state on-save:+.out)
   ;:  weld
-    %+  expect-eq  !>(3)
+    %+  expect-eq  !>(1)
     !>((lent -.out))
     %+  expect-eq  !>(1)
     !>((lent (~(contacts kad [20 20 3 12 %kademlia-urbit-v1]) routing.saved)))
@@ -182,7 +231,7 @@
   =/  sent  (on-poke:+.initialized %kademlia-message !>(message))
   =/  before=agent-state  (get-state on-save:+.sent)
   =/  acknowledged
-    (on-agent:+.sent /delivery/~nec/0 `sign:agent:gall`[%poke-ack ~])
+    (on-agent:+.sent /~/kademlia/delivery/~nec/0 `sign:agent:gall`[%poke-ack ~])
   =/  after=agent-state  (get-state on-save:+.acknowledged)
   ;:  weld
     %+  expect-eq  !>(1)
@@ -207,7 +256,7 @@
   =/  out  (on-poke:+.initialized %kademlia-message !>(message))
   =/  after=agent-state  (get-state on-save:+.out)
   ;:  weld
-    %+  expect-eq  !>(2)
+    %+  expect-eq  !>(0)
     !>((lent -.out))
     %+  expect-eq  !>(before)
     !>(after)
@@ -221,7 +270,7 @@
   =/  out  (on-poke:+.initialized %kademlia-message !>(message))
   =/  after=agent-state  (get-state on-save:+.out)
   ;:  weld
-    %+  expect-eq  !>(2)
+    %+  expect-eq  !>(0)
     !>((lent -.out))
     %+  expect-eq  !>(before)
     !>(after)

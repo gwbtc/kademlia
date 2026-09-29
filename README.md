@@ -1,7 +1,23 @@
 # Kademlia for Urbit
 
-This desk contains a Kademlia-style overlay for Urbit, including pure routing
-libraries and three headless Gall agents:
+This desk contains a Kademlia-style overlay for Urbit: pure routing libraries
+and three Gall agent wrappers. An agent gains the protocols by wrapping itself:
+
+```hoon
+/+  kademlia-agent, content-routing-agent, content-discovery-agent
+%-  agent:content-discovery-agent
+%-  agent:content-routing-agent
+%-  agent:kademlia-agent
+^-  agent:gall
+|_  =bowl:gall
+...
+```
+
+`kademlia-agent` works alone. Each content wrapper needs `kademlia-agent`
+below it. `app/kademlia-example.hoon` is a minimal agent that stacks all
+three. See [Using the wrappers](#using-the-wrappers).
+
+The desk holds:
 
 - `lib/feistel.hoon`: the supplied Feistel permutation over the complete
   128-bit Ames ship-ID and Kademlia node-ID domain.
@@ -14,23 +30,26 @@ libraries and three headless Gall agents:
   layer for signed mutable pointers, content-provider announcements, and
   content verification without coupling Kademlia to an application data type.
 - `sur/content-routing-agent.hoon`, `lib/content-routing-agent-logic.hoon`, and
-  `app/content-routing.hoon`: the ordinary-Ames record transport, leased replica
+  `lib/content-routing-agent.hoon`: the ordinary-Ames record transport, leased replica
   store, publication/query state machine, Jael-backed signatures, and Gall
   interface layered over node lookup.
 - `sur/content-discovery.hoon`, `lib/content-discovery.hoon`,
   `sur/content-discovery-agent.hoon`, `lib/content-discovery-agent-logic.hoon`,
-  and `app/content-discovery.hoon`: an open, signed hierarchical topic index
+  and `lib/content-discovery-agent.hoon`: an open, signed hierarchical topic index
   whose catalog payloads can be resolved through the content-routing layer.
-- `app/kademlia.hoon`: a headless Gall agent that runs iterative `FIND_NODE`
+- `lib/kademlia-agent.hoon`: an agent wrapper that runs iterative `FIND_NODE`
   lookups over ordinary Ames pokes, with its pure transitions in
   `lib/kademlia-agent-logic.hoon`.
+- `lib/record-crypto.hoon`: record signing and verification against Jael keys,
+  shared by the two content wrappers.
+- `app/kademlia-example.hoon`: the example agent.
 - `sur/bounded-poke.hoon` and `lib/bounded-poke.hoon`: the persistent,
-  per-peer outbound-poke gate shared by all three protocol agents.
+  per-peer outbound-poke gate shared by all three wrappers.
 - `tests/lib/kademlia.hoon`: unit coverage for the core invariants.
 - `tests/lib/content-routing.hoon`: unit coverage for content-routing records,
   validation, revision conflicts, and provider selection.
 - `tests/lib/content-discovery.hoon` and the content-routing and discovery
-  agent-logic and app tests: record selection, storage, operation, refresh,
+  agent-logic and wrapper tests: record selection, storage, operation, refresh,
   concurrency, callback, and Gall-interface coverage.
 - `tests/lib/bounded-poke.hoon`: queue ordering, expiry, acknowledgement,
   cancellation, reset, and response-cap coverage.
@@ -66,14 +85,50 @@ supported.
 The `%content-routing` agent transports those records over ordinary Ames pokes;
 remote scry remains one possible final retrieval mechanism, not a requirement.
 
-All three agents are installed together, but applications normally use only
-the highest API they need. Content-routing and content-discovery call
-`%kademlia` internally, so an application need not orchestrate their node
-lookups. It may call `%kademlia` directly for raw node lookup, call
-`%content-routing` for pointer/provider resolution, or browse with
-`%content-discovery` and then pass a selected catalog digest to
-`%content-routing` for retrieval locations. Overlay seeds and timing remain
-node-level configuration on `%kademlia`.
+An application stacks the wrappers it needs and normally uses only the
+highest API. The content-routing and content-discovery wrappers call the
+kademlia wrapper below them, so an application need not orchestrate their node
+lookups. It may send `%kademlia-command` for raw node lookup, send
+`%content-routing-command` for pointer/provider resolution, or browse with
+`%content-discovery-command` and then pass a selected catalog digest to
+content routing for retrieval locations. Overlay seeds and timing remain
+configuration on the kademlia wrapper.
+
+## Using the wrappers
+
+Each wrapper handles its own marks and passes everything else to the agent it
+wraps:
+
+| Wrapper | Marks | Wires | Scries |
+|---|---|---|---|
+| `kademlia-agent` | `%kademlia-command`, `%kademlia-message` | `/~/kademlia/...` | `/x/~/kademlia/...` |
+| `content-routing-agent` | `%content-routing-command`, `%content-routing-message` | `/~/content-routing/...` | `/x/~/content-routing/...` |
+| `content-discovery-agent` | `%content-discovery-command`, `%content-discovery-message` | `/~/content-discovery/...` | `/x/~/content-discovery/...` |
+
+The wrapped agent must leave those wires and paths alone.
+
+Peers are the same agent on other ships: a wrapper sends protocol messages to
+`[ship dap.bowl]`. Each wrapped app therefore forms its own overlay. Two apps
+on one ship share no routing table and no records.
+
+To send a command, the wrapped agent pokes itself:
+
+```hoon
+[%pass /my-wire %agent [our.bowl dap.bowl] %poke %kademlia-command !>(command)]
+```
+
+Commands that take a recipient (`%find-for`, `%observe`) deliver the result as
+a poke with the `%kademlia-result`, `%content-routing-result` or
+`%content-discovery-result` mark. When the recipient is the wrapped agent's own
+name, the wrapper calls the agent's `+on-poke` directly, with `src.bowl` set to
+our ship. Any other recipient gets an ordinary local poke. A reply path must
+not start with `/~`; the wrappers keep those for themselves.
+
+Each wrapper saves its state beside the wrapped agent's state, as
+`[[%kademlia state] inner]` and so on. Adding a wrapper to a running agent
+starts that wrapper with fresh state and passes the old state through.
+
+The wrappers do not apply `dbug` or `verb`; the application applies them.
 
 ## Content routing
 
@@ -134,7 +189,7 @@ Incoming node queries walk matching XOR-prefix branches first and stop after
 
 ## Peer-discovery agent
 
-The `%kademlia` agent implements the first ordinary-Ames protocol milestone.
+The `kademlia-agent` wrapper implements the first ordinary-Ames protocol milestone.
 Peers exchange typed `%kademlia-message` pokes containing versioned
 `%find-node` requests and `%nodes` responses.  Each outbound peer request has a
 unique request ID, a configurable Behn timeout (five minutes by default), and
@@ -165,28 +220,28 @@ so callback delivery performs one map lookup rather than scanning every
 registered callback after each response or timeout. Commands are accepted only
 from the local ship. Read-only
 diagnostics are available through `/summary`, `/settings`, `/table`, `/seeds`,
-`/delivery`, `/verbosity`, and `/lookup/<id>` Gall scries using the `%noun`
-output mark. For example:
+`/delivery`, `/verbosity`, and `/lookup/<id>` Gall scries under `/~/kademlia`,
+using the `%noun` output mark. For example:
 
 ```hoon
-.^(* %gx /=kademlia=/summary/noun)
-.^(* %gx /=kademlia=/lookup/0v1/noun)
-.^(* %gx /=kademlia=/delivery/noun)
+.^(* %gx /=kademlia-example=/~/kademlia/summary/noun)
+.^(* %gx /=kademlia-example=/~/kademlia/lookup/0v1/noun)
+.^(* %gx /=kademlia-example=/~/kademlia/delivery/noun)
 ```
 
 See [`docs/kademlia.md`](docs/kademlia.md) for the complete identity model,
 routing-table and bucket policy, iterative lookup state machine, refresh
 scheduler, peer protocol, Gall API, and invariants.
 
-## Content-record transport agent
+## Content-record transport wrapper
 
-The separate `%content-routing` agent keeps Kademlia itself agnostic about
+The separate `content-routing-agent` wrapper keeps Kademlia itself agnostic about
 application data. Local `%content-routing-command` pokes publish signed pointer
 or provider records, start pointer/provider queries, forget completed operation
 results, update transport limits, or set its independent persistent verbosity
 with `[%set-verbosity ?(%off %info %debug)]`. The current level is available at
-`/verbosity` through a `%noun` Gall scry. The agent asks `%kademlia` for the closest
-nodes through its callback API, then sends versioned `%content-routing-message`
+`/~/content-routing/verbosity` through a `%noun` Gall scry. The wrapper asks the
+kademlia wrapper below it for the closest nodes, then sends versioned `%content-routing-message`
 store/query RPCs to at most three peers per operation and twelve peers across
 the agent. A persistent round-robin ready queue shares that global budget among
 active operations. Each RPC has a five-minute Behn timeout. Publication
@@ -199,7 +254,7 @@ queued requests, and cumulative queue expirations. Its `overflow-dropped`
 counter records responses rejected after a peer already has 32 live responses
 queued. Expired responses are pruned before enforcing the cap. Responses are
 promoted ahead of requests, and both queues use the configured request timeout.
-The cap is per remote peer, separately within each protocol agent, and excludes
+The cap is per remote peer, separately within each wrapper, and excludes
 the one currently active poke. An overflowed response is silently discarded;
 the requester observes its normal request timeout. Locally initiated requests
 have no count cap because they are already bounded by application concurrency,
@@ -361,8 +416,11 @@ Mount `dist/` as `%kademlia-mortar`, `dist-pill/` as `%kademlia`,
 `dist-aqua-base/` as `%kademlia-aqua-base`, and `dist-aqua-test/` as
 `%kademlia-test`. The Aqua base is a complete Arvo source desk with a minimal
 `/desk/bill`; it omits unrelated background agents whose timers otherwise
-dominate a network test. The test-only desk contains the completion observer,
-while `%kademlia` contains only the production agents.
+dominate a network test. The test-only desk contains the completion observers,
+while `%kademlia` contains the wrappers, `%kademlia-example` and
+`%kademlia-demo`. Its `/desk/bill` comes from `aqua-pill/` and starts both
+agents. The protocol threads drive `%kademlia-example`; the demo thread drives
+`%kademlia-demo`.
 
 The Aqua integration coverage is split so each run boots only the fleet it
 needs.  `kademlia-network-test` creates three virtual ships and verifies
@@ -398,5 +456,5 @@ then advertises and browses a topic through the demo API:
 ```
 
 The Aqua pill includes both secondary desks. Virtual ships therefore boot with
-the production agents and test observer already installed; the threads do not
+the wrapped agents and test observers already installed; the threads do not
 modify `%base` or copy source files into the ships.

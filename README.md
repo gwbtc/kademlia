@@ -1,10 +1,12 @@
 # Kademlia for Urbit
 
 This desk contains a Kademlia-style overlay for Urbit: pure routing libraries
-and three Gall agent wrappers. An agent gains the protocols by wrapping itself:
+and four Gall agent wrappers. An agent gains the protocols by wrapping itself:
 
 ```hoon
 /+  kademlia-agent, content-routing-agent, content-discovery-agent
+/+  content-store-agent
+%-  agent:content-store-agent
 %-  agent:content-discovery-agent
 %-  agent:content-routing-agent
 %-  agent:kademlia-agent
@@ -13,9 +15,9 @@ and three Gall agent wrappers. An agent gains the protocols by wrapping itself:
 ...
 ```
 
-`kademlia-agent` works alone. Each content wrapper needs `kademlia-agent`
-below it. `app/kademlia-example.hoon` is a minimal agent that stacks all
-three. See [Using the wrappers](#using-the-wrappers).
+`kademlia-agent` works alone. The routing and discovery wrappers each need
+`kademlia-agent` below them. `content-store-agent` needs all three below it.
+`app/kademlia-example.hoon` is a minimal agent that stacks all four. See [Using the wrappers](#using-the-wrappers).
 
 The desk holds:
 
@@ -41,10 +43,15 @@ The desk holds:
   lookups over ordinary Ames pokes, with its pure transitions in
   `lib/kademlia-agent-logic.hoon`.
 - `lib/record-crypto.hoon`: record signing and verification against Jael keys,
-  shared by the two content wrappers.
+  shared by the routing and discovery wrappers.
 - `app/kademlia-example.hoon`: the example agent.
+- `sur/content-store.hoon`, `lib/content-store-agent-logic.hoon`,
+  `lib/content-store-agent.hoon`, and `lib/content-store-client.hoon`: a
+  wrapper that publishes typed casks through exact remote-scry pages,
+  advertises them through content routing and optional names and topics,
+  retrieves and verifies them, and exposes one typed callback API.
 - `sur/bounded-poke.hoon` and `lib/bounded-poke.hoon`: the persistent,
-  per-peer outbound-poke gate shared by all three wrappers.
+  per-peer outbound-poke gate shared by the three protocol wrappers.
 - `tests/lib/kademlia.hoon`: unit coverage for the core invariants.
 - `tests/lib/content-routing.hoon`: unit coverage for content-routing records,
   validation, revision conflicts, and provider selection.
@@ -53,6 +60,8 @@ The desk holds:
   concurrency, callback, and Gall-interface coverage.
 - `tests/lib/bounded-poke.hoon`: queue ordering, expiry, acknowledgement,
   cancellation, reset, and response-cap coverage.
+- `tests/lib/content-store-agent.hoon` and `tests/lib/content-store-client.hoon`:
+  wrapper orchestration, callback, page-reuse, revision, and client-card tests.
 
 ## Profiling demo
 
@@ -86,7 +95,9 @@ The `%content-routing` agent transports those records over ordinary Ames pokes;
 remote scry remains one possible final retrieval mechanism, not a requirement.
 
 An application stacks the wrappers it needs and normally uses only the
-highest API. The content-routing and content-discovery wrappers call the
+highest API. `content-store-agent` provides the simple end-to-end API; see
+[`docs/content-store.md`](docs/content-store.md). The content-routing and
+content-discovery wrappers call the
 kademlia wrapper below them, so an application need not orchestrate their node
 lookups. It may send `%kademlia-command` for raw node lookup, send
 `%content-routing-command` for pointer/provider resolution, or browse with
@@ -104,8 +115,11 @@ wraps:
 | `kademlia-agent` | `%kademlia-command`, `%kademlia-message` | `/~/kademlia/...` | `/x/~/kademlia/...` |
 | `content-routing-agent` | `%content-routing-command`, `%content-routing-message` | `/~/content-routing/...` | `/x/~/content-routing/...` |
 | `content-discovery-agent` | `%content-discovery-command`, `%content-discovery-message` | `/~/content-discovery/...` | `/x/~/content-discovery/...` |
+| `content-store-agent` | `%content-store-command` | `/~/content-store/...` | `/x/~/content-store/...` |
 
-The wrapped agent must leave those wires and paths alone.
+The wrapped agent must leave those wires and paths alone. `content-store-agent`
+also binds the casks it publishes under `/content-store` in the agent's
+`%grow` namespace.
 
 Peers are the same agent on other ships: a wrapper sends protocol messages to
 `[ship dap.bowl]`. Each wrapped app therefore forms its own overlay. Two apps
@@ -118,8 +132,9 @@ To send a command, the wrapped agent pokes itself:
 ```
 
 Commands that take a recipient (`%find-for`, `%observe`) deliver the result as
-a poke with the `%kademlia-result`, `%content-routing-result` or
-`%content-discovery-result` mark. When the recipient is the wrapped agent's own
+a poke with the `%kademlia-result`, `%content-routing-result`,
+`%content-discovery-result` or `%content-store-result` mark. When the
+recipient is the wrapped agent's own
 name, the wrapper calls the agent's `+on-poke` directly, with `src.bowl` set to
 our ship. Any other recipient gets an ordinary local poke. A reply path must
 not start with `/~`; the wrappers keep those for themselves.
@@ -134,7 +149,7 @@ The wrappers do not apply `dbug` or `verb`; the application applies them.
 
 Content routing is layered above the generic node lookup.  A mutable application
 name derives a 128-bit pointer key from its namespace, publisher node ID, and an
-opaque name noun.  A valid signed pointer selects either a `%direct` list of
+ordinary Hoon `path`.  A valid signed pointer selects either a `%direct` list of
 retrieval locators or a `%content` digest whose current providers must be found
 under a second derived Kademlia key:
 
@@ -445,6 +460,15 @@ parent edges and the exact leaf catalog without host-side polling:
 
 ```hoon
 -kademlia-mortar!content-discovery-network-test
+```
+
+`content-store-network-test` exercises the content-store wrapper across two ships. It
+publishes one cask from `~wes` with a provider record, mutable name, and topic
+advertisement; `~bud` then retrieves it by digest and name through exact remote
+scry and discovers its catalog through the topic API:
+
+```hoon
+-kademlia-mortar!content-store-network-test
 ```
 
 `kademlia-demo-network-test` additionally verifies complete resource retrieval

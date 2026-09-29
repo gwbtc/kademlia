@@ -195,8 +195,12 @@
   state
 ::
 ++  start-pointer-query
-  |=  [our=@p run=run-id publisher=@p namespace=@tas name=@t]
+  |=  [our=@p run=run-id publisher=@p namespace=@tas name=path]
   ^-  action
+  ?.  ?&  !=(%$ namespace)
+          (name-valid:cr name)
+      ==
+    (reject run 'invalid-name')
   =/  allocated=allocation  allocate-content
   =.  state  next.allocated
   =/  id=@uv  id.allocated
@@ -408,11 +412,17 @@
           run=run-id
           content=digest
           transport=transport
-          name=(unit [namespace=@tas name=@t revision=@ud])
+          name=(unit [namespace=@tas name=path revision=@ud])
       ==
   ^-  action
   =/  res=(unit resource)  (~(get by resources.state) content)
   ?~  res  (finish run | ~[['reason' s+'unknown-resource']])
+  ?.  ?~  name
+        &
+      ?&  !=(%$ namespace.u.name)
+          (name-valid:cr name.u.name)
+      ==
+    (reject run 'invalid-name')
   =/  pub=publication-state  [content name | ?~(name & |) |]
   =/  op=operation  [[%publish pub] now.bowl]
   =.  state  (put-op run op)
@@ -469,6 +479,15 @@
 ++  start-fetch
   |=  [=bowl:gall run=run-id query=fetch-query]
   ^-  action
+  =/  valid-query=?
+    ?-  -.query
+      %content  &
+      %name
+        ?&  !=(%$ namespace.query)
+            (name-valid:cr name.query)
+        ==
+    ==
+  ?.  valid-query  (reject run 'invalid-name')
   =/  content=(unit digest)
     ?-  -.query
       %content  `digest.query

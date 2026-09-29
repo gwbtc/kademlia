@@ -66,17 +66,24 @@ $:  namespace=@tas
 ==
 ```
 
-Its 128-bit Kademlia key is derived from namespace, publisher, and the opaque
-name noun:
+Its 128-bit Kademlia key is derived from namespace, publisher, and the name
+`path`:
 
 ```hoon
 (end 7 (shax (jam [%kad-content-pointer-key-v1 namespace publisher name])))
 ```
 
 Including the publisher means two identities can use the same namespace and
-name without collision. The name is not placed in the record; callers who know
-it derive the same key. Pointer expiry is optional, allowing either permanent
-or time-bounded mutable names.
+name without collision. Names such as `/releases/latest` are already composed
+of path segments and need no opaque noun encoding in paths or JSON APIs. The
+name is not placed in the record; callers who know it derive the same key.
+Pointer expiry is optional, allowing either permanent or time-bounded mutable
+names.
+
+A mutable name must contain between one and sixteen path segments. Every segment
+must be nonempty and no more than 64 bytes. Publishers and readers must supply
+the same canonical path; invalid names are rejected before Kademlia key
+derivation.
 
 Pointers are signed over a domain-separated digest. Selection authenticates
 the expected namespace, key, publisher, freshness, and signature. The greatest
@@ -152,6 +159,12 @@ The result includes selected records plus responder and timeout sets. Query
 completion does not fetch content and does not assert that a returned locator
 is currently reachable.
 
+Applications which only need exact remote-scry publication and verified cask
+retrieval can use the optional `content-store-agent` wrapper instead. It owns the
+page, coordinates these publication and query callbacks, and returns the final
+typed value. Direct use of `%content-routing` remains appropriate for custom
+locators and transports.
+
 ## Ames protocol and resource limits
 
 Peers exchange:
@@ -208,6 +221,9 @@ catalog may itself contain digests for independently routed resources.
 
 This composition preserves referential transparency where desired while still
 supporting mutable names through pointer records.
+
+`content-store-agent` also exposes this composition as a single `%put` or `%get`
+operation; see [`docs/content-store.md`](content-store.md).
 
 ## Source map
 

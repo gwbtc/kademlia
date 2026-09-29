@@ -39,7 +39,7 @@
   (provider-for content-id who revision address)
 ::
 ++  pointer-for
-  |=  [namespace=@tas publisher=node-id name=* revision=@ud expires=(unit @da)]
+  |=  [namespace=@tas publisher=node-id name=path revision=@ud expires=(unit @da)]
   ^-  record
   =/  target=target  [%content content-id]
   =/  key=key  (pointer-key:cr namespace publisher name)
@@ -199,7 +199,7 @@
     (expect !>((~(valid-query logic engine) [%providers ;;(@uvI (dec (pow 2 256)))])))
     (expect !>(!(~(valid-query logic engine) [%providers ;;(@uvI (pow 2 256))])))
     %-  expect-fail
-    |.  (~(start-find-pointer logic engine) 0v1 %test ;;(@ux (pow 2 128)) 0)
+    |.  (~(start-find-pointer logic engine) 0v1 %test ;;(@ux (pow 2 128)) ~)
     %-  expect-fail
     |.  (~(start-find-providers logic engine) 0v1 ;;(@uvI (pow 2 256)))
   ==
@@ -642,8 +642,8 @@
     [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  merged=operation
     (~(merge-records logic [~zod now ~nec %test state allow]) op [wrong correct ~])
-  =/  pointer=record  (pointer-for %test 0x12 %name 1 `~2026.8.12)
-  =/  pointer-key=key  (pointer-key:cr %test 0x12 %name)
+  =/  pointer=record  (pointer-for %test 0x12 ~[%name] 1 `~2026.8.12)
+  =/  pointer-key=key  (pointer-key:cr %test 0x12 ~[%name])
   =/  pointer-op=operation
     [[%find-pointer %other 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  pointer-merged=operation
@@ -697,9 +697,9 @@
     (~(finish logic [~zod now ~nec %test state deny]) 0v1 provider-op)
   =/  provider-result=operation-result  result.-.provider-finished
   ?>  ?=(%providers -.provider-result)
-  =/  pointer-rec=record  (pointer-for %test 0x12 %name 1 `~2026.8.12)
+  =/  pointer-rec=record  (pointer-for %test 0x12 ~[%name] 1 `~2026.8.12)
   ?>  ?=(%pointer -.pointer-rec)
-  =/  pointer-key=key  (pointer-key:cr %test 0x12 %name)
+  =/  pointer-key=key  (pointer-key:cr %test 0x12 ~[%name])
   =/  pointer-op=operation
     [[%find-pointer %test 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  pointer-op=operation

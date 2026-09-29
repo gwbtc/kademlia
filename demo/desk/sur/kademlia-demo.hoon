@@ -24,7 +24,7 @@
 +$  resources  (map digest resource)
 +$  fetch-query
   $%  [%content digest=digest]
-      [%name publisher=@p namespace=@tas name=@t]
+      [%name publisher=@p namespace=@tas name=path]
   ==
 +$  demo-command
   $%  [%reset ~]
@@ -33,7 +33,7 @@
           run=run-id
           content=digest
           transport=transport
-          name=(unit [namespace=@tas name=@t revision=@ud])
+          name=(unit [namespace=@tas name=path revision=@ud])
       ==
       [%lookup run=run-id target=@p]
       [%fetch run=run-id query=fetch-query]
@@ -105,7 +105,7 @@
   ==
 +$  publication-state
   $:  content=digest
-      name=(unit [namespace=@tas name=@t revision=@ud])
+      name=(unit [namespace=@tas name=path revision=@ud])
       provider-done=?
       pointer-done=?
       failed=?

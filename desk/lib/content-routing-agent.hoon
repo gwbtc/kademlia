@@ -141,6 +141,19 @@
               (notice-card id.completion u.callback result.completion)
           ==
         ::
+        ::
+        ::  answer: complete an operation from local records alone
+        ::
+        ++  answer
+          |=  [id=operation-id result=operation-result]
+          ^+  cor
+          =.  completed.state  (~(put by completed.state) id result)
+          =/  callback=(unit operation-callback)
+            (~(get by callbacks.state) id)
+          ?~  callback  cor
+          =.  callbacks.state  (~(del by callbacks.state) id)
+          (emit [(notice-card id u.callback result) ~])
+        ::
         ++  records-for
           |=  request=query
           ^-  records
@@ -181,6 +194,8 @@
               (weld delivery-cards [~(refresh-card logic engine) ~])
             %publish-pointer
               ?>  (~(valid-id logic engine) id.command)
+              ?>  !=(%$ namespace.command)
+              ?>  (name-valid:cr name.command)
               ?>  (target-valid:cr target.command)
               =/  publisher=node-id  ~(self-id logic engine)
               =/  key=key
@@ -212,11 +227,24 @@
               (emit new)
             %find-pointer
               ?>  (~(valid-id logic engine) id.command)
+              ?>  !=(%$ namespace.command)
+              ?>  (name-valid:cr name.command)
               ?>  (identity-valid:cr publisher.command)
-              =/  ignored
-                %+  log  %info
-                :^  %operation-start  id.command  %find-pointer
+              =/  key=key
                 (pointer-key:cr namespace.command publisher.command name.command)
+              =/  selection=pointer-selection
+                %-  select-pointer:cr
+                :*  now.bowl  namespace.command  key  publisher.command  verify
+                    %+  turn  (records-for [%pointer key])
+                    |=  rec=record
+                    ?>  ?=(%pointer -.rec)
+                    value.rec
+                ==
+              ?.  ?=(%none -.selection)
+                %+  answer  id.command
+                [%pointer selection (sy ~(self-id logic engine) ~) ~]
+              =/  ignored
+                (log %info [%operation-start id.command %find-pointer key])
               =^  new  state
                 %+  ~(start-find-pointer logic engine)
                   id.command
@@ -225,6 +253,17 @@
             %find-providers
               ?>  (~(valid-id logic engine) id.command)
               ?>  (digest-valid:cr content.command)
+              =/  selection=provider-selection
+                %:  select-providers:cr
+                  now.bowl  content.command  verify
+                  %+  turn  (records-for [%providers content.command])
+                  |=  rec=record
+                  ?>  ?=(%provider -.rec)
+                  value.rec
+                ==
+              ?.  ?=(~ records.selection)
+                %+  answer  id.command
+                [%providers selection (sy ~(self-id logic engine) ~) ~]
               =/  ignored
                 %+  log  %info
                 [%operation-start id.command %find-providers content.command]

@@ -1,17 +1,20 @@
-::  kademlia-example: a minimal agent wrapped with all three protocols
+::  kademlia-example: a minimal agent wrapped with all four layers
 ::
 ::    Send commands by poking this agent with the %kademlia-command,
-::    %content-routing-command and %content-discovery-command marks.  A
+::    %content-routing-command, %content-discovery-command and
+::    %content-store-command marks.  A
 ::    command that names this agent as its recipient gets its result back
 ::    as a poke, handled in +on-poke below.
 ::
 /+  default-agent, dbug, verb
 /+  kademlia-agent, content-routing-agent, content-discovery-agent
+/+  content-store-agent
 |%
 +$  card  card:agent:gall
 --
 %+  verb  |
 %-  agent:dbug
+%-  agent:content-store-agent
 %-  agent:content-discovery-agent
 %-  agent:content-routing-agent
 %-  agent:kademlia-agent
@@ -35,6 +38,7 @@
   ?.  ?=  $?  %kademlia-result
               %content-routing-result
               %content-discovery-result
+              %content-store-result
           ==
       mark
     (on-poke:def mark vase)

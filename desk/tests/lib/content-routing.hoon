@@ -33,15 +33,32 @@
 ::
 ++  test-key-derivation
   =/  publisher=node-id  0x1234
-  =/  a=key  (pointer-key:content-routing %app publisher %name)
-  =/  b=key  (pointer-key:content-routing %other publisher %name)
+  =/  a=key  (pointer-key:content-routing %app publisher ~[%name])
+  =/  b=key  (pointer-key:content-routing %other publisher ~[%name])
+  =/  c=key  (pointer-key:content-routing %app publisher ~[%name %child])
   =/  dig=digest  (digest-cask:content-routing `(cask)`[%noun 42])
   =/  providers=key  (provider-key:content-routing dig)
   ;:  weld
     (expect !>((identity-valid:content-routing a)))
     (expect !>((identity-valid:content-routing providers)))
     (expect !>(!=(a b)))
+    (expect !>(!=(a c)))
     (expect !>(!=(a providers)))
+  ==
+::
+++  test-mutable-name-validation
+  =/  sixteen=path
+    ~[%a %b %c %d %e %f %g %h %i %j %k %l %m %n %o %p]
+  =/  seventeen=path
+    ~[%a %b %c %d %e %f %g %h %i %j %k %l %m %n %o %p %q]
+  =/  long=@ta  (fil 3 65 'a')
+  ;:  weld
+    (expect !>((name-valid:content-routing ~[%packages %kademlia %latest])))
+    (expect !>((name-valid:content-routing sixteen)))
+    (expect !>(!(name-valid:content-routing ~)))
+    (expect !>(!(name-valid:content-routing seventeen)))
+    (expect !>(!(name-valid:content-routing ~[%packages %$ %latest])))
+    (expect !>(!(name-valid:content-routing [long ~])))
   ==
 ::
 ++  test-locators

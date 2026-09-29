@@ -573,7 +573,7 @@
   (start-operation id [%publish rec (record-key rec) payload])
 ::
 ++  start-find-pointer
-  |=  [id=operation-id namespace=@tas publisher=node-id name=*]
+  |=  [id=operation-id namespace=@tas publisher=node-id name=path]
   ^-  [(list card:agent:gall) content-state]
   ?>  (identity-valid:cr publisher)
   =/  target=key  (pointer-key:cr namespace publisher name)

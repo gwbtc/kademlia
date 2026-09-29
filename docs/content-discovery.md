@@ -231,6 +231,12 @@ A catalog can contain further content digests, producing a compact index of
 independently replicated immutable resources. Content-routing pointers can be
 used where an application wants mutable names instead.
 
+The optional `content-store-agent` wrapper wraps browsing as `%search` and can
+publish a cask, its provider record, and a topic advertisement as one observed
+operation. It deliberately returns browse records without interpreting or
+recursively fetching catalog bodies. See
+[`docs/content-store.md`](content-store.md).
+
 ## Demo and source map
 
 Kademlia Lab in [`demo/`](../demo/) can publish a resource, advertise its digest

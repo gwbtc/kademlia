@@ -228,11 +228,19 @@
     %-  expect-fail
     |.  %+  on-poke:+.initialized
           %content-routing-command
-        !>(`content-command`[%find-pointer 0v1 %test ;;(@ux (pow 2 128)) 0])
+        !>(`content-command`[%find-pointer 0v1 %test ;;(@ux (pow 2 128)) ~])
     %-  expect-fail
     |.  %+  on-poke:+.initialized
           %content-routing-command
         !>(`content-command`[%find-providers 0v2 ;;(@uvI (pow 2 256))])
+    %-  expect-fail
+    |.  %+  on-poke:+.initialized
+          %content-routing-command
+        !>(`content-command`[%find-pointer 0v3 %test 0x12 ~])
+    %-  expect-fail
+    |.  %+  on-poke:+.initialized
+          %content-routing-command
+        !>(`content-command`[%find-pointer 0v4 %test 0x12 ~[%a %b %c %d %e %f %g %h %i %j %k %l %m %n %o %p %q]])
   ==
 ::
 ++  test-response-admission-precedes-processing

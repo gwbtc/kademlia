@@ -121,7 +121,7 @@
     (on-poke:+.initialized %kademlia-demo-command !>(`demo-command`[%create %create 7 1.024 'text/plain']))
   =/  published
     %+  on-poke:+.created  %kademlia-demo-command
-    !>(`demo-command`[%publish %publish content.res %custom `[namespace=%demo name='latest' revision=1]])
+    !>(`demo-command`[%publish %publish content.res %custom `[namespace=%demo name=~[%latest] revision=1]])
   =/  accepted=(set node-id)  (silt ~[0x1])
   =/  provider-result=operation-result  [%published 0x1 accepted ~ ~]
   =/  provider-notice=operation-notice
@@ -146,6 +146,26 @@
     %+  expect-eq  !>(0)
     !>((lent ~(tap by active.pointer-state)))
     (expect !>(?=(^ -.pointer)))
+  ==
+::
+++  test-invalid-mutable-names-fail-before-starting
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.21)
+  =/  initialized  on-init:~(. agent bol)
+  =/  res=resource  (make-resource:demo 7 1.024 'text/plain')
+  =/  created
+    (on-poke:+.initialized %kademlia-demo-command !>(`demo-command`[%create %create 7 1.024 'text/plain']))
+  =/  published
+    %+  on-poke:+.created  %kademlia-demo-command
+    !>(`demo-command`[%publish %publish content.res %custom `[namespace=%demo name=~ revision=1]])
+  =/  fetched
+    %+  on-poke:+.published  %kademlia-demo-command
+    !>(`demo-command`[%fetch %fetch [%name ~zod %demo ~]])
+  =/  state=demo-state  (get-state on-save:+.fetched)
+  ;:  weld
+    (expect !>(?=(^ -.published)))
+    (expect !>(?=(^ -.fetched)))
+    %+  expect-eq  !>(0)
+    !>((lent ~(tap by active.state)))
   ==
 ::
 ++  test-digest-fetch-provider-callback-starts-transfer

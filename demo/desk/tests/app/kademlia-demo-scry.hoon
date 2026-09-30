@@ -73,7 +73,7 @@
     [[%fetch-providers (scot %uv 0v1) %fetch ~] result]
   =/  discovered
     (on-poke:+.started %content-routing-result !>(notice))
-  =/  deadline=@da  (add now.bol ~s30)
+  =/  deadline=@da  (add now.bol ~m2)
   =/  responded
     %-  on-arvo:+.discovered
     :-  /scry/fetch/(scot %da deadline)

@@ -12,7 +12,7 @@
 %+  verb  |
 %-  agent:dbug
 =/  cfg=config:kad  [20 20 3 12 %kademlia-urbit-v1]
-=/  defaults=demo-config  [32.768 4 ~s30 8.388.608 4]
+=/  defaults=demo-config  [32.768 4 ~m2 8.388.608 4]
 =|  state=demo-state
 =>  |%
 +$  action  [cards=(list card) next=demo-state]

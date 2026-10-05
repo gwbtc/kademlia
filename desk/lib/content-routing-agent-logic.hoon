@@ -728,7 +728,7 @@
   =/  query=?  !=(%publish -.kind.next)
   =/  message=content-message  (message-for request next)
   =/  ship=@p  (~(node-to-ship kad kad-cfg) peer)
-  =/  note=note:agent:gall
+  =/  note=delivery-note
     [%agent [ship dap] %poke %content-routing-message !>(message)]
   =/  sent=[delivery-id delivery-update]
     (~(enqueue delivery [now outbound.state]) ship deadline [%request request] note)
@@ -870,7 +870,7 @@
   |=  [ship=@p request=content-request-id message=content-message]
   ^-  [(list card:agent:gall) content-state]
   =/  deadline=@da  (add request-timeout.config.state now)
-  =/  note=note:agent:gall
+  =/  note=delivery-note
     [%agent [ship dap] %poke %content-routing-message !>(message)]
   =/  sent=[delivery-id delivery-update]
     (~(enqueue delivery [now outbound.state]) ship deadline [%response request] note)

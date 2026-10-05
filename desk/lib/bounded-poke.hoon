@@ -8,6 +8,27 @@
   ^-  delivery-state
   [0 ~ 0 0]
 ::
+::  load: make the delivery state at a wing of a saved state loadable.
+::  a queue saved before $delivery-note holds notes typed by the kernel
+::  of its day, which no later kernel can read back. keep its active
+::  pokes and drop what it queued, as +reset does.
+::
+++  load
+  |=  [sav=vase =wing]
+  ^-  vase
+  =/  old=vase  (slap sav [%wing wing])
+  ?:  (~(nest ut -:!>(*delivery-state)) | p.old)  sav
+  =/  stale  !<(stale-delivery-state old)
+  =/  new=delivery-state
+    %=    stale
+        peers
+      %-  ~(rep by peers.stale)
+      |=  [[peer=@p active=(unit active-delivery) *] out=(map @p peer-delivery)]
+      ?~  active  out
+      (~(put by out) peer [active ~ ~ ~])
+    ==
+  (slap (slop sav !>(new=new)) [%cnts ~[[%& 2]] [wing [%limb %new]]~])
+::
 ::  summary: count live delivery state without materializing the peer map.
 ::
 ++  summary
@@ -133,7 +154,7 @@
 ::  enqueue: send immediately or retain the expiring message in agent state.
 ::
 ++  enqueue
-  |=  [peer=@p deadline=@da context=delivery-context note=note:agent:gall]
+  |=  [peer=@p deadline=@da context=delivery-context note=delivery-note]
   ^-  [id=delivery-id update=delivery-update]
   =/  id=delivery-id  next-id.state
   =.  next-id.state  +(id)

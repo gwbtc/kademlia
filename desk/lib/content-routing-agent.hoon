@@ -405,8 +405,9 @@
     ?.  ?=([[%content-routing *] *] q.ole)
       =/  out  abet:init:(below:up (on-load:og ole))
       [cards.out this(inner inner.out, state state.out, verbosity verbosity.out)]
-    =+  !<([[%content-routing old=content-saved-state] ile=vase] ole)
-    =/  out  abet:(below:(load:up old) (on-load:og ile))
+    =/  old
+      !<(content-saved-state (load:delivery (slot 5 ole) ~[%outbound %state]))
+    =/  out  abet:(below:(load:up old) (on-load:og !<(vase (slot 3 ole))))
     [cards.out this(inner inner.out, state state.out, verbosity verbosity.out)]
   ::
   ++  on-poke

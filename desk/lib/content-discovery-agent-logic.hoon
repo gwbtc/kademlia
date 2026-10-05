@@ -719,7 +719,7 @@
   =/  query=?  !=(%publish -.kind.next)
   =/  message=discovery-message  (message-for request next)
   =/  ship=@p  (~(node-to-ship kad kad-cfg) peer)
-  =/  note=note:agent:gall
+  =/  note=delivery-note
     [%agent [ship dap] %poke %content-discovery-message !>(message)]
   =/  sent=[delivery-id delivery-update]
     (~(enqueue delivery [now outbound.state]) ship deadline [%request request] note)
@@ -859,7 +859,7 @@
   |=  [ship=@p request=discovery-request-id message=discovery-message]
   ^-  [(list card:agent:gall) discovery-state]
   =/  deadline=@da  (add request-timeout.config.state now)
-  =/  note=note:agent:gall
+  =/  note=delivery-note
     [%agent [ship dap] %poke %content-discovery-message !>(message)]
   =/  sent=[delivery-id delivery-update]
     (~(enqueue delivery [now outbound.state]) ship deadline [%response request] note)

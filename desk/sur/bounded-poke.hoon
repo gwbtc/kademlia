@@ -6,12 +6,17 @@
   $%  [%request id=@uv]
       [%response id=@uv]
   ==
+::
+::  delivery-note: the one note a delivery passes, a poke to an agent.
+::  state must not hold $note:agent:gall: its type covers every vane
+::  task, so a kernel update would change the type of the saved state.
++$  delivery-note  [%agent [=ship name=term] %poke =cage]
 +$  queued-delivery
   $:  id=delivery-id
       peer=@p
       deadline=@da
       context=delivery-context
-      note=note:agent:gall
+      note=delivery-note
   ==
 +$  active-delivery
   [id=delivery-id context=delivery-context]
@@ -24,6 +29,14 @@
 +$  delivery-state
   $:  next-id=delivery-id
       peers=(map @p peer-delivery)
+      expired-total=@ud
+      overflow-dropped=@ud
+  ==
+::
+::  stale-delivery-state: any $delivery-state, read without its queues.
++$  stale-delivery-state
+  $:  next-id=delivery-id
+      peers=(map @p [active=(unit active-delivery) *])
       expired-total=@ud
       overflow-dropped=@ud
   ==

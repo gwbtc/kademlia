@@ -42,7 +42,8 @@
           ~
         ::
         ::  take: keep cards from below.  A result addressed to us
-        ::  resumes its operation.
+        ::  resumes its operation.  An %unname takes effect at once, so
+        ::  the name a rejected %get settled never outlives its event.
         ::
         ++  take
           |=  new=(list card)
@@ -75,6 +76,14 @@
               %+  ~(discovery-result logic engine)
                 t.t.reply-path.notice
               result.notice
+            $(new t.new)
+          ::
+              %content-store-command
+            =+  !<(command=content-store-command q.u.mine)
+            ?.  ?=(%unname -.command)
+              $(new t.new, cards [i.new cards])
+            =.  names.state
+              (~(del by names.state) [publisher namespace name]:command)
             $(new t.new)
           ==
         ::
@@ -163,6 +172,11 @@
             =.  callbacks.state  (~(del by callbacks.state) id.command)
             cor
           ::
+              %unname
+            =.  names.state
+              (~(del by names.state) [publisher namespace name]:command)
+            cor
+          ::
               %set-config
             ?>  (~(valid-config logic engine) value.command)
             cor(config.state value.command)
@@ -243,7 +257,7 @@
     [cards.out this(inner inner.out, state state.out, verbosity verbosity.out)]
   ::
   ++  on-save
-    !>([[%content-store `content-store-saved-state`[state verbosity]] on-save:og])
+    !>([[%content-store `content-store-saved-state`[%1 state verbosity]] on-save:og])
   ::
   ++  on-load
     |=  ole=vase
@@ -251,8 +265,22 @@
     ?.  ?=([[%content-store *] *] q.ole)
       =/  out  abet:init:(below:up (on-load:og ole))
       [cards.out this(inner inner.out, state state.out, verbosity verbosity.out)]
-    =+  !<([[%content-store old=content-store-saved-state] ile=vase] ole)
-    =/  out  abet:(below:(load:up old) (on-load:og ile))
+    =/  ole-store=vase  (slot 5 ole)
+    =/  old=content-store-saved-state
+      ?:  ?=([%1 *] q.ole-store)
+        !<(content-store-saved-state ole-store)
+      ::
+      ::  an untagged state is from before %unname, when the wrapped
+      ::  agent could not reject what a %get fetched.  Drop every name
+      ::  but our own, so each settles again past the agent's check.
+      =+  !<  [was=content-store-state loud=content-store-verbosity]
+          ole-store
+      =.  names.was
+        %-  ~(gas by *(map publisher-name digest))
+        %+  skim  ~(tap by names.was)
+        |=([key=publisher-name digest] =(our.bowl publisher.key))
+      [%1 was loud]
+    =/  out  abet:(below:(load:up old) (on-load:og !<(vase (slot 3 ole))))
     [cards.out this(inner inner.out, state state.out, verbosity verbosity.out)]
   ::
   ++  on-poke

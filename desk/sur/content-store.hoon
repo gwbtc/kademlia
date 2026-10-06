@@ -51,6 +51,7 @@
       [%search id=content-store-id topic=topic-path:cd]
       [%observe id=content-store-id recipient=@tas reply-path=path]
       [%forget id=content-store-id]
+      [%unname publisher=@p namespace=@tas name=path]
       [%set-config value=content-store-config]
       [%set-verbosity level=content-store-verbosity]
   ==
@@ -166,6 +167,8 @@
       naming=(map content-store-id publisher-name)
       names=(map publisher-name digest)
   ==
+::
+::  A saved state from before the %1 tag was the bare pair.
 +$  content-store-saved-state
-  [state=content-store-state verbosity=content-store-verbosity]
+  [%1 state=content-store-state verbosity=content-store-verbosity]
 --

@@ -45,6 +45,7 @@ $%  [%put id value=(cask) options=publication-options lifetime=(unit @dr)]
     [%search id topic=topic-path]
     [%observe id recipient=@tas reply-path=/]
     [%forget id]
+    [%unname publisher=@p namespace=@tas name=/]
     [%set-config value=content-store-config]
     [%set-verbosity level=?(%off %info %debug)]
 ==
@@ -222,6 +223,17 @@ records replicate, so a second `%put` can read the first. Another publisher's
 name settles when a `%get` of it completes. `/names` returns the whole index. With `/content`,
 it lets an agent read the latest value it has fetched for a name without
 keeping its own copy. The index is local and may trail the network.
+
+`%unname` drops one name from the index. It sends nothing to the network and
+keeps the cached cask. A wrapped agent that checks what it fetches sends
+`%unname` from the `+on-poke` that receives a bad `%get` result: the wrapper
+applies it inside that event, so no scry ever reads the rejected name. A
+scry inside that `+on-poke` still reads the digest the name held before the
+`%get`, which lets the agent compare the two.
+
+The saved state carries a `%1` tag. An untagged state dates from before
+`%unname`, when the wrapped agent could not reject a name. Loading one drops
+every name but our own, so each settles again past the agent's check.
 
 ## Failure and consistency model
 

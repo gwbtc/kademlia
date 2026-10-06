@@ -50,6 +50,12 @@
   |=  [id=content-store-id content=digest]
   ^-  content-store-command
   [%unpin id content]
+::  Drop the digest a name settled on here.  A wrapped agent that
+::  rejects what a %get fetched sends this from the result's own event.
+++  unname
+  |=  [publisher=@p namespace=@tas name=path]
+  ^-  content-store-command
+  [%unname publisher namespace name]
 ::  Publish only by immutable digest.
 ++  unnamed
   ^-  publication-options

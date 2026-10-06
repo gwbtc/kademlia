@@ -9,7 +9,11 @@
   =/  search=content-store-command  (search:client 0v4 ~[%software %urbit])
   =/  pin=content-store-command  (pin:client 0v5 0v42 `~d7)
   =/  unpin=content-store-command  (unpin:client 0v6 0v42)
+  =/  unname=content-store-command  (unname:client ~zod %demo ~[%latest])
   ;:  weld
+    %+  expect-eq
+      !>(`content-store-command`[%unname ~zod %demo ~[%latest]])
+    !>(unname)
     %+  expect-eq
       !>(`content-store-command`[%put 0v1 value [~ ~] `~h6])
     !>(put)

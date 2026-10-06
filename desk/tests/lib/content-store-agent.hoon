@@ -322,7 +322,7 @@
   =/  initial=content-store-state  (get-state on-save:+.initialized)
   =.  values.initial  (~(put by values.initial) content value)
   =/  loaded
-    (on-load:~(. agent bowl) (put-saved [initial %off]))
+    (on-load:~(. agent bowl) (put-saved [%1 initial %off]))
   =/  started
     %+  on-poke:+.loaded  %content-store-command
     !>(`content-store-command`[%pin 0v30 content ~])
@@ -420,7 +420,7 @@
   =/  state=content-store-state  (get-state on-save:+.initialized)
   =.  values.state  (~(put by values.state) content value)
   =/  loaded
-    (on-load:~(. agent bowl) (put-saved [state %off]))
+    (on-load:~(. agent bowl) (put-saved [%1 state %off]))
   =/  observed
     %+  on-poke:+.loaded  %content-store-command
     !>(`content-store-command`[%observe 0v9 %sink /reply])
@@ -490,7 +490,7 @@
   =/  state=content-store-state  (get-state on-save:+.initialized)
   =.  values.state  (~(put by values.state) content value)
   =/  loaded
-    (on-load:~(. agent bowl) (put-saved [state %off]))
+    (on-load:~(. agent bowl) (put-saved [%1 state %off]))
   =/  observed
     %+  on-poke:+.loaded  %content-store-command
     !>(`content-store-command`[%observe 0v9 %content-store /reply])
@@ -531,7 +531,7 @@
   =/  state=content-store-state  (get-state on-save:+.initialized)
   =.  values.state  (~(put by values.state) content value)
   =/  loaded
-    (on-load:~(. agent bowl) (put-saved [state %off]))
+    (on-load:~(. agent bowl) (put-saved [%1 state %off]))
   =/  started
     %+  on-poke:+.loaded  %content-store-command
     !>(`content-store-command`[%get 0v41 [%name ~nec %demo ~[%latest]]])
@@ -557,6 +557,74 @@
     %+  expect-eq  !>(0)
     !>((lent ~(tap by naming.final)))
     (expect !>(?=([~ %get *] (~(get by completed.final) 0v41))))
+  ==
+::
+++  test-untagged-load-keeps-only-our-names
+  =/  initialized  on-init:~(. agent bowl)
+  =/  state=content-store-state  (get-state on-save:+.initialized)
+  =.  names.state
+    %-  ~(gas by names.state)
+    :~  [[~nec %demo ~[%latest]] 0v42]
+        [[~zod %demo ~[%latest]] 0v43]
+    ==
+  =/  loaded
+    %-  on-load:~(. agent bowl)
+    !>([[%content-store [state %debug]] !>(~)])
+  =/  saved=content-store-saved-state  (get-saved on-save:+.loaded)
+  =/  again
+    (on-load:~(. agent bowl) (put-saved [%1 state %off]))
+  ;:  weld
+    %+  expect-eq
+      !>(`(map publisher-name digest)`[[[~zod %demo ~[%latest]] 0v43] ~ ~])
+    !>(names.state.saved)
+    %+  expect-eq  !>(`content-store-verbosity`%debug)
+    !>(verbosity.saved)
+    %+  expect-eq  !>(2)
+    !>(~(wyt by names.state:(get-saved on-save:+.again)))
+  ==
+::
+++  test-unname-drops-a-name
+  =/  initialized  on-init:~(. agent bowl)
+  =/  state=content-store-state  (get-state on-save:+.initialized)
+  =.  names.state
+    %-  ~(gas by names.state)
+    :~  [[~nec %demo ~[%latest]] 0v42]
+        [[~nec %demo ~[%stable]] 0v43]
+    ==
+  =/  loaded
+    (on-load:~(. agent bowl) (put-saved [%1 state %off]))
+  =/  dropped
+    %+  on-poke:+.loaded  %content-store-command
+    !>(`content-store-command`[%unname ~nec %demo ~[%latest]])
+  =/  final=content-store-state  (get-state on-save:+.dropped)
+  ;:  weld
+    %+  expect-eq  !>(0)
+    !>((lent -.dropped))
+    %+  expect-eq
+      !>(`(map publisher-name digest)`[[[~nec %demo ~[%stable]] 0v43] ~ ~])
+    !>(names.final)
+  ==
+::
+++  test-unname-from-below-skips-gall
+  =/  initialized  on-init:~(. agent bowl)
+  =/  state=content-store-state  (get-state on-save:+.initialized)
+  =.  names.state  (~(put by names.state) [~nec %demo ~[%latest]] 0v42)
+  =/  loaded
+    (on-load:~(. agent bowl) (put-saved [%1 state %off]))
+  =/  dropped
+    %+  on-poke:+.loaded  %test-cards
+    !>  ^-  (list card:agent:gall)
+    :_  ~
+    :*  %pass  /unname  %agent  [~zod %content-store]
+        %poke  %content-store-command
+        !>(`content-store-command`[%unname ~nec %demo ~[%latest]])
+    ==
+  =/  final=content-store-state  (get-state on-save:+.dropped)
+  ;:  weld
+    %+  expect-eq  !>(0)
+    !>((lent -.dropped))
+    %+  expect-eq  !>(0)
+    !>(~(wyt by names.final))
   ==
 ::
 ++  test-crash-below-fails-the-operation

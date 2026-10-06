@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { command, subscribe, unsubscribe } from './api';
+import { mutableNameSegments } from './mutableName';
 import { phaseDuration, summarize } from './stats';
 import type { DemoEvent, PhaseEvent, ResourceSummary, RunRecord, SnapshotEvent } from './types';
 
@@ -161,11 +162,20 @@ export default function App() {
   async function submitPublish(event: FormEvent) {
     event.preventDefault();
     if (!digest) return;
+    let name: string[] | undefined;
+    if (publishName) {
+      try {
+        name = mutableNameSegments(resourceName);
+      } catch (reason) {
+        setError(String(reason));
+        return;
+      }
+    }
     await start('publish resource', {
       action: 'publish',
       content: digest,
       transport: publishTransport,
-      name: publishName ? { namespace, name: resourceName, revision: 1 } : null
+      name: publishName ? { namespace, name, revision: 1 } : null
     });
   }
 
@@ -177,7 +187,12 @@ export default function App() {
 
   async function submitFetchName(event: FormEvent) {
     event.preventDefault();
-    await start('fetch by name', { action: 'fetch-name', publisher, namespace, name: resourceName });
+    try {
+      const name = mutableNameSegments(resourceName);
+      await start('fetch by name', { action: 'fetch-name', publisher, namespace, name });
+    } catch (reason) {
+      setError(String(reason));
+    }
   }
 
   function topicSegments(): string[] {

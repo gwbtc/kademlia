@@ -20,7 +20,7 @@
 ::
 ++  initial
   ^-  content-state
-  ~(init logic [~zod now ~zod *content-state allow])
+  ~(init logic [~zod now ~zod %test *content-state allow])
 ::
 ++  content-id
   ^-  digest
@@ -39,7 +39,7 @@
   (provider-for content-id who revision address)
 ::
 ++  pointer-for
-  |=  [namespace=@tas publisher=node-id name=* revision=@ud expires=(unit @da)]
+  |=  [namespace=@tas publisher=node-id name=path revision=@ud expires=(unit @da)]
   ^-  record
   =/  target=target  [%content content-id]
   =/  key=key  (pointer-key:cr namespace publisher name)
@@ -97,7 +97,7 @@
 ::
 ++  test-record-payload-round-trip
   =/  state=content-state  initial
-  =/  engine  [~zod now ~zod state allow]
+  =/  engine  [~zod now ~zod %test state allow]
   =/  rec=record  (provider 0x12 1 'https://one.test')
   =/  payload=@  (~(pack-record logic engine) rec)
   =/  decoded=(unit sized-record)  (~(unpack-record logic engine) payload)
@@ -112,7 +112,7 @@
 ::
 ++  test-records-payload-round-trip
   =/  state=content-state  initial
-  =/  engine  [~zod now ~zod state allow]
+  =/  engine  [~zod now ~zod %test state allow]
   =/  values=records
     [(provider 0x12 1 'https://one.test') (provider 0x13 1 'https://two.test') ~]
   =/  packed=[count=@ud payload=@]  (~(pack-records logic engine) values)
@@ -135,7 +135,7 @@
 ::
 ++  test-records-payload-longest-fitting-prefix
   =/  state=content-state  initial
-  =/  engine  [~zod now ~zod state allow]
+  =/  engine  [~zod now ~zod %test state allow]
   =/  blob=@  (pow 2 (mul 8 40.000))
   =/  make
     |=  [remaining=@ud values=records]
@@ -156,7 +156,7 @@
 ::
 ++  test-malformed-record-payloads-rejected
   =/  state=content-state  initial
-  =/  engine  [~zod now ~zod state allow]
+  =/  engine  [~zod now ~zod %test state allow]
   =/  valid=[count=@ud payload=@]
     (~(pack-records logic engine) [(provider 0x12 1 'https://one.test') ~])
   ;:  weld
@@ -172,7 +172,7 @@
 ::
 ++  test-config-cannot-exceed-wire-limits
   =/  state=content-state  initial
-  =/  engine  [~zod now ~zod state allow]
+  =/  engine  [~zod now ~zod %test state allow]
   ;:  weld
     (expect !>(!(~(config-valid logic engine) config.state(max-record-bytes 65.537))))
     (expect !>(!(~(config-valid logic engine) config.state(max-providers 65))))
@@ -182,7 +182,7 @@
 ::
 ++  test-id-boundaries
   =/  state=content-state  initial
-  =/  engine  [~zod now ~zod state allow]
+  =/  engine  [~zod now ~zod %test state allow]
   ;:  weld
     (expect !>((~(valid-id logic engine) (dec (pow 2 64)))))
     (expect !>(!(~(valid-id logic engine) (pow 2 64))))
@@ -192,25 +192,25 @@
 ::
 ++  test-query-domain-boundaries
   =/  state=content-state  initial
-  =/  engine  [~zod now ~zod state allow]
+  =/  engine  [~zod now ~zod %test state allow]
   ;:  weld
     (expect !>((~(valid-query logic engine) [%pointer ;;(@ux (dec (pow 2 128)))])))
     (expect !>(!(~(valid-query logic engine) [%pointer ;;(@ux (pow 2 128))])))
     (expect !>((~(valid-query logic engine) [%providers ;;(@uvI (dec (pow 2 256)))])))
     (expect !>(!(~(valid-query logic engine) [%providers ;;(@uvI (pow 2 256))])))
     %-  expect-fail
-    |.  (~(start-find-pointer logic engine) 0v1 %test ;;(@ux (pow 2 128)) 0)
+    |.  (~(start-find-pointer logic engine) 0v1 %test ;;(@ux (pow 2 128)) ~)
     %-  expect-fail
     |.  (~(start-find-providers logic engine) 0v1 ;;(@uvI (pow 2 256)))
   ==
 ::
 ++  test-response-admission
   =/  state=content-state  initial
-  =/  peer=node-id  ~(self-id logic [~nec now ~nec state allow])
+  =/  peer=node-id  ~(self-id logic [~nec now ~nec %test state allow])
   =/  pen=pending-content-request  [0v9 peer %.y +(now) 0]
   =.  pending.state  (~(put by pending.state) 0v1 pen)
-  =/  correct  [~zod now ~nec state allow]
-  =/  wrong  [~zod now ~bud state allow]
+  =/  correct  [~zod now ~nec %test state allow]
+  =/  wrong  [~zod now ~bud %test state allow]
   ;:  weld
     (expect !>((~(response-expected logic correct) 0v1 %.y)))
     (expect !>(!(~(response-expected logic correct) 0v1 %.n)))
@@ -226,7 +226,7 @@
   =.  pending.state  (~(put by pending.state) ;;(@uv 0) pen)
   =.  next-request.state  max
   =/  out=[content-request-id content-state]
-    ~(take-content-request-id logic [~zod now ~zod state allow])
+    ~(take-content-request-id logic [~zod now ~zod %test state allow])
   ;:  weld
     %+  expect-eq  !>(;;(@uv 1))
     !>(-.out)
@@ -243,7 +243,7 @@
   =.  background.state  (~(put in background.state) ;;(@uv 1))
   =.  next-operation.state  max
   =/  out=[operation-id content-state]
-    ~(next-operation-id logic [~zod now ~zod state allow])
+    ~(next-operation-id logic [~zod now ~zod %test state allow])
   ;:  weld
     %+  expect-eq  !>(;;(@uv 2))
     !>(-.out)
@@ -258,16 +258,16 @@
   =/  conflict=record  (provider 0x12 2 'https://conflict.test')
   =/  excess=record  (provider 0x12 2 'https://excess.test')
   =/  a=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec state allow]) one)
+    (~(put-replica logic [~zod now ~nec %test state allow]) one)
   =/  b=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec +.a allow]) two)
+    (~(put-replica logic [~zod now ~nec %test +.a allow]) two)
   =/  c=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec +.b allow]) conflict)
+    (~(put-replica logic [~zod now ~nec %test +.b allow]) conflict)
   =/  d=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec +.c allow]) excess)
+    (~(put-replica logic [~zod now ~nec %test +.c allow]) excess)
   =/  key=key  (provider-key:cr content-id)
   =/  values=records
-    (~(values-for logic [~zod now ~zod +.d allow]) key)
+    (~(values-for logic [~zod now ~zod %test +.d allow]) key)
   ;:  weld
     %+  expect-eq  !>(`store-status`[%accepted ~])
     !>(-.a)
@@ -291,11 +291,11 @@
 ++  test-provider-cap
   =/  state=content-state  initial
   =.  state
-    (~(set-config logic [~zod now ~zod state allow]) config.state(max-providers 1))
+    (~(set-config logic [~zod now ~zod %test state allow]) config.state(max-providers 1))
   =/  first=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec state allow]) (provider 0x12 1 'https://one.test'))
+    (~(put-replica logic [~zod now ~nec %test state allow]) (provider 0x12 1 'https://one.test'))
   =/  second=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec +.first allow]) (provider 0x13 1 'https://two.test'))
+    (~(put-replica logic [~zod now ~nec %test +.first allow]) (provider 0x13 1 'https://two.test'))
   %+  expect-eq  !>(`store-status`[%rejected %provider-cap])
   !>(-.second)
 ::
@@ -306,16 +306,16 @@
   =/  newest=record  (provider 0x12 2 %newest)
   =/  stale=record  (provider 0x12 1 %stale)
   =/  a=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec state allow]) old)
+    (~(put-replica logic [~zod now ~nec %test state allow]) old)
   =/  b=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec +.a allow]) other)
+    (~(put-replica logic [~zod now ~nec %test +.a allow]) other)
   =/  c=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec +.b allow]) newest)
+    (~(put-replica logic [~zod now ~nec %test +.b allow]) newest)
   =/  later=@da  (add ~h1 now)
   =/  refreshed=[store-status content-state]
-    (~(put-replica logic [~zod later ~nec +.c allow]) newest)
+    (~(put-replica logic [~zod later ~nec %test +.c allow]) newest)
   =/  rejected=[store-status content-state]
-    (~(put-replica logic [~zod later ~nec +.refreshed allow]) stale)
+    (~(put-replica logic [~zod later ~nec %test +.refreshed allow]) stale)
   =/  target=key  (provider-key:cr content-id)
   =/  stored=leased-records
     (~(gut by replicas.+.refreshed) [target ~])
@@ -347,7 +347,7 @@
     (~(put by replicas.state) unrelated-key [[unrelated-record (dec now)] ~])
   =.  replica-count.state  2
   =/  values=records
-    (~(values-for logic [~zod now ~zod state allow]) requested-key)
+    (~(values-for logic [~zod now ~zod %test state allow]) requested-key)
   ;:  weld
     %+  expect-eq  !>(`records`~)
     !>(values)
@@ -366,7 +366,7 @@
     (~(put by replicas.state) expired-key [[expired-record (dec now)] ~])
   =.  replica-count.state  1
   =/  out=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec state allow]) incoming-record)
+    (~(put-replica logic [~zod now ~nec %test state allow]) incoming-record)
   ;:  weld
     %+  expect-eq  !>(`store-status`[%accepted ~])
     !>(-.out)
@@ -384,7 +384,7 @@
     (~(put by replicas.state) target [[rec (dec now)] ~])
   =.  replica-count.state  1
   =/  out=content-state
-    (~(prune-key logic [~zod now ~zod state allow]) target)
+    (~(prune-key logic [~zod now ~zod %test state allow]) target)
   ;:  weld
     (expect !>(!(~(has by replicas.out) target)))
     %+  expect-eq  !>(0)
@@ -393,7 +393,7 @@
 ::
 ++  test-prune-list-change-reporting
   =/  state=content-state  initial
-  =/  engine  [~zod now ~zod state allow]
+  =/  engine  [~zod now ~zod %test state allow]
   =/  a=leased-record  [(provider 0x11 1 %a) +(now)]
   =/  b=leased-record  [(provider 0x12 1 %b) (dec now)]
   =/  c=leased-record  [(provider 0x13 1 %c) (add 2 now)]
@@ -429,7 +429,7 @@
     (~(put by replicas.state) target [[rec +(now)] ~])
   =.  replica-count.state  1
   =/  out=content-state
-    (~(prune-key logic [~zod now ~zod state allow]) target)
+    (~(prune-key logic [~zod now ~zod %test state allow]) target)
   ;:  weld
     %+  expect-eq  !>(state)
     !>(out)
@@ -451,7 +451,7 @@
     (~(put by replicas.state) live-key [[live-record +(now)] ~])
   =.  replica-count.state  2
   =/  out=content-state
-    ~(prune-all logic [~zod now ~zod state allow])
+    ~(prune-all logic [~zod now ~zod %test state allow])
   ;:  weld
     (expect !>(!(~(has by replicas.out) expired-key)))
     (expect !>((~(has by replicas.out) live-key)))
@@ -462,7 +462,7 @@
 ++  test-eviction-preserves-replica-count
   =/  state=content-state  initial
   =.  state
-    (~(set-config logic [~zod now ~zod state allow]) config.state(max-replica-keys 1))
+    (~(set-config logic [~zod now ~zod %test state allow]) config.state(max-replica-keys 1))
   =/  old=digest  (digest-cask:cr `(cask)`[%noun 1])
   =/  incoming=digest  (digest-cask:cr `(cask)`[%noun 2])
   =/  old-record=record  (provider-for old 0x12 1 %old)
@@ -473,7 +473,7 @@
     (~(put by replicas.state) old-key [[old-record +(now)] ~])
   =.  replica-count.state  1
   =/  out=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec state allow]) incoming-record)
+    (~(put-replica logic [~zod now ~nec %test state allow]) incoming-record)
   ;:  weld
     %+  expect-eq  !>(`store-status`[%accepted ~])
     !>(-.out)
@@ -505,7 +505,7 @@
   =/  victim=key  (min one-key two-key)
   =/  survivor=key  (max one-key two-key)
   =/  out=content-state
-    ~(evict-one logic [~zod now ~zod state allow])
+    ~(evict-one logic [~zod now ~zod %test state allow])
   ;:  weld
     (expect !>(!(~(has by replicas.out) victim)))
     (expect !>((~(has by replicas.out) survivor)))
@@ -517,7 +517,7 @@
 ++  test-capacity-sweep-reclaims-expired-key
   =/  state=content-state  initial
   =.  state
-    (~(set-config logic [~zod now ~zod state allow]) config.state(max-replica-keys 2))
+    (~(set-config logic [~zod now ~zod %test state allow]) config.state(max-replica-keys 2))
   =/  expired=digest  (digest-cask:cr `(cask)`[%noun 1])
   =/  live=digest  (digest-cask:cr `(cask)`[%noun 2])
   =/  incoming=digest  (digest-cask:cr `(cask)`[%noun 3])
@@ -533,7 +533,7 @@
     (~(put by replicas.state) live-key [[live-record +(now)] ~])
   =.  replica-count.state  2
   =/  out=[store-status content-state]
-    (~(put-replica logic [~zod now ~nec state allow]) incoming-record)
+    (~(put-replica logic [~zod now ~nec %test state allow]) incoming-record)
   ;:  weld
     %+  expect-eq  !>(`store-status`[%accepted ~])
     !>(-.out)
@@ -550,11 +550,11 @@
   =/  state=content-state  initial
   =/  rec=record  (provider 0x12 1 'https://one.test')
   =/  started=[(list card:agent:gall) content-state]
-    (~(start-publish logic [~zod now ~zod state allow]) 0v1 rec)
+    (~(start-publish logic [~zod now ~zod %test state allow]) 0v1 rec)
   =/  found=[(list card:agent:gall) operation-update]
-    (~(receive-lookup logic [~zod now ~zod +.started allow]) 0v1 ~)
+    (~(receive-lookup logic [~zod now ~zod %test +.started allow]) 0v1 ~)
   =/  view=(unit operation-view)
-    (~(get-operation logic [~zod now ~zod state.+.found allow]) 0v1)
+    (~(get-operation logic [~zod now ~zod %test state.+.found allow]) 0v1)
   ?>  ?=(^ completions.+.found)
   =/  completion=operation-completion  i.completions.+.found
   =/  got=operation-view  (need view)
@@ -565,7 +565,7 @@
     !>(-.found)
     %+  expect-eq  !>(1)
     !>((lent ~(tap in accepted.value.value.got)))
-    (expect !>((~(has in accepted.value.value.got) ~(self-id logic [~zod now ~zod state.+.found allow]))))
+    (expect !>((~(has in accepted.value.value.got) ~(self-id logic [~zod now ~zod %test state.+.found allow]))))
     %+  expect-eq  !>(0v1)
     !>(id.completion)
   ==
@@ -575,7 +575,7 @@
   =/  rec=record  (provider 0x12 1 %packed)
   =/  expected=@  (jam rec)
   =/  started=[(list card:agent:gall) content-state]
-    (~(start-publish logic [~zod now ~zod state allow]) 0v1 rec)
+    (~(start-publish logic [~zod now ~zod %test state allow]) 0v1 rec)
   =/  active=(unit operation)  (~(get by active.+.started) 0v1)
   =/  op=operation  (need active)
   ?>  ?=(%publish -.kind.op)
@@ -591,20 +591,20 @@
 ++  test-remote-publication-completes-after-stored
   =/  state=content-state  initial
   =.  state
-    (~(set-config logic [~zod now ~zod state allow]) config.state(replication 2, concurrency 1))
+    (~(set-config logic [~zod now ~zod %test state allow]) config.state(replication 2, concurrency 1))
   =/  rec=record  (provider 0x12 1 %remote)
-  =/  peer=node-id  ~(self-id logic [~nec now ~nec state allow])
+  =/  peer=node-id  ~(self-id logic [~nec now ~nec %test state allow])
   =/  started=[(list card:agent:gall) content-state]
-    (~(start-publish logic [~zod now ~zod state allow]) 0v1 rec)
+    (~(start-publish logic [~zod now ~zod %test state allow]) 0v1 rec)
   =/  found=[(list card:agent:gall) operation-update]
-    (~(receive-lookup logic [~zod now ~zod +.started allow]) 0v1 [peer ~])
+    (~(receive-lookup logic [~zod now ~zod %test +.started allow]) 0v1 [peer ~])
   ?>  =(1 ~(wyt by pending.state.+.found))
   =/  pending-entries=(list [content-request-id pending-content-request])
     ~(tap by pending.state.+.found)
   ?>  ?=(^ pending-entries)
   =/  request=content-request-id  -.i.pending-entries
   =/  stored=[(list card:agent:gall) operation-update]
-    (~(receive-stored logic [~zod now ~nec state.+.found allow]) request [%accepted ~])
+    (~(receive-stored logic [~zod now ~nec %test state.+.found allow]) request [%accepted ~])
   ?>  ?=(^ completions.+.stored)
   =/  completion=operation-completion  i.completions.+.stored
   ?>  ?=(%published -.result.completion)
@@ -620,13 +620,13 @@
   =/  state=content-state  initial
   =/  rec=record  (provider 0x12 1 'https://one.test')
   ?>  ?=(%provider -.rec)
-  =.  state  (~(put-origin logic [~zod now ~zod state allow]) rec)
+  =.  state  (~(put-origin logic [~zod now ~zod %test state allow]) rec)
   =/  started=[(list card:agent:gall) content-state]
-    (~(start-find-providers logic [~zod now ~zod state allow]) 0v2 content-id)
+    (~(start-find-providers logic [~zod now ~zod %test state allow]) 0v2 content-id)
   =/  found=[(list card:agent:gall) operation-update]
-    (~(receive-lookup logic [~zod now ~zod +.started allow]) 0v2 ~)
+    (~(receive-lookup logic [~zod now ~zod %test +.started allow]) 0v2 ~)
   =/  view=(unit operation-view)
-    (~(get-operation logic [~zod now ~zod state.+.found allow]) 0v2)
+    (~(get-operation logic [~zod now ~zod %test state.+.found allow]) 0v2)
   =/  got=operation-view  (need view)
   ?>  ?=(%complete -.got)
   ?>  ?=(%providers -.value.got)
@@ -641,13 +641,13 @@
   =/  op=operation
     [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  merged=operation
-    (~(merge-records logic [~zod now ~nec state allow]) op [wrong correct ~])
-  =/  pointer=record  (pointer-for %test 0x12 %name 1 `~2026.8.12)
-  =/  pointer-key=key  (pointer-key:cr %test 0x12 %name)
+    (~(merge-records logic [~zod now ~nec %test state allow]) op [wrong correct ~])
+  =/  pointer=record  (pointer-for %test 0x12 ~[%name] 1 `~2026.8.12)
+  =/  pointer-key=key  (pointer-key:cr %test 0x12 ~[%name])
   =/  pointer-op=operation
     [[%find-pointer %other 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  pointer-merged=operation
-    (~(merge-records logic [~zod now ~nec state allow]) pointer-op [pointer ~])
+    (~(merge-records logic [~zod now ~nec %test state allow]) pointer-op [pointer ~])
   ;:  weld
     %+  expect-eq  !>(1)
     !>((lent providers.merged))
@@ -666,12 +666,12 @@
   =/  op=operation
     [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  local=operation
-    (~(merge-records logic [~zod now ~nec state allow]) op [rec rec ~])
+    (~(merge-records logic [~zod now ~nec %test state allow]) op [rec rec ~])
   =/  decoded=operation
-    %+  ~(merge-sized-records logic [~zod now ~nec state allow])  op
+    %+  ~(merge-sized-records logic [~zod now ~nec %test state allow])  op
     [[rec size] [rec size] ~]
   =/  repeated=operation
-    %+  ~(merge-sized-records logic [~zod now ~nec state explode])  decoded
+    %+  ~(merge-sized-records logic [~zod now ~nec %test state explode])  decoded
     [[rec size] ~]
   ;:  weld
     %+  expect-eq  !>(1)
@@ -692,20 +692,20 @@
   =/  provider-op=operation
     [[%find-providers content-id (provider-key:cr content-id)] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  provider-op=operation
-    (~(merge-records logic [~zod now ~nec state allow]) provider-op [provider-rec ~])
+    (~(merge-records logic [~zod now ~nec %test state allow]) provider-op [provider-rec ~])
   =/  provider-finished=[operation-completion content-state]
-    (~(finish logic [~zod now ~nec state deny]) 0v1 provider-op)
+    (~(finish logic [~zod now ~nec %test state deny]) 0v1 provider-op)
   =/  provider-result=operation-result  result.-.provider-finished
   ?>  ?=(%providers -.provider-result)
-  =/  pointer-rec=record  (pointer-for %test 0x12 %name 1 `~2026.8.12)
+  =/  pointer-rec=record  (pointer-for %test 0x12 ~[%name] 1 `~2026.8.12)
   ?>  ?=(%pointer -.pointer-rec)
-  =/  pointer-key=key  (pointer-key:cr %test 0x12 %name)
+  =/  pointer-key=key  (pointer-key:cr %test 0x12 ~[%name])
   =/  pointer-op=operation
     [[%find-pointer %test 0x12 pointer-key] %.y ~ 0 ~ ~ ~ ~ ~ ~ ~]
   =/  pointer-op=operation
-    (~(merge-records logic [~zod now ~nec state allow]) pointer-op [pointer-rec ~])
+    (~(merge-records logic [~zod now ~nec %test state allow]) pointer-op [pointer-rec ~])
   =/  pointer-finished=[operation-completion content-state]
-    (~(finish logic [~zod now ~nec state deny]) 0v2 pointer-op)
+    (~(finish logic [~zod now ~nec %test state deny]) 0v2 pointer-op)
   =/  pointer-result=operation-result  result.-.pointer-finished
   ?>  ?=(%pointer -.pointer-result)
   ;:  weld
@@ -719,9 +719,9 @@
   =/  state=content-state  initial
   =/  rec=record  (provider 0x12 1 'https://one.test')
   =/  started=[(list card:agent:gall) content-state]
-    (~(start-publish logic [~zod now ~zod state allow]) 0v3 rec)
+    (~(start-publish logic [~zod now ~zod %test state allow]) 0v3 rec)
   =/  found=[(list card:agent:gall) operation-update]
-    (~(receive-lookup logic [~zod now ~zod +.started allow]) 0v3 [0x10 0x20 0x30 0x40 ~])
+    (~(receive-lookup logic [~zod now ~zod %test +.started allow]) 0v3 [0x10 0x20 0x30 0x40 ~])
   ;:  weld
     %+  expect-eq  !>(3)
     !>((lent ~(tap by pending.state.+.found)))
@@ -735,24 +735,24 @@
 ++  test-global-concurrency-is-fair-across-operations
   =/  state=content-state  initial
   =.  state
-    (~(set-config logic [~zod now ~zod state allow]) config.state(global-concurrency 2))
+    (~(set-config logic [~zod now ~zod %test state allow]) config.state(global-concurrency 2))
   =/  one=record  (provider-for content-id 0x12 1 %one)
   =/  other=digest  (digest-cask:cr `(cask)`[%noun 43])
   =/  two=record  (provider-for other 0x13 1 %two)
   =/  first=[(list card:agent:gall) content-state]
-    (~(start-publish logic [~zod now ~zod state allow]) 0v1 one)
+    (~(start-publish logic [~zod now ~zod %test state allow]) 0v1 one)
   =/  second=[(list card:agent:gall) content-state]
-    (~(start-publish logic [~zod now ~zod +.first allow]) 0v2 two)
+    (~(start-publish logic [~zod now ~zod %test +.first allow]) 0v2 two)
   =/  first-ready=[(list card:agent:gall) operation-update]
-    %+  ~(receive-lookup logic [~zod now ~zod +.second allow])  0v1
+    %+  ~(receive-lookup logic [~zod now ~zod %test +.second allow])  0v1
     [0x10 0x20 0x30 0x40 ~]
   =/  both-ready=[(list card:agent:gall) operation-update]
-    %+  ~(receive-lookup logic [~zod now ~zod state.+.first-ready allow])  0v2
+    %+  ~(receive-lookup logic [~zod now ~zod %test state.+.first-ready allow])  0v2
     [0x50 0x60 0x70 0x80 ~]
   =/  freed-one=[(list card:agent:gall) operation-update]
-    (~(fail-request logic [~zod now ~zod state.+.both-ready allow]) 0v1 |)
+    (~(fail-request logic [~zod now ~zod %test state.+.both-ready allow]) 0v1 |)
   =/  freed-two=[(list card:agent:gall) operation-update]
-    (~(fail-request logic [~zod now ~zod state.+.freed-one allow]) 0v2 |)
+    (~(fail-request logic [~zod now ~zod %test state.+.freed-one allow]) 0v2 |)
   ;:  weld
     %+  expect-eq  !>(2)
     !>(~(wyt by pending.state.+.both-ready))
@@ -775,10 +775,10 @@
 ++  test-origin-refresh-is-background
   =/  state=content-state  initial
   =/  rec=record  (provider 0x12 1 'https://one.test')
-  =.  state  (~(put-origin logic [~zod now ~zod state allow]) rec)
+  =.  state  (~(put-origin logic [~zod now ~zod %test state allow]) rec)
   =/  later=@da  (add ~h12 now)
   =/  refreshed=[(list card:agent:gall) content-state]
-    ~(refresh-origins logic [~zod later ~zod state allow])
+    ~(refresh-origins logic [~zod later ~zod %test state allow])
   ;:  weld
     %+  expect-eq  !>(2)
     !>((lent -.refreshed))
@@ -793,25 +793,25 @@
 ++  test-origin-refresh-is-batched
   =/  state=content-state  initial
   =.  state
-    (~(set-config logic [~zod now ~zod state allow]) config.state(refresh-batch 1))
+    (~(set-config logic [~zod now ~zod %test state allow]) config.state(refresh-batch 1))
   =/  one=digest  (digest-cask:cr `(cask)`[%noun 1])
   =/  two=digest  (digest-cask:cr `(cask)`[%noun 2])
   =/  three=digest  (digest-cask:cr `(cask)`[%noun 3])
   =.  state
-    (~(put-origin logic [~zod now ~zod state allow]) (provider-for one 0x11 1 %one))
+    (~(put-origin logic [~zod now ~zod %test state allow]) (provider-for one 0x11 1 %one))
   =.  state
-    (~(put-origin logic [~zod now ~zod state allow]) (provider-for two 0x12 1 %two))
+    (~(put-origin logic [~zod now ~zod %test state allow]) (provider-for two 0x12 1 %two))
   =.  state
-    (~(put-origin logic [~zod now ~zod state allow]) (provider-for three 0x13 1 %three))
+    (~(put-origin logic [~zod now ~zod %test state allow]) (provider-for three 0x13 1 %three))
   =/  first-now=@da  (add ~h12 now)
   =/  first=[(list card:agent:gall) content-state]
-    ~(refresh-origins logic [~zod first-now ~zod state allow])
+    ~(refresh-origins logic [~zod first-now ~zod %test state allow])
   =/  second-now=@da  (add ~s1 first-now)
   =/  second=[(list card:agent:gall) content-state]
-    ~(refresh-origins logic [~zod second-now ~zod +.first allow])
+    ~(refresh-origins logic [~zod second-now ~zod %test +.first allow])
   =/  third-now=@da  (add ~s1 second-now)
   =/  third=[(list card:agent:gall) content-state]
-    ~(refresh-origins logic [~zod third-now ~zod +.second allow])
+    ~(refresh-origins logic [~zod third-now ~zod %test +.second allow])
   ;:  weld
     %+  expect-eq  !>(1)
     !>(~(wyt by active.+.first))
@@ -837,14 +837,14 @@
   =/  one=record  (provider-for content-id 0x12 1 'https://one.test')
   =/  two=record  (provider-for other-content 0x13 1 'https://two.test')
   =/  active-publish=[(list card:agent:gall) content-state]
-    (~(start-publish logic [~zod now ~zod state allow]) 0v9 one)
+    (~(start-publish logic [~zod now ~zod %test state allow]) 0v9 one)
   =.  state  +.active-publish
-  =.  state  (~(put-origin logic [~zod now ~zod state allow]) two)
+  =.  state  (~(put-origin logic [~zod now ~zod %test state allow]) two)
   =/  later=@da  (add ~h12 now)
   =/  refreshed=[(list card:agent:gall) content-state]
-    ~(refresh-origins logic [~zod later ~zod state allow])
+    ~(refresh-origins logic [~zod later ~zod %test state allow])
   =/  publishing=(set key)
-    ~(publishing-keys logic [~zod later ~zod +.refreshed allow])
+    ~(publishing-keys logic [~zod later ~zod %test +.refreshed allow])
   ;:  weld
     %+  expect-eq  !>(2)
     !>((lent ~(tap by active.+.refreshed)))
@@ -859,15 +859,15 @@
 ++  test-background-completion-is-emitted-but-not-retained
   =/  state=content-state  initial
   =/  rec=record  (provider 0x12 1 'https://one.test')
-  =.  state  (~(put-origin logic [~zod now ~zod state allow]) rec)
+  =.  state  (~(put-origin logic [~zod now ~zod %test state allow]) rec)
   =/  later=@da  (add ~h12 now)
   =/  refreshed=[(list card:agent:gall) content-state]
-    ~(refresh-origins logic [~zod later ~zod state allow])
+    ~(refresh-origins logic [~zod later ~zod %test state allow])
   =/  entries=(list [operation-id operation])  ~(tap by active.+.refreshed)
   ?>  ?=(^ entries)
   =/  id=operation-id  -.i.entries
   =/  finished=[(list card:agent:gall) operation-update]
-    (~(receive-lookup logic [~zod later ~zod +.refreshed allow]) id ~)
+    (~(receive-lookup logic [~zod later ~zod %test +.refreshed allow]) id ~)
   ?>  ?=(^ completions.+.finished)
   =/  completion=operation-completion  i.completions.+.finished
   ;:  weld
@@ -882,12 +882,12 @@
   =/  message=content-message
     [%stored %content-routing-v1 0v1 [%accepted ~]]
   =/  first=[(list card:agent:gall) content-state]
-    (~(send-response logic [~zod now ~zod state allow]) ~nec 0v1 message)
+    (~(send-response logic [~zod now ~zod %test state allow]) ~nec 0v1 message)
   =/  second=[(list card:agent:gall) content-state]
-    (~(send-response logic [~zod now ~zod +.first allow]) ~nec 0v2 message)
+    (~(send-response logic [~zod now ~zod %test +.first allow]) ~nec 0v2 message)
   =/  before=peer-delivery  (need (~(get by peers.outbound.+.second) ~nec))
   =/  reset=[(list card:agent:gall) content-state]
-    ~(reset-state logic [~zod now ~zod +.second allow])
+    ~(reset-state logic [~zod now ~zod %test +.second allow])
   =/  after=peer-delivery  (need (~(get by peers.outbound.+.reset) ~nec))
   ;:  weld
     %+  expect-eq  !>(1)

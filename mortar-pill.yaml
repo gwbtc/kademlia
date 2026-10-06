@@ -1,10 +1,15 @@
 output: dist-pill
 
+local aqua-pill:
+  path: ./aqua-pill
+  include:
+    - desk.bill
+  priority: 130
+
 local kademlia-demo:
   path: ./demo/desk
   include:
     - app/kademlia-demo.hoon
-    - desk.bill
     - lib/kademlia-demo.hoon
     - mar/kademlia-demo
     - sur/kademlia-demo.hoon

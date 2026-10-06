@@ -1,7 +1,7 @@
 # Content routing layer
 
-`%content-routing` is a signed record-discovery protocol layered above
-Kademlia. It maps mutable names and immutable content digests to retrieval
+`content-routing-agent` is a signed record-discovery protocol layered above
+Kademlia, shipped as an agent wrapper. Stack it above `kademlia-agent`. It maps mutable names and immutable content digests to retrieval
 information. It never transports application payloads: it returns signed
 pointers and provider locators, after which the application performs the
 actual fetch.
@@ -66,17 +66,24 @@ $:  namespace=@tas
 ==
 ```
 
-Its 128-bit Kademlia key is derived from namespace, publisher, and the opaque
-name noun:
+Its 128-bit Kademlia key is derived from namespace, publisher, and the name
+`path`:
 
 ```hoon
 (end 7 (shax (jam [%kad-content-pointer-key-v1 namespace publisher name])))
 ```
 
 Including the publisher means two identities can use the same namespace and
-name without collision. The name is not placed in the record; callers who know
-it derive the same key. Pointer expiry is optional, allowing either permanent
-or time-bounded mutable names.
+name without collision. Names such as `/releases/latest` are already composed
+of path segments and need no opaque noun encoding in paths or JSON APIs. The
+name is not placed in the record; callers who know it derive the same key.
+Pointer expiry is optional, allowing either permanent or time-bounded mutable
+names.
+
+A mutable name must contain between one and sixteen path segments. Every segment
+must be nonempty and no more than 64 bytes. Publishers and readers must supply
+the same canonical path; invalid names are rejected before Kademlia key
+derivation.
 
 Pointers are signed over a domain-separated digest. Selection authenticates
 the expected namespace, key, publisher, freshness, and signature. The greatest
@@ -129,7 +136,7 @@ Applications publish with `%publish-pointer` or `%publish-provider`. The agent:
 
 1. validates and signs the local record;
 2. stores it as an origin for refresh;
-3. asks `%kademlia` for nodes nearest the derived record key;
+3. asks the kademlia wrapper below it for nodes nearest the derived record key;
 4. sends bounded `%store` requests under a fair global scheduler; and
 5. reports accepted, rejected, and timed-out replicas.
 
@@ -151,6 +158,12 @@ single query from monopolizing the Ames request budget.
 The result includes selected records plus responder and timeout sets. Query
 completion does not fetch content and does not assert that a returned locator
 is currently reachable.
+
+Applications which only need exact remote-scry publication and verified cask
+retrieval can use the optional `content-store-agent` wrapper instead. It owns the
+page, coordinates these publication and query callbacks, and returns the final
+typed value. Direct use of `%content-routing` remains appropriate for custom
+locators and transports.
 
 ## Ames protocol and resource limits
 
@@ -177,15 +190,18 @@ prune plus deterministic earliest-expiry eviction only under capacity pressure.
 
 ## Gall API
 
-Local commands are `%publish-pointer`, `%publish-provider`, `%find-pointer`,
+The wrapped agent sends `%content-routing-command` by poking itself. Local
+commands are `%publish-pointer`, `%publish-provider`, `%find-pointer`,
 `%find-providers`, `%observe`, `%forget`, `%set-config`, `%set-verbosity`, and
 `%reset`.
 
 Applications associate a 64-bit operation ID with `[recipient reply-path]` by
 using `%observe` before starting the operation. Completion targets that
-callback directly with a typed `%content-routing-result`. The reply path is
-application correlation data, not Gall's effect wire. Results can also be read
-under `%gx` at `/operation/<id>`, `/records/<key>`, `/pointer/<key>`, and
+callback directly with a typed `%content-routing-result`. When the recipient is
+the wrapped agent, the wrapper calls its `+on-poke` directly. The reply path is
+application correlation data, not Gall's effect wire; it must not start with
+`/~`. Results can also be read
+under `%gx` below `/~/content-routing` at `/operation/<id>`, `/records/<key>`, `/pointer/<key>`, and
 `/providers/<digest>`, appending `/noun` as the requested mark. Configuration
 and delivery state are exposed at `/settings`, `/verbosity`, and `/delivery`.
 The delivery summary reports current tracked peers, active per-peer poke gates,
@@ -206,6 +222,9 @@ catalog may itself contain digests for independently routed resources.
 This composition preserves referential transparency where desired while still
 supporting mutable names through pointer records.
 
+`content-store-agent` also exposes this composition as a single `%put` or `%get`
+operation; see [`docs/content-store.md`](content-store.md).
+
 ## Source map
 
 - [`desk/sur/content-routing.hoon`](../desk/sur/content-routing.hoon): digests,
@@ -219,5 +238,7 @@ supporting mutable names through pointer records.
 - [`desk/sur/bounded-poke.hoon`](../desk/sur/bounded-poke.hoon) and
   [`desk/lib/bounded-poke.hoon`](../desk/lib/bounded-poke.hoon): shared
   persistent per-peer delivery gating, expiry, and response limits.
-- [`desk/app/content-routing.hoon`](../desk/app/content-routing.hoon): Gall,
-  Kademlia callbacks, Ames, Behn, Jael, scries, and logging.
+- [`desk/lib/content-routing-agent.hoon`](../desk/lib/content-routing-agent.hoon):
+  the agent wrapper: Gall, Kademlia lookups, Ames, Behn, scries, and logging.
+- [`desk/lib/record-crypto.hoon`](../desk/lib/record-crypto.hoon): Jael-backed
+  signing and verification.

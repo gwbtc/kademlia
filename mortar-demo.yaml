@@ -7,29 +7,38 @@ local demo:
 local kademlia:
   path: ./desk
   include:
-    - app/content-routing.hoon
-    - app/content-discovery.hoon
-    - app/kademlia.hoon
+    - lib/bounded-poke.hoon
+    - lib/content-routing-agent.hoon
     - lib/content-routing-agent-logic.hoon
     - lib/content-routing.hoon
+    - lib/content-discovery-agent.hoon
     - lib/content-discovery-agent-logic.hoon
     - lib/content-discovery.hoon
+    - lib/content-store-agent.hoon
+    - lib/content-store-agent-logic.hoon
+    - lib/content-store-client.hoon
     - lib/feistel.hoon
+    - lib/kademlia-agent.hoon
     - lib/kademlia-agent-logic.hoon
     - lib/kademlia.hoon
+    - lib/record-crypto.hoon
     - mar/content-routing/command.hoon
     - mar/content-routing/message.hoon
     - mar/content-routing/result.hoon
     - mar/content-discovery/command.hoon
     - mar/content-discovery/message.hoon
     - mar/content-discovery/result.hoon
+    - mar/content-store/command.hoon
+    - mar/content-store/result.hoon
     - mar/kademlia/command.hoon
     - mar/kademlia/message.hoon
     - mar/kademlia/result.hoon
+    - sur/bounded-poke.hoon
     - sur/content-routing.hoon
     - sur/content-routing-agent.hoon
     - sur/content-discovery.hoon
     - sur/content-discovery-agent.hoon
+    - sur/content-store.hoon
     - sur/kademlia.hoon
     - sur/kademlia-agent.hoon
   priority: 100

@@ -1,7 +1,9 @@
 # Kademlia Lab
 
-Kademlia Lab is a small profiling application built on the `%kademlia`,
-`%content-routing`, and `%content-discovery` agents. It generates deterministic
+Kademlia Lab is a small profiling application wrapped with the
+`kademlia-agent`, `content-routing-agent`, and `content-discovery-agent`
+wrappers. It sends protocol commands by poking itself and forms its own
+overlay with `%kademlia-demo` on other ships. It generates deterministic
 resources, advertises them through content routing and hierarchical topics,
 transfers them in bounded parallel chunks, and emits phase events that the
 browser timestamps with `performance.now()`.
@@ -45,8 +47,8 @@ mortar build --config mortar-demo.yaml
 
 The complete desk is written to `demo/dist`. Mount or copy that directory into
 a `%kademlia-demo` desk, commit it, and install the desk. The demo desk already
-contains the Kademlia, content-routing, and content-discovery agents it depends
-on.
+contains the Kademlia, content-routing, and content-discovery wrappers it
+depends on.
 
 ## Run the frontend in development
 

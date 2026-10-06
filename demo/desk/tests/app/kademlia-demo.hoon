@@ -14,9 +14,18 @@
     now  now
   ==
 ::
+++  strip
+  |=  c=card:agent:gall
+  ^-  *
+  ?.  ?=([%pass * %agent * %poke *] c)  -.c
+  [p.c +<.q.c p.cage.task.q.c q.q.cage.task.q.c]
+::
 ++  get-state
   |=  saved=vase
-  !<(demo-state saved)
+  =+  !<([* routing=vase] saved)
+  =+  !<([* kademlia=vase] routing)
+  =+  !<([* inner=vase] kademlia)
+  !<(demo-state inner)
 ::
 ++  test-init
   =/  out  on-init:~(. agent (bowl ~zod ~zod ~2026.8.21))
@@ -88,16 +97,21 @@
   =/  command=demo-command
     [%network ~[~bud ~nec] ~s30 ~h1 %debug]
   =/  out  (on-poke:+.initialized %kademlia-demo-command !>(command))
-  =/  cards=(list card)  -.out
-  =/  expected=(list card)
-    :~  [%pass /kademlia/seeds %agent [~zod %kademlia] %poke %kademlia-command !>(`kademlia-command`[%set-seeds ~[~bud ~nec]])]
-        [%pass /kademlia/request-timeout %agent [~zod %kademlia] %poke %kademlia-command !>(`kademlia-command`[%set-request-timeout ~s30])]
-        [%pass /kademlia/refresh-interval %agent [~zod %kademlia] %poke %kademlia-command !>(`kademlia-command`[%set-refresh-interval ~h1])]
-        [%pass /kademlia/verbosity %agent [~zod %kademlia] %poke %kademlia-command !>(`kademlia-command`[%set-verbosity %debug])]
-        [%pass /discovery/0v0/network-config %agent [~zod %content-discovery] %poke %content-discovery-command !>(`discovery-command:cda`[%set-config [20 3 12 ~s30 ~d1 ~h12 8 65.536 64 8 10.000]])]
-        [%pass /discovery/0v0/network-verbosity %agent [~zod %content-discovery] %poke %content-discovery-command !>(`discovery-command:cda`[%set-verbosity %debug])]
+  =/  cards=(list card:agent:gall)  -.out
+  =/  expected=(list card:agent:gall)
+    :~  [%pass /kademlia/seeds %agent [~zod %kademlia-demo] %poke %kademlia-command !>(`kademlia-command`[%set-seeds ~[~bud ~nec]])]
+        [%pass /kademlia/request-timeout %agent [~zod %kademlia-demo] %poke %kademlia-command !>(`kademlia-command`[%set-request-timeout ~s30])]
+        [%pass /kademlia/refresh-interval %agent [~zod %kademlia-demo] %poke %kademlia-command !>(`kademlia-command`[%set-refresh-interval ~h1])]
+        [%pass /kademlia/verbosity %agent [~zod %kademlia-demo] %poke %kademlia-command !>(`kademlia-command`[%set-verbosity %debug])]
+        [%pass /discovery/0v0/network-config %agent [~zod %kademlia-demo] %poke %content-discovery-command !>(`discovery-command:cda`[%set-config [20 3 12 ~s30 ~d1 ~h12 8 65.536 64 8 10.000]])]
+        [%pass /discovery/0v0/network-verbosity %agent [~zod %kademlia-demo] %poke %content-discovery-command !>(`discovery-command:cda`[%set-verbosity %debug])]
     ==
-  (expect-eq !>(expected) !>(cards))
+  ::
+  ::  compare passes by value: vases carry their types, which are
+  ::  costly to print, and the verb wrapper adds its own gives
+  %+  expect-eq
+    !>((turn expected strip))
+  !>((turn (skim cards |=(c=card:agent:gall ?=(%pass -.c))) strip))
 ::
 ++  test-publish-callbacks-complete-the-run
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.21)
@@ -107,7 +121,7 @@
     (on-poke:+.initialized %kademlia-demo-command !>(`demo-command`[%create %create 7 1.024 'text/plain']))
   =/  published
     %+  on-poke:+.created  %kademlia-demo-command
-    !>(`demo-command`[%publish %publish content.res %custom `[namespace=%demo name='latest' revision=1]])
+    !>(`demo-command`[%publish %publish content.res %custom `[namespace=%demo name=~[%latest] revision=1]])
   =/  accepted=(set node-id)  (silt ~[0x1])
   =/  provider-result=operation-result  [%published 0x1 accepted ~ ~]
   =/  provider-notice=operation-notice
@@ -134,6 +148,26 @@
     (expect !>(?=(^ -.pointer)))
   ==
 ::
+++  test-invalid-mutable-names-fail-before-starting
+  =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.21)
+  =/  initialized  on-init:~(. agent bol)
+  =/  res=resource  (make-resource:demo 7 1.024 'text/plain')
+  =/  created
+    (on-poke:+.initialized %kademlia-demo-command !>(`demo-command`[%create %create 7 1.024 'text/plain']))
+  =/  published
+    %+  on-poke:+.created  %kademlia-demo-command
+    !>(`demo-command`[%publish %publish content.res %custom `[namespace=%demo name=~ revision=1]])
+  =/  fetched
+    %+  on-poke:+.published  %kademlia-demo-command
+    !>(`demo-command`[%fetch %fetch [%name ~zod %demo ~]])
+  =/  state=demo-state  (get-state on-save:+.fetched)
+  ;:  weld
+    (expect !>(?=(^ -.published)))
+    (expect !>(?=(^ -.fetched)))
+    %+  expect-eq  !>(0)
+    !>((lent ~(tap by active.state)))
+  ==
+::
 ++  test-digest-fetch-provider-callback-starts-transfer
   =/  bol=bowl:gall  (bowl ~zod ~zod ~2026.8.21)
   =/  initialized  on-init:~(. agent bol)
@@ -154,9 +188,9 @@
   ?>  ?=(%fetch -.kind.op)
   =/  fetch=fetch-state  state.kind.op
   ;:  weld
-    %+  expect-eq  !>(`digest`content)
+    %+  expect-eq  !>(`(unit digest)``content)
     !>(content.fetch)
-    %+  expect-eq  !>(`node-id`provider-id)
+    %+  expect-eq  !>(`(unit node-id)``provider-id)
     !>(provider.fetch)
     (expect !>((gth in-flight.fetch 0)))
   ==

@@ -5,7 +5,7 @@
 |%
 ++  test-kademlia-command-tag
   =/  value=command  [%set-seeds ~[~dev]]
-  =/  rendered=tape  ":kademlia &kademlia-command {<value>}"
+  =/  rendered=tape  ":kademlia-example &kademlia-command {<value>}"
   %+  expect-eq  !>(%.y)
   !>(!=(~ (find "%set-seeds" rendered)))
 ::
@@ -13,7 +13,7 @@
   =/  value=content-command
     :-  %find-providers
     [0v2 0v1.oinng.a74ba.t4pes.6mpjg.2utco.u5gg5.7m1cr.qjq8a.eioop.i05o2]
-  =/  rendered=tape  ":content-routing &content-routing-command {<value>}"
+  =/  rendered=tape  ":kademlia-example &content-routing-command {<value>}"
   %+  expect-eq  !>(%.y)
   !>(!=(~ (find "%find-providers" rendered)))
 ::

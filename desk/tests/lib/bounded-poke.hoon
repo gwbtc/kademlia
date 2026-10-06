@@ -5,7 +5,7 @@
 ::
 ++  note
   |=  [peer=@p value=@ud]
-  ^-  note:agent:gall
+  ^-  delivery-note
   [%agent [peer %sink] %poke %noun !>(value)]
 ::
 ++  initial
@@ -176,4 +176,35 @@
     %+  expect-eq  !>(`delivery-summary`[1 1 0 0 0 0])
     !>(summary)
   ==
+::
+++  test-load-keeps-a-current-queue
+  =/  first=[delivery-id delivery-update]
+    (~(enqueue delivery [now initial]) ~nec (add ~m1 now) [%request 0v1] (note ~nec 1))
+  =/  second=[delivery-id delivery-update]
+    (~(enqueue delivery [now state.+.first]) ~nec (add ~m1 now) [%request 0v2] (note ~nec 2))
+  =/  sav=vase  !>([state=[seeds=~ outbound=state.+.second] verbosity=~])
+  %+  expect-eq  !>(state.+.second)
+  (slap (load:delivery sav ~[%outbound %state]) [%wing ~[%outbound %state]])
+::
+++  test-load-drops-a-stale-queue
+  =/  queued
+    :*  id=1
+        peer=~nec
+        deadline=(add ~m1 now)
+        context=`delivery-context`[%request 0v2]
+        note=`note:agent:gall`(note ~nec 2)
+    ==
+  =/  peers
+    %-  my
+    :~  [~nec `[0 `delivery-context`[%request 0v1]] ~ ~[queued] `(add ~m1 now)]
+        [~bud ~ ~[queued] ~ `(add ~m1 now)]
+    ==
+  =/  sav=vase  !>([state=[seeds=~ outbound=[2 peers 3 4]] verbosity=~])
+  =/  got
+    !<  [state=[seeds=~ outbound=delivery-state] verbosity=~]
+    (load:delivery sav ~[%outbound %state])
+  %+  expect-eq
+    !>  ^-  delivery-state
+    [2 (my [~nec `[0 %request 0v1] ~ ~ ~] ~) 3 4]
+  !>(outbound.state.got)
 --

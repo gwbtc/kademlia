@@ -47,7 +47,7 @@
 ++  poke-kademlia
   |=  [who=@p =command]
   =/  m  (strand ,~)
-  (dojo who ":kademlia &kademlia-command {<command>}")
+  (dojo who ":kademlia-example &kademlia-command {<command>}")
 ::
 ++  poke-observer
   |=  [who=@p command=observer-command]

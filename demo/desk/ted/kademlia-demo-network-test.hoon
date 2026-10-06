@@ -74,17 +74,17 @@
 ++  poke-kademlia
   |=  [who=@p command=command]
   =/  m  (strand ,~)
-  (dojo who ":kademlia &kademlia-command {<command>}")
+  (dojo who ":kademlia-demo &kademlia-command {<command>}")
 ::
 ++  poke-content
   |=  [who=@p command=content-command]
   =/  m  (strand ,~)
-  (dojo who ":content-routing &content-routing-command {<command>}")
+  (dojo who ":kademlia-demo &content-routing-command {<command>}")
 ::
 ++  poke-discovery
   |=  [who=@p command=discovery-command:cda]
   =/  m  (strand ,~)
-  (dojo who ":content-discovery &content-discovery-command {<command>}")
+  (dojo who ":kademlia-demo &content-discovery-command {<command>}")
 ::
 ++  poke-demo
   |=  [who=@p command=demo-command]

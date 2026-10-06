@@ -1,7 +1,57 @@
 /-  *kademlia, *kademlia-agent, *content-routing, *content-routing-agent, *bounded-poke
-/+  kad=kademlia, cr=content-routing, *test
-/=  agent  /app/content-routing
+/+  kad=kademlia, cr=content-routing, *test, default-agent
+/+  content-routing-agent, kademlia-agent
 |%
+++  agent  (agent:content-routing-agent stub)
+::
+::  stub: wrapped agent.  it swallows lookup commands, emits the cards
+::  poked at it as %test-cards, and saves the result marks it was poked with.
+::
+++  stub
+  =|  got=(list mark)
+  ^-  agent:gall
+  |_  =bowl:gall
+  +*  this  .
+      def   ~(. (default-agent this %|) bowl)
+  ++  on-init   `this
+  ++  on-save   !>(got)
+  ++  on-load   |=(vase `this)
+  ++  on-watch  on-watch:def
+  ++  on-leave  on-leave:def
+  ++  on-peek   on-peek:def
+  ++  on-agent  on-agent:def
+  ++  on-arvo   on-arvo:def
+  ++  on-fail   on-fail:def
+  ++  on-poke
+    |=  [=mark =vase]
+    ^-  (quip card:agent:gall _this)
+    ?+  mark  [~ this(got [mark got])]
+      %kademlia-command  `this
+      %test-cards        [!<((list card:agent:gall) vase) this]
+    ==
+  --
+::
+++  get-saved
+  |=  saved=vase
+  ^-  content-saved-state
+  =+  !<([[%content-routing app=content-saved-state] *] saved)
+  app
+::
+++  put-saved
+  |=  app=content-saved-state
+  ^-  vase
+  !>([[%content-routing app] !>(~)])
+::
+++  result
+  |=  notice=lookup-notice
+  ^-  vase
+  !>  ^-  (list card:agent:gall)
+  :_  ~
+  :*  %pass  /callback  %agent  [~zod %content-routing]
+      %poke  %kademlia-result
+      !>(notice(reply-path [%~.~ %content-routing reply-path.notice]))
+  ==
+::
 ++  now  ~2026.8.10..12.00.00
 ::
 ++  bowl
@@ -17,20 +67,19 @@
 ++  get-state
   |=  saved=vase
   ^-  content-state
-  =/  app=content-saved-state  !<(content-saved-state saved)
-  state.app
+  state:(get-saved saved)
 ::
 ++  test-init-and-settings-scry
   =/  bol=bowl:gall  (bowl ~zod ~zod)
   =/  out  on-init:~(. agent bol)
   =/  saved=content-state  (get-state on-save:+.out)
-  =/  peek=(unit (unit cage))  (on-peek:+.out /x/settings)
+  =/  peek=(unit (unit cage))  (on-peek:+.out /x/~/content-routing/settings)
   =/  got=content-config  !<(content-config q:(need (need peek)))
-  =/  delivery-peek=(unit (unit cage))  (on-peek:+.out /x/delivery)
+  =/  delivery-peek=(unit (unit cage))  (on-peek:+.out /x/~/content-routing/delivery)
   =/  delivery=delivery-summary
     !<(delivery-summary q:(need (need delivery-peek)))
   ;:  weld
-    %+  expect-eq  !>(3)
+    %+  expect-eq  !>(1)
     !>((lent -.out))
     %+  expect-eq  !>(config.saved)
     !>(got)
@@ -51,9 +100,9 @@
   =/  started  (on-poke:+.observed %content-routing-command !>(command))
   =/  saved=content-state  (get-state on-save:+.started)
   =/  notice=lookup-notice  [/operation/(scot %uv 0v7) [(provider-key:cr content) ~]]
-  =/  finished  (on-poke:+.started %kademlia-result !>(notice))
+  =/  finished  (on-poke:+.started %test-cards (result notice))
   =/  final=content-state  (get-state on-save:+.finished)
-  =/  path=path  /x/operation/(scot %uv 0v7)
+  =/  path=path  /x/~/content-routing/operation/(scot %uv 0v7)
   =/  peek=(unit (unit cage))  (on-peek:+.finished path)
   =/  view=operation-view  !<(operation-view q:(need (need peek)))
   ?>  ?=(%complete -.view)
@@ -63,7 +112,7 @@
     !>((lent ~(tap by active.saved)))
     %+  expect-eq  !>(`providers`~)
     !>(records.selection.value.value.view)
-    %+  expect-eq  !>(3)
+    %+  expect-eq  !>(1)
     !>((lent -.finished))
     %+  expect-eq  !>(0)
     !>((lent ~(tap by callbacks.final)))
@@ -73,15 +122,15 @@
   =/  bol=bowl:gall  (bowl ~zod ~zod)
   =/  initialized  on-init:~(. agent bol)
   =/  initial=content-saved-state
-    !<(content-saved-state on-save:+.initialized)
+    (get-saved on-save:+.initialized)
   =/  command=content-command  [%set-verbosity %info]
   =/  changed
     (on-poke:+.initialized %content-routing-command !>(command))
-  =/  saved=content-saved-state  !<(content-saved-state on-save:+.changed)
-  =/  peek=(unit (unit cage))  (on-peek:+.changed /x/verbosity)
+  =/  saved=content-saved-state  (get-saved on-save:+.changed)
+  =/  peek=(unit (unit cage))  (on-peek:+.changed /x/~/content-routing/verbosity)
   =/  got=verbosity  !<(verbosity q:(need (need peek)))
-  =/  loaded  (on-load:~(. agent bol) !>(saved))
-  =/  restored=content-saved-state  !<(content-saved-state on-save:+.loaded)
+  =/  loaded  (on-load:~(. agent bol) (put-saved saved))
+  =/  restored=content-saved-state  (get-saved on-save:+.loaded)
   ;:  weld
     %+  expect-eq  !>(%off)
     !>(verbosity.initial)
@@ -97,8 +146,8 @@
   =/  observe=content-command
     [%observe 0v8 %test-recipient /test/reply]
   =/  observed  (on-poke:+.initialized %content-routing-command !>(observe))
-  =/  saved=content-saved-state  !<(content-saved-state on-save:+.observed)
-  =/  loaded  (on-load:~(. agent bol) !>(saved))
+  =/  saved=content-saved-state  (get-saved on-save:+.observed)
+  =/  loaded  (on-load:~(. agent bol) (put-saved saved))
   =/  restored=content-state  (get-state on-save:+.loaded)
   =/  forget=content-command  [%forget 0v8]
   =/  forgotten  (on-poke:+.loaded %content-routing-command !>(forget))
@@ -118,13 +167,13 @@
   =/  started  (on-poke:+.initialized %content-routing-command !>(command))
   =/  notice=lookup-notice
     [/operation/(scot %uv 0v9) [(provider-key:cr content) ~]]
-  =/  finished  (on-poke:+.started %kademlia-result !>(notice))
+  =/  finished  (on-poke:+.started %test-cards (result notice))
   =/  observe=content-command
     [%observe 0v9 %test-recipient /test/reply]
   =/  observed  (on-poke:+.finished %content-routing-command !>(observe))
   =/  final=content-state  (get-state on-save:+.observed)
   ;:  weld
-    %+  expect-eq  !>(3)
+    %+  expect-eq  !>(1)
     !>((lent -.observed))
     %+  expect-eq  !>(0)
     !>((lent ~(tap by callbacks.final)))
@@ -147,7 +196,7 @@
   =/  out  (on-poke:+.initialized %content-routing-message !>(message))
   =/  after=content-state  (get-state on-save:+.out)
   ;:  weld
-    %+  expect-eq  !>(2)
+    %+  expect-eq  !>(0)
     !>((lent -.out))
     %+  expect-eq  !>(before)
     !>(after)
@@ -179,11 +228,19 @@
     %-  expect-fail
     |.  %+  on-poke:+.initialized
           %content-routing-command
-        !>(`content-command`[%find-pointer 0v1 %test ;;(@ux (pow 2 128)) 0])
+        !>(`content-command`[%find-pointer 0v1 %test ;;(@ux (pow 2 128)) ~])
     %-  expect-fail
     |.  %+  on-poke:+.initialized
           %content-routing-command
         !>(`content-command`[%find-providers 0v2 ;;(@uvI (pow 2 256))])
+    %-  expect-fail
+    |.  %+  on-poke:+.initialized
+          %content-routing-command
+        !>(`content-command`[%find-pointer 0v3 %test 0x12 ~])
+    %-  expect-fail
+    |.  %+  on-poke:+.initialized
+          %content-routing-command
+        !>(`content-command`[%find-pointer 0v4 %test 0x12 ~[%a %b %c %d %e %f %g %h %i %j %k %l %m %n %o %p %q]])
   ==
 ::
 ++  test-response-admission-precedes-processing
@@ -202,7 +259,7 @@
   =/  stored-message=content-message
     [%stored %content-routing-v1 0v4 [%accepted ~]]
   =/  wrong-loaded
-    (on-load:~(. agent (bowl ~zod ~bud)) !>(`content-saved-state`[state %off]))
+    (on-load:~(. agent (bowl ~zod ~bud)) (put-saved [state %off]))
   =/  wrong-records
     (on-poke:+.wrong-loaded %content-routing-message !>(records-message))
   =/  wrong-records-state=content-state  (get-state on-save:+.wrong-records)
@@ -210,7 +267,7 @@
     (on-poke:+.wrong-loaded %content-routing-message !>(stored-message))
   =/  wrong-stored-state=content-state  (get-state on-save:+.wrong-stored)
   =/  correct-loaded
-    (on-load:~(. agent (bowl ~zod ~nec)) !>(`content-saved-state`[state %off]))
+    (on-load:~(. agent (bowl ~zod ~nec)) (put-saved [state %off]))
   =/  correct-records
     (on-poke:+.correct-loaded %content-routing-message !>(records-message))
   =/  correct-records-state=content-state  (get-state on-save:+.correct-records)
@@ -236,7 +293,7 @@
   =/  out  (on-poke:+.initialized %content-routing-message !>(message))
   =/  after=content-state  (get-state on-save:+.out)
   ;:  weld
-    %+  expect-eq  !>(2)
+    %+  expect-eq  !>(0)
     !>((lent -.out))
     %+  expect-eq  !>(before)
     !>(after)
@@ -260,5 +317,42 @@
     !>(replica-count.state)
     %+  expect-eq  !>(0)
     !>((lent ~(tap by origins.state)))
+  ==
+::
+++  stack  (agent:content-routing-agent (agent:kademlia-agent stub))
+::
+++  test-stacked-lookup-completes-in-one-event
+  =/  bol=bowl:gall  (bowl ~zod ~zod)
+  =/  initialized  on-init:~(. stack bol)
+  =/  observed
+    %+  on-poke:+.initialized  %content-routing-command
+    !>(`content-command`[%observe 0v7 %content-routing /reply])
+  =/  finished
+    %+  on-poke:+.observed  %content-routing-command
+    !>  ^-  content-command
+    [%find-providers 0v7 (digest-cask:cr `(cask)`[%noun 42])]
+  =/  final=content-state  (get-state on-save:+.finished)
+  =+  !<([* below=vase] on-save:+.finished)
+  =+  !<([* inner=vase] below)
+  ;:  weld
+    %+  expect-eq  !>(0)
+    !>(~(wyt by active.final))
+    %+  expect-eq  !>(0)
+    !>(~(wyt by callbacks.final))
+    %+  expect-eq  !>(`(list mark)`~[%content-routing-result])
+    !>(!<((list mark) inner))
+    %+  expect-eq  !>(0)
+    !>((lent -.finished))
+  ==
+::
+++  test-untagged-state-loads-fresh
+  =/  bol=bowl:gall  (bowl ~zod ~zod)
+  =/  loaded  (on-load:~(. stack bol) !>(%old))
+  =/  state=content-state  (get-state on-save:+.loaded)
+  ;:  weld
+    %+  expect-eq  !>((add ~h12 now))
+    !>(refresh-at.state)
+    %+  expect-eq  !>(2)
+    !>((lent -.loaded))
   ==
 --

@@ -42,8 +42,9 @@
           ~
         ::
         ::  take: keep cards from below.  A result addressed to us
-        ::  resumes its operation.  An %unname takes effect at once, so
-        ::  the name a rejected %get settled never outlives its event.
+        ::  resumes its operation.  An %unname or %evict takes effect at
+        ::  once, so what a rejected %get left here never outlives its
+        ::  event.
         ::
         ++  take
           |=  new=(list card)
@@ -80,11 +81,16 @@
           ::
               %content-store-command
             =+  !<(command=content-store-command q.u.mine)
-            ?.  ?=(%unname -.command)
-              $(new t.new, cards [i.new cards])
-            =.  names.state
-              (~(del by names.state) [publisher namespace name]:command)
-            $(new t.new)
+            ?+    -.command  $(new t.new, cards [i.new cards])
+                %unname
+              =.  names.state
+                (~(del by names.state) [publisher namespace name]:command)
+              $(new t.new)
+            ::
+                %evict
+              =.  state  (~(evict logic engine) content.command)
+              $(new t.new)
+            ==
           ==
         ::
         ::  emit: namespace our cards.  A command for a layer below goes
@@ -176,6 +182,9 @@
             =.  names.state
               (~(del by names.state) [publisher namespace name]:command)
             cor
+          ::
+              %evict
+            cor(state (~(evict logic engine) content.command))
           ::
               %set-config
             ?>  (~(valid-config logic engine) value.command)
@@ -302,6 +311,7 @@
         [%publications ~]  ``noun+!>(publications.state)
         [%pins ~]          ``noun+!>(~(pinned-contents logic engine:up))
         [%names ~]         ``noun+!>(names.state)
+        [%digests ~]       ``noun+!>(~(key by values.state))
         [%provider @ ~]
       =/  content=(unit @uv)  (slaw %uv i.t.t.t.t.path)
       ?~  content  ~

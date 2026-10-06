@@ -37,6 +37,7 @@
 +$  content-store-query
   $%  [%content digest=digest]
       [%name publisher=@p namespace=@tas name=path]
+      [%direct digest=digest source=locator]
   ==
 +$  content-store-command
   $%  $:  %put
@@ -52,6 +53,7 @@
       [%observe id=content-store-id recipient=@tas reply-path=path]
       [%forget id=content-store-id]
       [%unname publisher=@p namespace=@tas name=path]
+      [%evict content=digest]
       [%set-config value=content-store-config]
       [%set-verbosity level=content-store-verbosity]
   ==

@@ -46,6 +46,7 @@ $%  [%put id value=(cask) options=publication-options lifetime=(unit @dr)]
     [%observe id recipient=@tas reply-path=/]
     [%forget id]
     [%unname publisher=@p namespace=@tas name=/]
+    [%evict content=digest]
     [%set-config value=content-store-config]
     [%set-verbosity level=?(%off %info %debug)]
 ==
@@ -136,7 +137,14 @@ must repeat `%pin` before expiry.
 ```hoon
 [%content digest]
 [%name publisher=@p namespace=@tas name=path]
+[%direct digest source=locator]
 ```
+
+`%direct` fetches a digest from a location the caller already knows, such as
+a page its publisher grew, and skips the provider query. The wrapper checks
+the answer against the digest and caches it, so a second `%direct` or
+`%content` query for that digest answers from the cache. The publisher needs
+no provider record for it.
 
 For example, `[%name ~sampel-palnet %releases /packages/kademlia/latest]`
 addresses a readable hierarchical name. Its path segments can be appended
@@ -198,6 +206,7 @@ The Gall `%gx` namespace exposes:
 /x/~/content-store/publication/<digest>/noun
 /x/~/content-store/content/<digest>/<value-mark>
 /x/~/content-store/cask/<digest>/noun
+/x/~/content-store/digests/noun
 /x/~/content-store/names/noun
 /x/~/content-store/name/<publisher>/<namespace>/<name...>/noun
 ```
@@ -215,7 +224,8 @@ views, not live queries of the DHT. The older `/publication/<digest>` view
 continues to return the local remote-scry page descriptor.
 
 `/cask/<digest>` returns the whole `(cask)` as a noun, for a reader that lacks
-the value's mark.
+the value's mark. It blocks on a digest the cache lacks. `/digests` returns
+the set of cached digests, so a reader can ask before it reads.
 
 `/name/<publisher>/<namespace>/<name...>` returns the digest that name last
 settled on here. Our own name settles when `%put` is accepted, before its
@@ -230,6 +240,11 @@ keeps the cached cask. A wrapped agent that checks what it fetches sends
 applies it inside that event, so no scry ever reads the rejected name. A
 scry inside that `+on-poke` still reads the digest the name held before the
 `%get`, which lets the agent compare the two.
+
+`%evict` forgets one cached cask, unless we publish that cask ourselves. Like
+`%unname`, the wrapper applies it inside the event of the `+on-poke` that
+sends it. An agent that checks what it fetches sends it for a cask that fails,
+so that a cask in the cache is one the agent accepted.
 
 The saved state carries a `%1` tag. An untagged state dates from before
 `%unname`, when the wrapped agent could not reject a name. Loading one drops

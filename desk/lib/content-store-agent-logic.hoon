@@ -488,6 +488,15 @@
           ==
         (fail id %invalid)
       (begin-pointer-query id query)
+    ::
+    ::  a caller that knows where the content lives skips the
+    ::  provider query
+    %direct
+      ?.  (digest-valid:cr digest.query)  (fail id %invalid)
+      =/  local=(unit (cask))  (~(get by values.state) digest.query)
+      ?~  local
+        (begin-scry id digest.query source.query [%get ~])
+      (finish id [%get digest.query u.local `source.query])
   ==
 ::
 ++  start-pin
@@ -519,6 +528,14 @@
   =.  active.state  (~(put by active.state) id [%search topic])
   :_  state
   (ask-discovery /search id lower [%browse lower topic])
+::
+::  evict: forget a cached cask, unless we publish it ourselves
+::
+++  evict
+  |=  content=digest
+  ^-  content-store-state
+  ?:  (~(has by pages.state) content)  state
+  state(values (~(del by values.state) content))
 ::
 ++  operation-conflict
   |=  id=content-store-id

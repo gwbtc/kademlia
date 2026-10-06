@@ -627,6 +627,71 @@
     !>(~(wyt by names.final))
   ==
 ::
+++  test-direct-get-fetches-checks-and-caches
+  =/  initialized  on-init:~(. agent bowl)
+  =/  value=(cask)  [%noun 42]
+  =/  content=digest  (digest-cask:cr value)
+  =/  =spar:ames  [~nec /g/x/1/app//1/some/page]
+  =/  started
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%get 0v60 [%direct content [%scry spar]]])
+  =/  heard
+    %+  on-arvo:+.started  /~/content-store/scry/(scot %uv 0v60)
+    [%ames %sage spar value]
+  =/  state=content-store-state  (get-state on-save:+.heard)
+  =/  wrong
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%get 0v61 [%direct 0v77 [%scry spar]]])
+  =/  lied
+    %+  on-arvo:+.wrong  /~/content-store/scry/(scot %uv 0v61)
+    [%ames %sage spar value]
+  =/  bad=content-store-state  (get-state on-save:+.lied)
+  ;:  weld
+    %+  expect-eq  !>(`(unit (cask))``value)
+    !>((~(get by values.state) content))
+    %+  expect-eq  !>(`(set digest)`[content ~ ~])
+    !>  !<  (set digest)
+        q:(need (need (on-peek:+.heard /x/~/content-store/digests)))
+    %+  expect-eq
+      !>(`content-store-result`[%get content value `[%scry spar]])
+    !>((need (~(get by completed.state) 0v60)))
+    %+  expect-eq  !>(`content-store-result`[%failed %digest-mismatch])
+    !>((need (~(get by completed.bad) 0v61)))
+    %+  expect-eq  !>(0)
+    !>(~(wyt by values.bad))
+  ==
+::
+++  test-evict-forgets-a-cask-we-do-not-publish
+  =/  initialized  on-init:~(. agent bowl)
+  =/  value=(cask)  [%noun 42]
+  =/  content=digest  (digest-cask:cr value)
+  =/  state=content-store-state  (get-state on-save:+.initialized)
+  =.  values.state  (~(put by values.state) content value)
+  =/  loaded
+    (on-load:~(. agent bowl) (put-saved [%1 state %off]))
+  =/  evicted
+    %+  on-poke:+.loaded  %test-cards
+    !>  ^-  (list card:agent:gall)
+    :_  ~
+    :*  %pass  /evict  %agent  [~zod %content-store]
+        %poke  %content-store-command
+        !>(`content-store-command`[%evict content])
+    ==
+  =/  ours
+    %+  on-poke:+.initialized  %content-store-command
+    !>(`content-store-command`[%put 0v62 value [~ ~] ~])
+  =/  kept
+    %+  on-poke:+.ours  %content-store-command
+    !>(`content-store-command`[%evict content])
+  ;:  weld
+    %+  expect-eq  !>(0)
+    !>((lent -.evicted))
+    %+  expect-eq  !>(0)
+    !>(~(wyt by values:(get-state on-save:+.evicted)))
+    %+  expect-eq  !>(`(unit (cask))``value)
+    !>((~(get by values:(get-state on-save:+.kept)) content))
+  ==
+::
 ++  test-crash-below-fails-the-operation
   =/  crashing
     %-  agent:content-store-agent

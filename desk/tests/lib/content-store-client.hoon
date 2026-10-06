@@ -10,7 +10,13 @@
   =/  pin=content-store-command  (pin:client 0v5 0v42 `~d7)
   =/  unpin=content-store-command  (unpin:client 0v6 0v42)
   =/  unname=content-store-command  (unname:client ~zod %demo ~[%latest])
+  =/  =locator  [%scry ~nec /g/x/1/app//1/some/page]
   ;:  weld
+    %+  expect-eq
+      !>(`content-store-command`[%get 0v8 [%direct 0v42 locator]])
+    !>((get-direct:client 0v8 0v42 locator))
+    %+  expect-eq  !>(`content-store-command`[%evict 0v42])
+    !>((evict:client 0v42))
     %+  expect-eq
       !>(`content-store-command`[%unname ~zod %demo ~[%latest]])
     !>(unname)

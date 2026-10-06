@@ -56,6 +56,12 @@
   |=  [publisher=@p namespace=@tas name=path]
   ^-  content-store-command
   [%unname publisher namespace name]
+::  Forget a cached cask.  A wrapped agent that rejects what a %get
+::  fetched sends this from the result's own event.
+++  evict
+  |=  content=digest
+  ^-  content-store-command
+  [%evict content]
 ::  Publish only by immutable digest.
 ++  unnamed
   ^-  publication-options
@@ -95,6 +101,12 @@
   |=  [id=content-store-id content=digest]
   ^-  content-store-command
   [%get id [%content content]]
+::
+::  Fetch content from a known location, and check it against its digest.
+++  get-direct
+  |=  [id=content-store-id content=digest source=locator]
+  ^-  content-store-command
+  [%get id [%direct content source]]
 ::
 ++  get-name
   |=  [id=content-store-id publisher=@p namespace=@tas name=path]
